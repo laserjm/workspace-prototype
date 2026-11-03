@@ -24,9 +24,24 @@ pnpm start
 
 ## Workspace screen
 
-The initial screen recreates the T3 Code reference: a thread sidebar, project breadcrumb, centered new-thread composer, and project actions card. It supports sidebar search and filters, project creation and selection, local thread navigation, model and permission selection, file attachment previews, and saved project-script definitions.
+The screen adapts the T3 Code shell into an enterprise workspace: a thread sidebar, project breadcrumb, a compact source picker, and a centered new-thread composer. It supports sidebar search and filters, project creation and selection, local thread navigation, model and permission selection, and file attachment previews.
 
-All state is kept in memory for the current session. Refreshing resets it. File attachments are held in the browser and only their names are added to a draft; files are not uploaded or parsed. The model names and permission options are demo selections, with no AI requests or tool execution. The data-source catalog and desktop/Git actions are placeholders for the next implementation step.
+### Try the enterprise-source flow
+
+1. Open **Choose a source** beneath the new-thread composer and choose **Jira**. The source picker uses the same compact style as the **Full access** picker. The composer shows **Platform · Sprint 24 / 5 tickets**.
+2. Click the scope strip to inspect the five sample tickets and change the selection. At least one record is required.
+3. Click **Try it — Create a summary of these 5 tickets**, then send the message.
+4. The session shows a sample summary beside a lightweight Jira explorer. Search, filter by status, switch to the grouped board view, or open a ticket to inspect its description, owner, priority, and next step.
+5. Click a citation in the response to open that record in the explorer. Try **What are the risks?** or **What are the next steps?** as follow-ups.
+6. Start another thread with **Confluence** (three sample pages) or **Codebeamer** (four sample requirements and test items). Each thread keeps its own record scope. The sidebar includes a ready-made session for each source.
+
+On smaller screens, **View source** and citations open the explorer in an accessible drawer. Closing it returns to the conversation.
+
+All state is kept in memory for the current session. Refreshing resets it. These are fictional, bundled sample records: no enterprise APIs are called, no external systems are changed, and responses are deterministic summaries, risk lists, or next steps derived from the selected records. Other prompts show an explanatory sample-summary fallback. The model and permission controls are demo preferences. File attachments are held in the browser and only their names are added to a thread; files are not uploaded, parsed, or used in responses. Live authentication, fetches, AI responses, and saved sessions are future integration work.
+
+### UI approach
+
+Make the source and selected record count visible before sending. Once a thread starts, preserve that scope and keep the source snapshot beside the conversation. Citations connect answers to individual records, while source-specific labels and layouts make Jira tickets, Confluence pages, and Codebeamer items recognizable. Choosing a different source from an active session starts a new thread.
 
 ## Project structure
 
@@ -34,6 +49,10 @@ All state is kept in memory for the current session. Refreshing resets it. File 
 - `src/app/layout.tsx`: root layout, fonts, and metadata.
 - `src/app/globals.css`: Tailwind imports and shadcn theme tokens.
 - `src/components/workspace/`: screen, sidebar, composer, demo data, and scoped workspace styles.
+- `source-data.ts`: source definitions, fictional enterprise records, and scope helpers.
+- `source-picker.tsx`: compact source dropdown, catalog cards, and record selection dialog.
+- `source-explorer.tsx`: source list, Jira grouped board, record details, and responsive drawer.
+- `source-response.tsx`: deterministic sample responses with source citations.
 - `src/components/ui/`: shadcn Button, Dialog, Dropdown Menu, and Tooltip components.
 - `components.json`: shadcn configuration, using the Base UI Nova style.
 

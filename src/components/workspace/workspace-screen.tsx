@@ -1,16 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import {
   Cable,
   Check,
   ChevronDown,
-  Database,
   FileText,
   Folder,
-  GitBranchPlus,
-  FolderGit2,
-  Laptop,
   PanelBottom,
   PanelLeftOpen,
   PanelRight,
@@ -38,17 +34,20 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { IconButton } from "./icon-button";
 import { WorkspaceSidebar } from "./workspace-sidebar";
 import { WorkspaceComposer } from "./workspace-composer";
-import { ProjectIcon, VSCodeIcon } from "./workspace-icons";
+import { ProjectIcon } from "./workspace-icons";
 import { initialProjects, initialThreads, type Thread } from "./workspace-data";
+import {
+  defaultScope,
+  getSource,
+  scopeLabel,
+  type SourceId,
+  type SourceScope,
+} from "./source-data";
+import { ScopeDialog, SourceChoices, SourceMark } from "./source-picker";
+import { SourceExplorer } from "./source-explorer";
+import { SourceResponse } from "./source-response";
 
-type DialogKind =
-  | "project"
-  | "settings"
-  | "sources"
-  | "script"
-  | "environment"
-  | "activity"
-  | null;
+type DialogKind = "project" | "settings" | "sources" | "activity" | null;
 
 export function WorkspaceScreen() {
   const [threads, setThreads] = useState(initialThreads);
@@ -58,23 +57,30 @@ export function WorkspaceScreen() {
   const [historyIndex, setHistoryIndex] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const [detailsOpen, setDetailsOpen] = useState(true);
   const [panelOpen, setPanelOpen] = useState(false);
   const [dialog, setDialog] = useState<DialogKind>(null);
   const [projectName, setProjectName] = useState("");
-  const [scriptName, setScriptName] = useState("");
-  const [scriptCommand, setScriptCommand] = useState("");
-  const [scripts, setScripts] = useState<{ name: string; command: string }[]>(
-    [],
-  );
-  const [notice, setNotice] = useState("");
-  const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [draftScope, setDraftScope] = useState<SourceScope>();
+  const [editingScope, setEditingScope] = useState(false);
+  const [sourceOpen, setSourceOpen] = useState(true);
+  const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);
+  const messagesRef = useRef<HTMLDivElement>(null);
   const activeThread = threads.find(
     (thread) => thread.id === history[historyIndex],
   );
   const currentProject = activeThread?.project ?? project;
 
+  useEffect(() => {
+    const messages = messagesRef.current;
+    if (messages)
+      messages.scrollTop = activeThread?.followUps?.length
+        ? messages.scrollHeight
+        : 0;
+  }, [activeThread?.id, activeThread?.followUps?.length]);
+
   function navigate(threadId: string | null) {
+    setSelectedRecordId(null);
+    setSourceOpen(!window.matchMedia("(max-width: 1100px)").matches);
     setHistory((previous) => [
       ...previous.slice(0, historyIndex + 1),
       threadId,
@@ -85,7 +91,22 @@ export function WorkspaceScreen() {
 
   function newThread() {
     setProject(currentProject);
+    setDraftScope(undefined);
     navigate(null);
+  }
+
+  function chooseSource(sourceId: SourceId) {
+    setDraftScope(defaultScope(sourceId));
+    if (activeThread) {
+      setProject(currentProject);
+      navigate(null);
+    }
+    setDialog(null);
+  }
+
+  function openRecord(id: string) {
+    setSelectedRecordId(id);
+    setSourceOpen(true);
   }
 
   function toggleSidebar() {
@@ -93,19 +114,6 @@ export function WorkspaceScreen() {
       setMobileSidebarOpen((open) => !open);
     else setSidebarOpen((open) => !open);
   }
-
-  function announce(message: string) {
-    setNotice(message);
-    if (noticeTimer.current) clearTimeout(noticeTimer.current);
-    noticeTimer.current = setTimeout(() => setNotice(""), 5000);
-  }
-
-  useEffect(
-    () => () => {
-      if (noticeTimer.current) clearTimeout(noticeTimer.current);
-    },
-    [],
-  );
 
   useEffect(() => {
     function handleKey(event: KeyboardEvent) {
@@ -157,6 +165,9 @@ export function WorkspaceScreen() {
       prompt,
       attachments,
       provider,
+      scope: draftScope
+        ? { ...draftScope, recordIds: [...draftScope.recordIds] }
+        : undefined,
     };
     setThreads((previous) => [thread, ...previous]);
     navigate(thread.id);
@@ -226,12 +237,8 @@ export function WorkspaceScreen() {
             </div>
             <div className="workspace-header-actions">
               <IconButton
-                label={
-                  detailsOpen ? "Hide project details" : "Show project details"
-                }
-                className={detailsOpen ? "is-active" : ""}
-                aria-pressed={detailsOpen}
-                onClick={() => setDetailsOpen((open) => !open)}
+                label="Workspace settings"
+                onClick={() => setDialog("settings")}
               >
                 <SquareMenu />
               </IconButton>
@@ -244,95 +251,44 @@ export function WorkspaceScreen() {
                 <PanelBottom />
               </IconButton>
               <IconButton
-                label="Data sources"
-                onClick={() => setDialog("sources")}
+                label={
+                  activeThread?.scope
+                    ? sourceOpen
+                      ? "Hide source explorer"
+                      : "Show source explorer"
+                    : "Choose data source"
+                }
+                aria-pressed={activeThread?.scope ? sourceOpen : undefined}
+                className={activeThread?.scope && sourceOpen ? "is-active" : ""}
+                onClick={() =>
+                  activeThread?.scope
+                    ? setSourceOpen((open) => !open)
+                    : setDialog("sources")
+                }
               >
                 <PanelRight />
               </IconButton>
             </div>
           </header>
 
-          <main id="workspace-main" className="workspace-main" tabIndex={-1}>
-            {detailsOpen && (
-              <section className="project-details" aria-label="Project details">
-                <div className="project-details-main">
-                  <button
-                    type="button"
-                    className="project-action"
-                    onClick={() => setDialog("environment")}
-                  >
-                    <Laptop />
-                    <span className="project-action-label">
-                      MacBook Pro von Mich...
-                    </span>
-                    <Folder />
-                    <ChevronDown className="project-action-chevron" />
-                  </button>
-                  <button
-                    type="button"
-                    className="project-action"
-                    onClick={() => setDialog("environment")}
-                  >
-                    <VSCodeIcon />
-                    <span className="project-action-label">
-                      Open in VS Code
-                    </span>
-                    <ChevronDown className="project-action-chevron" />
-                  </button>
-                  {scripts.map((script) => (
-                    <button
-                      type="button"
-                      className="project-action"
-                      key={script.name}
-                      onClick={() =>
-                        announce(
-                          `${script.name}: ${script.command}. Connect an environment to run scripts.`,
-                        )
-                      }
-                    >
-                      <FileText />
-                      <span className="project-action-label">
-                        {script.name}
-                      </span>
-                    </button>
-                  ))}
-                  <button
-                    type="button"
-                    className="project-action"
-                    onClick={() => setDialog("script")}
-                  >
-                    <Plus />
-                    <span className="project-action-label">
-                      Add project script
-                    </span>
-                  </button>
-                </div>
-                <div className="project-details-footer">
-                  <button
-                    type="button"
-                    className="project-action"
-                    onClick={() => setDialog("sources")}
-                  >
-                    <GitBranchPlus />
-                    <span className="project-action-label">Initialize Git</span>
-                  </button>
-                </div>
-              </section>
-            )}
-
+          <main
+            id="workspace-main"
+            className={`workspace-main ${activeThread?.scope ? "source-session" : ""} ${activeThread?.scope && sourceOpen ? "source-session-open" : ""}`}
+            tabIndex={-1}
+          >
             {!activeThread ? (
-              <div className="workspace-draft">
+              <div className="workspace-draft enterprise-draft">
                 <div className="draft-heading">
                   <h1
                     aria-label={
                       project
-                        ? `What should we build in ${project}?`
+                        ? `What would you like to know in ${project}?`
                         : "What should we work on?"
                     }
                   >
                     {project ? (
                       <>
-                        What should we build in{" "}
+                        What would you like to know in{" "}
                         <DropdownMenu>
                           <DropdownMenuTrigger
                             render={
@@ -389,11 +345,42 @@ export function WorkspaceScreen() {
                   key={project ?? "no-project"}
                   onSend={sendMessage}
                   onSources={() => setDialog("sources")}
+                  scope={draftScope}
+                  onScope={() => setEditingScope(true)}
+                  onChooseSource={chooseSource}
+                  onClearSource={() => setDraftScope(undefined)}
                 />
+                <p className="draft-demo-note">
+                  Explore with sample data. Live enterprise connections come
+                  next.
+                </p>
               </div>
             ) : (
               <div className="conversation-view">
-                <div className="conversation-messages">
+                {activeThread.scope && (
+                  <div className="session-context-heading">
+                    <SourceMark id={activeThread.scope.sourceId} />
+                    <div>
+                      <strong>
+                        {getSource(activeThread.scope.sourceId).collection}
+                      </strong>
+                      <span>
+                        {scopeLabel(activeThread.scope)} · Read-only sample
+                        snapshot
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedRecordId(null);
+                        setSourceOpen(true);
+                      }}
+                    >
+                      View source <ChevronDown size={12} />
+                    </button>
+                  </div>
+                )}
+                <div className="conversation-messages" ref={messagesRef}>
                   <div className="user-message">
                     <p>{activeThread.prompt ?? activeThread.title}</p>
                     {activeThread.attachments?.map((name, index) => (
@@ -406,41 +393,74 @@ export function WorkspaceScreen() {
                       </span>
                     ))}
                   </div>
+                  {activeThread.scope && (
+                    <SourceResponse
+                      scope={activeThread.scope}
+                      prompt={activeThread.prompt ?? activeThread.title}
+                      onOpenRecord={openRecord}
+                    />
+                  )}
                   {activeThread.followUps?.map((message, index) => (
-                    <div className="user-message" key={index}>
-                      <p>{message.text}</p>
-                      {message.attachments.map((name, attachmentIndex) => (
-                        <span
-                          className="attachment-chip"
-                          key={`${name}-${attachmentIndex}`}
-                        >
-                          <FileText size={14} />
-                          {name}
-                        </span>
-                      ))}
-                    </div>
+                    <Fragment key={index}>
+                      <div className="user-message" key={index}>
+                        <p>{message.text}</p>
+                        {message.attachments.map((name, attachmentIndex) => (
+                          <span
+                            className="attachment-chip"
+                            key={`${name}-${attachmentIndex}`}
+                          >
+                            <FileText size={14} />
+                            {name}
+                          </span>
+                        ))}
+                      </div>
+                      {activeThread.scope && (
+                        <SourceResponse
+                          scope={activeThread.scope}
+                          prompt={message.text}
+                          onOpenRecord={openRecord}
+                        />
+                      )}
+                    </Fragment>
                   ))}
-                  <div className="conversation-empty">
-                    <Cable />
-                    <h2>Bring your workspace into the conversation.</h2>
-                    <p>
-                      Connect a data source and an AI provider to continue. Your
-                      draft stays here for this session.
-                    </p>
-                    <Button
-                      variant="outline"
-                      onClick={() => setDialog("sources")}
-                    >
-                      Explore data sources
-                    </Button>
-                  </div>
+                  {!activeThread.scope && (
+                    <div className="conversation-empty">
+                      <Cable />
+                      <h2>Bring your workspace into the conversation.</h2>
+                      <p>
+                        Connect a data source and an AI provider to continue.
+                        Your draft stays here for this session.
+                      </p>
+                      <Button
+                        variant="outline"
+                        onClick={() => setDialog("sources")}
+                      >
+                        Explore data sources
+                      </Button>
+                    </div>
+                  )}
                 </div>
                 <WorkspaceComposer
+                  key={activeThread.id}
                   compact
                   onSend={sendMessage}
                   onSources={() => setDialog("sources")}
+                  scope={activeThread.scope}
+                  onScope={() => {
+                    setSelectedRecordId(null);
+                    setSourceOpen(true);
+                  }}
                 />
               </div>
+            )}
+            {activeThread?.scope && sourceOpen && (
+              <SourceExplorer
+                key={activeThread.id}
+                scope={activeThread.scope}
+                selectedId={selectedRecordId}
+                onSelect={setSelectedRecordId}
+                onClose={() => setSourceOpen(false)}
+              />
             )}
           </main>
 
@@ -450,7 +470,7 @@ export function WorkspaceScreen() {
               aria-label="Project panel"
             >
               <div className="bottom-panel-header">
-                <span>Workspace</span>
+                <span>Thread context</span>
                 <IconButton
                   label="Close bottom panel"
                   onClick={() => setPanelOpen(false)}
@@ -460,7 +480,13 @@ export function WorkspaceScreen() {
               </div>
               <div className="bottom-panel-content">
                 <Cable />
-                <p>No environment connected.</p>
+                <p>
+                  {activeThread?.scope
+                    ? `${getSource(activeThread.scope.sourceId).name}: ${scopeLabel(activeThread.scope)} in this thread’s read-only snapshot.`
+                    : draftScope
+                      ? `${getSource(draftScope.sourceId).name}: ${scopeLabel(draftScope)} selected for your next thread.`
+                      : "Choose a source to add context to your thread."}
+                </p>
                 <button type="button" onClick={() => setDialog("sources")}>
                   Explore data sources <ChevronDown />
                 </button>
@@ -468,20 +494,6 @@ export function WorkspaceScreen() {
             </section>
           )}
         </div>
-
-        {notice && (
-          <div className="workspace-notice" role="status">
-            <Check />
-            {notice}
-            <button
-              type="button"
-              aria-label="Dismiss notification"
-              onClick={() => setNotice("")}
-            >
-              <X />
-            </button>
-          </div>
-        )}
       </div>
 
       <Dialog
@@ -498,12 +510,8 @@ export function WorkspaceScreen() {
                 : dialog === "settings"
                   ? "Workspace settings"
                   : dialog === "sources"
-                    ? "Connect your data"
-                    : dialog === "script"
-                      ? "Add project script"
-                      : dialog === "activity"
-                        ? "Workspace activity"
-                        : "Workspace environment"}
+                    ? "Choose a data source"
+                    : "Workspace activity"}
             </DialogTitle>
             <DialogDescription>
               {dialog === "project"
@@ -511,12 +519,10 @@ export function WorkspaceScreen() {
                 : dialog === "settings"
                   ? "A starting point for your connected workspace."
                   : dialog === "sources"
-                    ? "Your sources, together in one workspace. Connectors are coming next; local files can already be attached in the composer."
-                    : dialog === "script"
-                      ? "Save a command for this session. Running scripts requires a connected environment."
-                      : dialog === "activity"
-                        ? "Recent conversations in this workspace."
-                        : "This is a browser prototype. Opening an editor and running Git commands will be available with a connected environment."}
+                    ? activeThread
+                      ? "Choose a source to start a new thread. Each thread keeps its own selected records. All sources use sample data."
+                      : "Pick a sample enterprise source. You can choose which records to include before sending your first message."
+                    : "Recent conversations in this workspace."}
             </DialogDescription>
           </DialogHeader>
 
@@ -553,82 +559,17 @@ export function WorkspaceScreen() {
           )}
 
           {dialog === "sources" && (
-            <div className="source-catalog">
-              {[
-                {
-                  name: "GitHub",
-                  description: "Repositories, issues, and pull requests",
-                  icon: FolderGit2,
-                },
-                {
-                  name: "Google Drive",
-                  description: "Documents, spreadsheets, and files",
-                  icon: Folder,
-                },
-                {
-                  name: "Notion",
-                  description: "Pages, knowledge, and databases",
-                  icon: FileText,
-                },
-                {
-                  name: "Database",
-                  description: "Tables, queries, and business data",
-                  icon: Database,
-                },
-              ].map((source) => (
-                <div key={source.name} className="source-option">
-                  <span className="source-option-icon">
-                    <source.icon />
-                  </span>
-                  <span>
-                    <strong>{source.name}</strong>
-                    <small>{source.description}</small>
-                  </span>
-                  <span className="source-status">Coming soon</span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {dialog === "script" && (
-            <form
-              className="workspace-dialog-form"
-              onSubmit={(event) => {
-                event.preventDefault();
-                setScripts((previous) => [
-                  ...previous,
-                  { name: scriptName.trim(), command: scriptCommand.trim() },
-                ]);
-                setScriptName("");
-                setScriptCommand("");
-                setDialog(null);
-              }}
-            >
-              <label htmlFor="script-name">Name</label>
-              <input
-                id="script-name"
-                autoFocus
-                placeholder="Start development server"
-                value={scriptName}
-                onChange={(event) => setScriptName(event.target.value)}
-                required
+            <>
+              <SourceChoices
+                selected={activeThread?.scope?.sourceId ?? draftScope?.sourceId}
+                onSelect={chooseSource}
               />
-              <label htmlFor="script-command">Command</label>
-              <input
-                id="script-command"
-                className="font-mono"
-                placeholder="pnpm dev"
-                value={scriptCommand}
-                onChange={(event) => setScriptCommand(event.target.value)}
-                required
-              />
-              <Button
-                type="submit"
-                disabled={!scriptName.trim() || !scriptCommand.trim()}
-              >
-                Save script
-              </Button>
-            </form>
+              <p className="source-catalog-note">
+                More enterprise systems can follow the same pattern: choose a
+                source, scope the records, then work with a source-specific
+                view.
+              </p>
+            </>
           )}
 
           {dialog === "settings" && (
@@ -675,15 +616,18 @@ export function WorkspaceScreen() {
               ))}
             </div>
           )}
-
-          {dialog === "environment" && (
-            <Button variant="outline" onClick={() => setDialog("sources")}>
-              <Cable />
-              Explore data sources
-            </Button>
-          )}
         </DialogContent>
       </Dialog>
+      {editingScope && draftScope && (
+        <ScopeDialog
+          scope={draftScope}
+          onClose={() => setEditingScope(false)}
+          onApply={(scope) => {
+            setDraftScope(scope);
+            setEditingScope(false);
+          }}
+        />
+      )}
     </TooltipProvider>
   );
 }

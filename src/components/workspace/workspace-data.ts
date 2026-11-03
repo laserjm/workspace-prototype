@@ -1,3 +1,5 @@
+import { defaultScope, type SourceScope } from "./source-data";
+
 export type ProjectKind =
   "rocket" | "chart" | "conventions" | "automation" | "workspace";
 
@@ -14,76 +16,49 @@ export type Thread = {
   prompt?: string;
   attachments?: string[];
   followUps?: { text: string; attachments: string[] }[];
+  scope?: SourceScope;
 };
 
 export const initialThreads: Thread[] = [
   {
-    id: "issue-366",
-    project: "laserjm/screenerhub2",
-    kind: "rocket",
-    title: "Resolve Issue 366",
-    branch: "t3/issue-366",
-    age: "",
-    changes: 13,
-    done: true,
-    provider: "claude",
-  },
-  {
-    id: "convention-migration",
-    project: "laserjm/screener-hub",
-    kind: "chart",
-    title: "Plan Next.js Convention Migration",
-    branch: "migration/nextjs-conventions",
-    age: "1h",
-    changes: 3,
-    provider: "openai",
-  },
-  {
-    id: "structural-guardrails",
-    project: "conventions",
-    kind: "conventions",
-    title: "Structural Guardrails and Screen Architecture",
+    id: "jira-sprint-summary",
+    project: "workspace-prototype",
+    kind: "workspace",
+    title: "Sprint 24 summary",
     branch: "main",
-    age: "14h",
-    changes: 7,
+    age: "2h",
     provider: "claude",
+    prompt: "Create a summary of these 5 tickets.",
+    scope: defaultScope("jira"),
   },
   {
-    id: "review-guardrails",
-    project: "conventions",
-    kind: "conventions",
-    title: "Review Structural Guardrails and Tooling",
-    branch: "rebuild/profiles-and-tooling",
-    age: "1d",
-    changes: 7,
+    id: "confluence-knowledge-review",
+    project: "workspace-prototype",
+    kind: "workspace",
+    title: "Review platform knowledge",
+    branch: "main",
+    age: "5h",
     provider: "claude",
+    prompt: "Summarize these 3 pages and their key decisions.",
+    scope: defaultScope("confluence"),
   },
   {
-    id: "api-architecture",
-    project: "yt-automation",
-    kind: "automation",
-    title: "Document API Architecture as Linear Issues",
+    id: "codebeamer-release-readiness",
+    project: "workspace-prototype",
+    kind: "workspace",
+    title: "Release 2.4 risks",
     branch: "main",
     age: "1d",
     provider: "claude",
-  },
-  {
-    id: "module-architecture",
-    project: "laserjm/screenerhub2",
-    kind: "rocket",
-    title: "Assess Deep Module Architecture",
-    branch: "main",
-    age: "1d",
-    provider: "claude",
+    prompt: "What are the risks in these 4 items?",
+    scope: defaultScope("codebeamer"),
   },
 ];
 
 export const initialProjects = [
   "workspace-prototype",
-  "laserjm/screenerhub2",
-  "laserjm/screener-hub",
-  "conventions",
-  "yt-automation",
+  "enterprise-platform",
+  "battery-management",
 ];
 
 export const models = [

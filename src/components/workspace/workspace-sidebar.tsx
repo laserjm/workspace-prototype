@@ -29,6 +29,8 @@ import {
 import type { Thread } from "./workspace-data";
 import { LinuxIcon, ProjectIcon, ProviderIcon } from "./workspace-icons";
 import { IconButton } from "./icon-button";
+import { SourceMark } from "./source-picker";
+import { getSource, scopeLabel } from "./source-data";
 
 type SidebarProps = {
   threads: Thread[];
@@ -52,7 +54,7 @@ export function WorkspaceSidebar(props: SidebarProps) {
   const [expandedArchive, setExpandedArchive] = useState<string | null>(null);
   const filteredThreads = props.threads.filter(
     (thread) =>
-      `${thread.title} ${thread.project} ${thread.branch}`
+      `${thread.title} ${thread.project} ${thread.branch} ${thread.scope ? getSource(thread.scope.sourceId).name : ""}`
         .toLowerCase()
         .includes(query.toLowerCase()) &&
       (filter === "all" || (filter === "done" ? thread.done : !thread.done)),
@@ -71,7 +73,7 @@ export function WorkspaceSidebar(props: SidebarProps) {
           <PanelLeftClose />
         </IconButton>
         <span className="app-wordmark">
-          <strong>T3</strong> Code
+          <strong>Workspace</strong>
         </span>
         <div className="sidebar-history">
           <IconButton
@@ -150,7 +152,11 @@ export function WorkspaceSidebar(props: SidebarProps) {
             aria-current={props.activeId === thread.id ? "page" : undefined}
           >
             <span className="thread-project-row">
-              <ProjectIcon kind={thread.kind} />
+              {thread.scope ? (
+                <SourceMark id={thread.scope.sourceId} />
+              ) : (
+                <ProjectIcon kind={thread.kind} />
+              )}
               <span className="thread-project-name">{thread.project}</span>
               {thread.done ? (
                 <span className="thread-done">
@@ -168,8 +174,17 @@ export function WorkspaceSidebar(props: SidebarProps) {
               {thread.done && (
                 <FolderGit2 aria-hidden className="thread-branch-icon" />
               )}
-              <span className="thread-branch" title={thread.branch}>
-                {thread.branch}
+              <span
+                className="thread-branch"
+                title={
+                  thread.scope
+                    ? getSource(thread.scope.sourceId).name
+                    : thread.branch
+                }
+              >
+                {thread.scope
+                  ? `${getSource(thread.scope.sourceId).name} · ${scopeLabel(thread.scope)}`
+                  : thread.branch}
               </span>
               {thread.changes && (
                 <span className="thread-changes">

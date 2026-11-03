@@ -22,11 +22,18 @@ import {
 import { IconButton } from "./icon-button";
 import { models } from "./workspace-data";
 import { ProviderIcon } from "./workspace-icons";
+import type { SourceId, SourceScope } from "./source-data";
+import { getSource, scopeLabel } from "./source-data";
+import { SourceContext, SourcePicker } from "./source-picker";
 
 export function WorkspaceComposer({
   onSend,
   onSources,
   compact = false,
+  scope,
+  onScope,
+  onChooseSource,
+  onClearSource,
 }: {
   onSend: (
     prompt: string,
@@ -35,6 +42,10 @@ export function WorkspaceComposer({
   ) => void;
   onSources: () => void;
   compact?: boolean;
+  scope?: SourceScope;
+  onScope?: () => void;
+  onChooseSource?: (id: SourceId) => void;
+  onClearSource?: () => void;
 }) {
   const [prompt, setPrompt] = useState("");
   const [model, setModel] = useState(models[0]);
@@ -64,6 +75,7 @@ export function WorkspaceComposer({
           submit();
         }}
       >
+        {scope && onScope && <SourceContext scope={scope} onClick={onScope} />}
         {attachments.length > 0 && (
           <div className="composer-attachments">
             {attachments.map((file, index) => (
@@ -87,7 +99,11 @@ export function WorkspaceComposer({
         )}
         <textarea
           aria-label="Message"
-          placeholder="Ask anything. @ files, $ skills, / commands"
+          placeholder={
+            scope
+              ? `Ask about these ${getSource(scope.sourceId).plural}…`
+              : "Ask anything, or choose a source to add context…"
+          }
           value={prompt}
           rows={compact ? 2 : 3}
           onChange={(event) => setPrompt(event.target.value)}
@@ -189,6 +205,13 @@ export function WorkspaceComposer({
         </div>
       </form>
       <div className="composer-footnote">
+        {!compact && onChooseSource && onClearSource && (
+          <SourcePicker
+            selected={scope?.sourceId}
+            onSelect={onChooseSource}
+            onClear={onClearSource}
+          />
+        )}
         {error && (
           <p role="alert" className="composer-error">
             {error}
@@ -221,6 +244,23 @@ export function WorkspaceComposer({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+      {!compact && scope && (
+        <button
+          type="button"
+          className="example-prompt"
+          onClick={() => {
+            setPrompt(`Create a summary of these ${scopeLabel(scope)}.`);
+            requestAnimationFrame(() =>
+              document
+                .querySelector<HTMLTextAreaElement>(".workspace-draft textarea")
+                ?.focus(),
+            );
+          }}
+        >
+          <span>Try it</span>Create a summary of these {scopeLabel(scope)}{" "}
+          <ArrowUp size={12} />
+        </button>
+      )}
     </div>
   );
 }
