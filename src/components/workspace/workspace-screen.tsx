@@ -48,11 +48,27 @@ import { SourceResponse } from "./source-response";
 import { type SkillId } from "./skill-data";
 import { useSkillPreferences } from "./use-skill-preferences";
 import { WorkspaceSettings, type SettingsSection } from "./workspace-settings";
+import {
+  formatWakeTime,
+  isThreadWorking,
+  threadShelf,
+  type ThreadPlacement,
+} from "./thread-lifecycle";
+import { useSnoozeWake } from "./use-snooze-wake";
 
 type DialogKind = "project" | "settings" | "sources" | "activity" | null;
 
 export function WorkspaceScreen() {
   const [threads, setThreads] = useState(initialThreads);
+  const [threadNotice, setThreadNotice] = useState<{
+    message: string;
+    undo?: {
+      threadId: string;
+      placement: ThreadPlacement;
+      returnToThread: boolean;
+    };
+  }>();
+  useSnoozeWake(threads, setThreads);
   const [projects, setProjects] = useState(initialProjects);
   const [project, setProject] = useState<string | null>("workspace-prototype");
   const [history, setHistory] = useState<(string | null)[]>([null]);
@@ -81,6 +97,12 @@ export function WorkspaceScreen() {
   const responseWorking = Boolean(
     activeThread?.scope && latestTiming?.completedAt === null,
   );
+
+  useEffect(() => {
+    if (!threadNotice) return;
+    const timer = setTimeout(() => setThreadNotice(undefined), 8_000);
+    return () => clearTimeout(timer);
+  }, [threadNotice]);
 
   useEffect(() => {
     const timers = responseTimers.current;
@@ -112,6 +134,103 @@ export function WorkspaceScreen() {
     setProject(currentProject);
     setDraftScope(undefined);
     navigate(null);
+  }
+
+  function placeThread(
+    id: string,
+    placement: ThreadPlacement,
+    message: string,
+    nextId?: string | null,
+  ) {
+    const thread = threads.find((item) => item.id === id);
+    if (!thread) return;
+    const returnToThread = activeThread?.id === id && nextId !== undefined;
+    setThreadNotice({
+      message,
+      undo: {
+        threadId: id,
+        placement: {
+          settledAt: thread.settledAt,
+          snoozedUntil: thread.snoozedUntil,
+          wokeAt: thread.wokeAt,
+        },
+        returnToThread,
+      },
+    });
+    setThreads((previous) =>
+      previous.map((item) =>
+        item.id === id ? { ...item, ...placement } : item,
+      ),
+    );
+    if (returnToThread) {
+      const next = threads.find((item) => item.id === nextId);
+      setProject(next?.project ?? thread.project);
+      setDraftScope(undefined);
+      navigate(nextId ?? null);
+    }
+  }
+
+  function settleThread(id: string, nextId: string | null) {
+    placeThread(
+      id,
+      {
+        settledAt: new Date().toISOString(),
+        snoozedUntil: undefined,
+        wokeAt: undefined,
+      },
+      "Session settled",
+      nextId,
+    );
+  }
+
+  function snoozeThread(id: string, until: string, nextId: string | null) {
+    const thread = threads.find((item) => item.id === id);
+    if (!thread) return;
+    if (
+      !Number.isFinite(Date.parse(until)) ||
+      Date.parse(until) <= Date.now()
+    ) {
+      setThreadNotice({
+        message: "That time has passed. Choose another time.",
+      });
+      return;
+    }
+    if (isThreadWorking(thread)) {
+      setThreadNotice({
+        message: "Wait for the response to finish before snoozing.",
+      });
+      return;
+    }
+    placeThread(
+      id,
+      { settledAt: undefined, snoozedUntil: until, wokeAt: undefined },
+      "Session snoozed",
+      nextId,
+    );
+  }
+
+  function restoreThread(id: string) {
+    placeThread(
+      id,
+      { settledAt: undefined, snoozedUntil: undefined, wokeAt: undefined },
+      "Session returned to active",
+    );
+  }
+
+  function undoThreadPlacement() {
+    if (!threadNotice?.undo) return;
+    const { threadId, placement, returnToThread } = threadNotice.undo;
+    setThreads((previous) =>
+      previous.map((thread) =>
+        thread.id === threadId ? { ...thread, ...placement } : thread,
+      ),
+    );
+    if (returnToThread) {
+      const thread = threads.find((item) => item.id === threadId);
+      if (thread) setProject(thread.project);
+      navigate(threadId);
+    }
+    setThreadNotice(undefined);
   }
 
   function chooseSource(sourceId: SourceId) {
@@ -188,6 +307,9 @@ export function WorkspaceScreen() {
       title: `Fork: ${activeThread.title.replace(/^Fork: /, "")}`,
       age: "now",
       done: false,
+      settledAt: undefined,
+      snoozedUntil: undefined,
+      wokeAt: undefined,
       scope: activeThread.scope
         ? {
             ...activeThread.scope,
@@ -242,12 +364,17 @@ export function WorkspaceScreen() {
       completedAt: null,
     };
     if (activeThread) {
+      if (threadNotice?.undo?.threadId === activeThread.id)
+        setThreadNotice(undefined);
       setThreads((previous) =>
         previous.map((thread) =>
           thread.id === activeThread.id
             ? {
                 ...thread,
                 provider,
+                settledAt: undefined,
+                snoozedUntil: undefined,
+                wokeAt: undefined,
                 followUps: [
                   ...(thread.followUps ?? []),
                   { text: prompt, attachments, responseTiming, skillId },
@@ -267,7 +394,7 @@ export function WorkspaceScreen() {
       id: crypto.randomUUID(),
       project: project ?? "No project",
       kind: "workspace",
-      title: prompt.length > 56 ? `${prompt.slice(0, 56)}…` : prompt,
+      title: prompt,
       branch: "main",
       age: "now",
       prompt,
@@ -305,6 +432,12 @@ export function WorkspaceScreen() {
           projects={projects}
           activeId={activeThread?.id}
           onSelect={(thread) => {
+            if (thread.wokeAt)
+              setThreads((previous) =>
+                previous.map((item) =>
+                  item.id === thread.id ? { ...item, wokeAt: undefined } : item,
+                ),
+              );
             setProject(thread.project);
             navigate(thread.id);
           }}
@@ -314,6 +447,17 @@ export function WorkspaceScreen() {
           onSettings={() => openSettings()}
           onSources={() => setDialog("sources")}
           onActivity={() => setDialog("activity")}
+          onSettle={settleThread}
+          onSnooze={snoozeThread}
+          onRestore={restoreThread}
+          notice={
+            threadNotice
+              ? {
+                  message: threadNotice.message,
+                  onUndo: threadNotice.undo ? undoThreadPlacement : undefined,
+                }
+              : undefined
+          }
         />
 
         <div className="workspace-canvas" inert={mobileSidebarOpen}>
@@ -465,6 +609,23 @@ export function WorkspaceScreen() {
               </div>
             ) : (
               <div className="conversation-view">
+                {threadShelf(activeThread) !== "active" && (
+                  <div className="thread-placement-banner">
+                    <span>
+                      {activeThread.snoozedUntil
+                        ? `Snoozed until ${formatWakeTime(activeThread.snoozedUntil)}`
+                        : "This session is settled."}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => restoreThread(activeThread.id)}
+                    >
+                      {activeThread.snoozedUntil
+                        ? "Wake now"
+                        : "Return to active"}
+                    </button>
+                  </div>
+                )}
                 {activeThread.forkedFrom && (
                   <div className="thread-fork-origin">
                     <GitFork size={12} />

@@ -43,7 +43,16 @@ New sample responses have a short, measured 2.4-second preparation phase so the 
 
 On smaller screens, **View source** and citations open the explorer in an accessible drawer. Closing it returns to the conversation.
 
-Conversations are kept in memory for the current session; refreshing resets them. Skill activation and the source panel width persist in browser storage. These are fictional, bundled sample records: no enterprise APIs are called, no external systems are changed, and responses are deterministic summaries, risk lists, or next steps derived from the selected records. Other prompts show an explanatory sample-summary fallback. The model and permission controls are demo preferences. File attachments are held in the browser and only their names are added to a thread; files are not uploaded, parsed, or used in responses. Live authentication, fetches, AI responses, and saved sessions are future integration work.
+Conversations, including settle and snooze state, are kept in memory for the current session; refreshing resets them. Skill activation and the source panel width persist in browser storage. These are fictional, bundled sample records: no enterprise APIs are called, no external systems are changed, and responses are deterministic summaries, risk lists, or next steps derived from the selected records. Other prompts show an explanatory sample-summary fallback. The model and permission controls are demo preferences. File attachments are held in the browser and only their names are added to a thread; files are not uploaded, parsed, or used in responses. Live authentication, fetches, AI responses, and saved sessions are future integration work.
+
+### Settle, snooze, and preview sessions
+
+1. Hover a session or focus it with the keyboard. The card reveals its full title, project, source, and the exact tickets, pages, or items selected for that conversation. New session titles retain the complete prompt; only the sidebar presentation is cropped. Use the info button to open the same details in a dialog, including on touch devices.
+2. Choose **Settle** to move a session into the **Settled** shelf. Settling the open session advances to the next active session within the sidebar filters, or a new thread when none remain. **Undo** is available for eight seconds. Expand the shelf to reopen a session or use **Un-settle** to return it to the active list.
+3. Use the clock button to snooze for **1 minute**, **1 hour**, **Tomorrow at 09:00**, or **Next week on Monday at 09:00**, in the browser’s local time. **Custom…** accepts a future local date/time or a duration in minutes. Snoozing is unavailable while a response is being prepared.
+4. Expand **Snoozed** to see return times or wake a session manually. Sessions return automatically at their deadlines with a **Woke** indicator, without changing the open conversation. Returning to an inactive tab also checks overdue sessions. The one-minute option makes this easy to demonstrate.
+
+Both shelves respect project filtering and thread search. Search reveals matching parked sessions automatically. Reading a parked session leaves its placement intact; sending a follow-up returns it to active. Source scope, conversation content, and applied skills remain intact throughout.
 
 ### Try skills
 
@@ -69,6 +78,8 @@ On desktop, drag the source panel’s left edge to resize it. The width is remem
 - `src/app/globals.css`: Tailwind imports and shadcn theme tokens.
 - `src/components/workspace/`: screen, sidebar, composer, demo data, and scoped workspace styles.
 - `project-filter.tsx`: searchable sidebar project filter with keyboard navigation and multiple selection.
+- `workspace-thread-row.tsx`, `thread-context-card.tsx`: session actions and full-title/source-context previews.
+- `thread-lifecycle.ts`, `use-snooze-wake.ts`, `custom-snooze-dialog.tsx`: shelf state, return-time scheduling, and custom snoozes.
 - `source-data.ts`: source definitions, fictional enterprise records, and scope helpers.
 - `source-picker.tsx`: compact source dropdown, catalog cards, and record selection dialog.
 - `source-explorer.tsx`: source list, Jira grouped board, record details, and responsive drawer.
@@ -86,6 +97,6 @@ pnpm exec shadcn add card input
 
 ## Reference
 
-The reference screen lives in [T3 Code's web app](https://github.com/pingdotgg/t3code/tree/main/apps/web), specifically `components/chat/DraftHeroProjectHeading.tsx`, `ChatComposer.tsx`, `ChatHeader.tsx`, and `components/Sidebar.tsx`. The desktop app provides the Electron shell around the web UI. The appearance is adapted into standalone Next.js components, without the T3 runtime or backend dependencies.
+The reference screen lives in [T3 Code's web app](https://github.com/pingdotgg/t3code/tree/main/apps/web), specifically `components/chat/DraftHeroProjectHeading.tsx`, `ChatComposer.tsx`, `ChatHeader.tsx`, and `components/Sidebar.tsx`. Session lifecycle and previews follow `components/sidebar/SidebarThreadRow.tsx`, `Sidebar.snooze.ts`, `CustomSnoozeDialog.tsx`, and `ThreadHoverCard.tsx`, adapted to enterprise source records. The desktop app provides the Electron shell around the web UI. The appearance is adapted into standalone Next.js components, without the T3 runtime or backend dependencies.
 
 Provider and Linux icons are adapted under the MIT license; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

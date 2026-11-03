@@ -277,8 +277,10 @@
   font-size: 11px;
 }
 .sidebar-threads {
+  display: flex;
   min-height: 0;
   flex: 1;
+  flex-direction: column;
   overflow-y: auto;
   padding: 7px 7px;
   scrollbar-width: thin;
@@ -371,7 +373,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.thread-item:first-child .thread-title {
+.sidebar-active-threads > .thread-row:first-child .thread-title {
   color: #28282c;
   font-weight: 550;
 }
@@ -454,14 +456,313 @@
   transform: rotate(90deg);
 }
 .archive-content {
-  max-height: 100px;
-  overflow-y: auto;
-  padding: 3px 6px 8px;
+  padding: 3px 0 8px;
   color: #898993;
   font-size: 12px;
 }
 .archive-content button {
   text-align: left;
+}
+.sidebar-shelves {
+  margin-top: auto;
+}
+.shelf-empty {
+  padding: 8px 8px 12px;
+  color: #898993;
+  font-size: 12px;
+}
+.thread-row {
+  position: relative;
+  margin-bottom: 5px;
+  border-radius: 8px;
+}
+.thread-row .thread-item {
+  margin-bottom: 0;
+}
+.thread-row:hover .thread-item,
+.thread-row-menu-open .thread-item {
+  background: #eeeef0;
+}
+.thread-row-actions {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  height: 25px;
+  align-items: center;
+  gap: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+.thread-row:hover .thread-row-actions,
+.thread-row:focus-within .thread-row-actions,
+.thread-row-menu-open .thread-row-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+.thread-row:hover .thread-project-row,
+.thread-row:focus-within .thread-project-row,
+.thread-row-menu-open .thread-project-row {
+  padding-right: 111px;
+}
+.thread-row:hover .thread-age,
+.thread-row:focus-within .thread-age,
+.thread-row-menu-open .thread-age {
+  display: none;
+}
+.thread-row-action {
+  display: inline-flex;
+  width: 24px;
+  height: 25px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border-radius: 5px;
+  background: transparent;
+  color: #85858f;
+  font-size: 11px;
+}
+.thread-row-action svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 1.6;
+}
+.thread-row-action:hover {
+  background: #e2e2e6;
+  color: #3f3f46;
+}
+.thread-row-action:disabled {
+  opacity: 0.4;
+}
+.thread-settle-action {
+  width: auto;
+  padding: 0 5px;
+}
+.thread-age > svg {
+  width: 13px;
+  height: 13px;
+}
+.thread-woke {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #6f6597;
+}
+.thread-snooze-menu {
+  width: 282px;
+  max-width: calc(100vw - 24px);
+}
+.thread-snooze-heading {
+  padding: 5px 7px;
+  color: #85858f;
+  font-size: 11px;
+}
+.thread-snooze-time {
+  margin-left: auto;
+  color: #898993;
+  font-size: 11px;
+}
+.thread-undo-notice {
+  display: flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #e4e4e7;
+  border-radius: 7px;
+  padding: 7px 8px;
+  color: #71717a;
+  font-size: 12px;
+}
+.thread-undo-notice button {
+  margin-left: auto;
+  color: #3f3f46;
+  font-weight: 550;
+}
+.thread-placement-banner {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+  border: 1px solid #e4e4e7;
+  border-radius: 8px;
+  padding: 9px 12px;
+  color: #71717a;
+  font-size: 12px;
+}
+.thread-placement-banner button {
+  color: #3f3f46;
+  font-weight: 550;
+}
+.thread-context-positioner {
+  z-index: 55;
+  outline: none;
+}
+.thread-context-popup {
+  width: 350px;
+  max-width: min(var(--available-width), calc(100vw - 24px));
+  max-height: min(var(--available-height), 600px);
+  overflow-y: auto;
+  border: 1px solid #e0e0e5;
+  border-radius: 10px;
+  background: #fcfcfdf5;
+  box-shadow: 0 12px 32px -12px #00000030;
+  backdrop-filter: blur(16px);
+  outline: none;
+}
+.thread-context-card {
+  min-width: 0;
+  padding: 15px;
+  color: #71717a;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.thread-context-title {
+  display: block;
+  color: #3f3f46;
+  font-size: 13px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.thread-context-meta {
+  display: grid;
+  gap: 6px;
+  margin-top: 11px;
+}
+.thread-context-meta > span {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+  overflow-wrap: anywhere;
+}
+.thread-context-meta svg {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+}
+.thread-context-source {
+  margin-top: 13px;
+  border-top: 1px solid #e8e8ec;
+  padding-top: 12px;
+}
+.thread-context-source-heading {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.thread-context-source-heading strong {
+  color: #52525b;
+  font-weight: 550;
+}
+.thread-context-source-heading .source-mark {
+  width: 22px;
+  height: 22px;
+}
+.thread-context-source-heading .source-mark svg {
+  width: 13px;
+  height: 13px;
+}
+.thread-context-source-heading > span:last-child {
+  margin-left: auto;
+  color: #898993;
+}
+.thread-context-collection {
+  margin-top: 5px;
+  color: #898993;
+  font-size: 11px;
+}
+.thread-context-records {
+  display: grid;
+  max-height: 280px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.thread-context-records li {
+  padding: 8px 0;
+}
+.thread-context-records li + li {
+  border-top: 1px solid #eeeef1;
+}
+.thread-context-records li > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 10px;
+}
+.thread-context-records li > div > span:first-child {
+  color: #85858f;
+  font-family: var(--font-geist-mono), monospace;
+}
+.thread-context-records p {
+  margin-top: 3px;
+  color: #52525b;
+  overflow-wrap: anywhere;
+}
+.thread-context-note {
+  margin-top: 10px;
+  color: #a1a1aa;
+  font-size: 10px;
+}
+.thread-context-dialog {
+  width: 400px;
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+}
+.thread-context-dialog .thread-context-card {
+  padding: 0;
+}
+.custom-snooze-dialog {
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+}
+.snooze-mode-picker {
+  display: flex;
+  gap: 3px;
+  border-radius: 7px;
+  background: #f1f1f3;
+  padding: 3px;
+}
+.snooze-mode-picker button {
+  flex: 1;
+  border-radius: 5px;
+  padding: 6px;
+  color: #85858f;
+  font-size: 12px;
+}
+.snooze-mode-picker button[aria-pressed="true"] {
+  background: white;
+  box-shadow: 0 1px 3px #0000000d;
+  color: #3f3f46;
+}
+.snooze-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 6px;
+}
+.snooze-error {
+  color: #b34f4f;
+  font-size: 12px;
+}
+@media (hover: none), (pointer: coarse) {
+  .thread-row-actions {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .thread-row .thread-project-row {
+    padding-right: 111px;
+  }
+  .thread-row .thread-age {
+    display: none;
+  }
 }
 .sidebar-footer {
   display: flex;

@@ -14,6 +14,9 @@ export type Thread = {
   age: string;
   changes?: number;
   done?: boolean;
+  settledAt?: string;
+  snoozedUntil?: string;
+  wokeAt?: string;
   provider?: "claude" | "openai";
   prompt?: string;
   attachments?: string[];

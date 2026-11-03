@@ -4,23 +4,29 @@ import { useRef, useState } from "react";
 import {
   ArrowUpCircle,
   BarChart3,
-  CircleCheck,
   ChevronRight,
-  FolderGit2,
   FolderPlus,
-  GitBranch,
   GitPullRequest,
   PanelLeftClose,
   Search,
   Settings,
   SquarePen,
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import type { Thread } from "./workspace-data";
-import { LinuxIcon, ProjectIcon, ProviderIcon } from "./workspace-icons";
 import { IconButton } from "./icon-button";
-import { SourceMark } from "./source-picker";
-import { getSource, scopeLabel } from "./source-data";
 import { ProjectFilter } from "./project-filter";
+import { getSource } from "./source-data";
+import { threadShelf } from "./thread-lifecycle";
+import { WorkspaceThreadRow } from "./workspace-thread-row";
+import { ThreadContextCard } from "./thread-context-card";
+import { CustomSnoozeDialog } from "./custom-snooze-dialog";
 
 type SidebarProps = {
   threads: Thread[];
@@ -33,19 +39,25 @@ type SidebarProps = {
   onSettings: () => void;
   onActivity: () => void;
   onSources: () => void;
+  onSettle: (id: string, nextId: string | null) => void;
+  onSnooze: (id: string, until: string, nextId: string | null) => void;
+  onRestore: (id: string) => void;
+  notice?: { message: string; onUndo?: () => void };
 };
 
 export function WorkspaceSidebar(props: SidebarProps) {
   const [query, setQuery] = useState("");
   const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
   const searchRow = useRef<HTMLDivElement>(null);
+  const [expandedShelves, setExpandedShelves] = useState<string[]>([]);
+  const [customSnoozeId, setCustomSnoozeId] = useState<string | null>(null);
+  const [contextId, setContextId] = useState<string | null>(null);
   const projects = [
     ...new Set([
       ...props.projects,
       ...props.threads.map((thread) => thread.project),
     ]),
   ];
-  const [expandedArchive, setExpandedArchive] = useState<string | null>(null);
   const filteredThreads = props.threads.filter(
     (thread) =>
       `${thread.title} ${thread.project} ${thread.branch} ${thread.scope ? getSource(thread.scope.sourceId).name : ""}`
@@ -54,7 +66,47 @@ export function WorkspaceSidebar(props: SidebarProps) {
       (selectedProjects.length === 0 ||
         selectedProjects.includes(thread.project)),
   );
-  const doneThreads = filteredThreads.filter((thread) => thread.done);
+  const activeThreads = filteredThreads.filter(
+    (thread) => threadShelf(thread) === "active",
+  );
+  const snoozedThreads = filteredThreads
+    .filter((thread) => threadShelf(thread) === "snoozed")
+    .sort((a, b) => Date.parse(a.snoozedUntil!) - Date.parse(b.snoozedUntil!));
+  const settledThreads = filteredThreads
+    .filter((thread) => threadShelf(thread) === "settled")
+    .sort((a, b) => Date.parse(b.settledAt!) - Date.parse(a.settledAt!));
+  const customSnoozeThread = props.threads.find(
+    (thread) => thread.id === customSnoozeId,
+  );
+  const contextThread = props.threads.find((thread) => thread.id === contextId);
+
+  function nextThread(id: string) {
+    const index = activeThreads.findIndex((thread) => thread.id === id);
+    return (
+      [
+        ...activeThreads.slice(index + 1),
+        ...activeThreads.slice(0, Math.max(0, index)),
+      ].find((thread) => thread.id !== id)?.id ?? null
+    );
+  }
+
+  function renderThread(thread: Thread) {
+    return (
+      <WorkspaceThreadRow
+        key={thread.id}
+        thread={thread}
+        active={props.activeId === thread.id}
+        onSelect={() => props.onSelect(thread)}
+        onSettle={() => props.onSettle(thread.id, nextThread(thread.id))}
+        onRestore={() => props.onRestore(thread.id)}
+        onSnooze={(until) =>
+          props.onSnooze(thread.id, until, nextThread(thread.id))
+        }
+        onCustomSnooze={() => setCustomSnoozeId(thread.id)}
+        onContext={() => setContextId(thread.id)}
+      />
+    );
+  }
 
   return (
     <aside className="workspace-sidebar" aria-label="Workspace sidebar">
@@ -66,7 +118,6 @@ export function WorkspaceSidebar(props: SidebarProps) {
           <PanelLeftClose />
         </IconButton>
       </div>
-
       <div className="sidebar-search-row" ref={searchRow}>
         <label className="sidebar-search">
           <Search aria-hidden="true" />
@@ -94,115 +145,87 @@ export function WorkspaceSidebar(props: SidebarProps) {
       </div>
 
       <nav className="sidebar-threads" aria-label="Threads">
-        {filteredThreads.map((thread) => (
-          <button
-            type="button"
-            key={thread.id}
-            className={`thread-item ${props.activeId === thread.id ? "thread-item-active" : ""}`}
-            onClick={() => props.onSelect(thread)}
-            aria-current={props.activeId === thread.id ? "page" : undefined}
-          >
-            <span className="thread-project-row">
-              {thread.scope ? (
-                <SourceMark id={thread.scope.sourceId} />
-              ) : (
-                <ProjectIcon kind={thread.kind} />
-              )}
-              <span className="thread-project-name">{thread.project}</span>
-              {thread.done ? (
-                <span className="thread-done">
-                  <CircleCheck />
-                  Done
-                </span>
-              ) : (
-                <span className="thread-age">{thread.age}</span>
-              )}
-            </span>
-            <span className="thread-title" title={thread.title}>
-              {thread.title}
-            </span>
-            <span className="thread-meta">
-              {thread.done && (
-                <FolderGit2 aria-hidden className="thread-branch-icon" />
-              )}
-              <span
-                className="thread-branch"
-                title={
-                  thread.scope
-                    ? getSource(thread.scope.sourceId).name
-                    : thread.branch
-                }
-              >
-                {thread.scope
-                  ? `${getSource(thread.scope.sourceId).name} · ${scopeLabel(thread.scope)}`
-                  : thread.branch}
-              </span>
-              {thread.changes && (
-                <span className="thread-changes">
-                  <GitBranch aria-hidden />
-                  {thread.done ? "+" : ""}
-                  {thread.changes}
-                </span>
-              )}
-              {(thread.kind === "rocket" || thread.kind === "chart") && (
-                <LinuxIcon />
-              )}
-              <ProviderIcon provider={thread.provider} />
-            </span>
-          </button>
-        ))}
-        {filteredThreads.length === 0 && (
-          <p className="sidebar-empty">
-            {query
-              ? "No threads found."
-              : "No threads in the selected projects."}
-          </p>
-        )}
+        <div className="sidebar-active-threads" aria-label="Active threads">
+          {activeThreads.map(renderThread)}
+          {activeThreads.length === 0 && (
+            <p className="sidebar-empty">
+              {query
+                ? "No active threads found."
+                : selectedProjects.length
+                  ? "No active threads in these projects."
+                  : "You’re all caught up."}
+            </p>
+          )}
+        </div>
+        <div className="sidebar-shelves">
+          {[
+            { id: "snoozed", label: "Snoozed", threads: snoozedThreads },
+            { id: "settled", label: "Settled", threads: settledThreads },
+          ].map((section) => {
+            const expanded = expandedShelves.includes(section.id);
+            // Keep a selected parked session discoverable even when its shelf is collapsed.
+            const visible =
+              expanded || query.trim()
+                ? section.threads
+                : section.threads.filter(
+                    (thread) => thread.id === props.activeId,
+                  );
+            return (
+              <section key={section.id} aria-label={`${section.label} threads`}>
+                <button
+                  type="button"
+                  className="archive-toggle"
+                  aria-expanded={expanded || Boolean(query.trim())}
+                  aria-controls={`shelf-${section.id}`}
+                  onClick={() =>
+                    setExpandedShelves((previous) =>
+                      expanded
+                        ? previous.filter((id) => id !== section.id)
+                        : [...previous, section.id],
+                    )
+                  }
+                >
+                  <span>{section.label}</span>
+                  <span className="archive-count">
+                    {section.threads.length}
+                  </span>
+                  <ChevronRight
+                    className={
+                      expanded || query.trim() ? "chevron-expanded" : ""
+                    }
+                  />
+                </button>
+                <div
+                  id={`shelf-${section.id}`}
+                  className="archive-content"
+                  hidden={visible.length === 0 && !expanded && !query.trim()}
+                >
+                  {visible.map(renderThread)}
+                  {visible.length === 0 && (
+                    <p className="shelf-empty">
+                      {query
+                        ? `No matching ${section.label.toLowerCase()} threads.`
+                        : `No ${section.label.toLowerCase()} threads.`}
+                    </p>
+                  )}
+                </div>
+              </section>
+            );
+          })}
+        </div>
       </nav>
 
       <div className="sidebar-bottom">
-        {[
-          { id: "snoozed", label: "Snoozed", count: 0 },
-          { id: "settled", label: "Settled", count: doneThreads.length },
-        ].map((section) => (
-          <div key={section.id}>
-            <button
-              type="button"
-              className="archive-toggle"
-              aria-expanded={expandedArchive === section.id}
-              onClick={() =>
-                setExpandedArchive(
-                  expandedArchive === section.id ? null : section.id,
-                )
-              }
-            >
-              <span>{section.label}</span>
-              <span className="archive-count">{section.count}</span>
-              <ChevronRight
-                className={
-                  expandedArchive === section.id ? "chevron-expanded" : ""
-                }
-              />
-            </button>
-            {expandedArchive === section.id && (
-              <div className="archive-content">
-                {section.id === "settled" && doneThreads.length > 0 ? (
-                  doneThreads.map((thread) => (
-                    <button
-                      type="button"
-                      key={thread.id}
-                      onClick={() => props.onSelect(thread)}
-                    >
-                      {thread.title}
-                    </button>
-                  ))
-                ) : (
-                  <p>No snoozed threads.</p>
-                )}
-              </div>
+        {props.notice && (
+          <div className="thread-undo-notice">
+            <span role="status">{props.notice.message}</span>
+            {props.notice.onUndo && (
+              <button type="button" onClick={props.notice.onUndo}>
+                Undo
+              </button>
             )}
           </div>
-        ))}
+        )}
         <div className="sidebar-footer">
           <IconButton label="Settings" onClick={props.onSettings}>
             <Settings />
@@ -223,6 +246,37 @@ export function WorkspaceSidebar(props: SidebarProps) {
           </IconButton>
         </div>
       </div>
+      {customSnoozeThread && (
+        <CustomSnoozeDialog
+          key={customSnoozeThread.id}
+          thread={customSnoozeThread}
+          onClose={() => setCustomSnoozeId(null)}
+          onSnooze={(until) => {
+            props.onSnooze(
+              customSnoozeThread.id,
+              until,
+              nextThread(customSnoozeThread.id),
+            );
+            setCustomSnoozeId(null);
+          }}
+        />
+      )}
+      <Dialog
+        open={Boolean(contextThread)}
+        onOpenChange={(open) => {
+          if (!open) setContextId(null);
+        }}
+      >
+        <DialogContent className="thread-context-dialog">
+          <DialogHeader>
+            <DialogTitle>Session context</DialogTitle>
+            <DialogDescription>
+              Source records included in this conversation.
+            </DialogDescription>
+          </DialogHeader>
+          {contextThread && <ThreadContextCard thread={contextThread} />}
+        </DialogContent>
+      </Dialog>
     </aside>
   );
 }
