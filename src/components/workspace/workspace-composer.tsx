@@ -5,6 +5,7 @@ import {
   ArrowUp,
   Check,
   FileText,
+  LoaderCircle,
   Paperclip,
   Plug,
   Shield,
@@ -34,6 +35,7 @@ export function WorkspaceComposer({
   onScope,
   onChooseSource,
   onClearSource,
+  busy = false,
 }: {
   onSend: (
     prompt: string,
@@ -46,6 +48,7 @@ export function WorkspaceComposer({
   onScope?: () => void;
   onChooseSource?: (id: SourceId) => void;
   onClearSource?: () => void;
+  busy?: boolean;
 }) {
   const [prompt, setPrompt] = useState("");
   const [model, setModel] = useState(models[0]);
@@ -53,7 +56,7 @@ export function WorkspaceComposer({
   const [attachments, setAttachments] = useState<File[]>([]);
   const [error, setError] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
-  const canSend = prompt.trim().length > 0;
+  const canSend = prompt.trim().length > 0 && !busy;
 
   function submit() {
     if (!canSend) return;
@@ -70,6 +73,7 @@ export function WorkspaceComposer({
     <div className={`composer-stack ${compact ? "composer-compact" : ""}`}>
       <form
         className="workspace-composer"
+        aria-busy={busy}
         onSubmit={(event) => {
           event.preventDefault();
           submit();
@@ -200,7 +204,7 @@ export function WorkspaceComposer({
             className={`send-button ${canSend ? "send-button-ready" : ""}`}
             disabled={!canSend}
           >
-            <ArrowUp />
+            {busy ? <LoaderCircle className="animate-spin" /> : <ArrowUp />}
           </IconButton>
         </div>
       </form>

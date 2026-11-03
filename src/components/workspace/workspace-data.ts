@@ -1,4 +1,5 @@
 import { defaultScope, type SourceScope } from "./source-data";
+import type { ResponseTiming } from "./response-timing";
 
 export type ProjectKind =
   "rocket" | "chart" | "conventions" | "automation" | "workspace";
@@ -15,7 +16,13 @@ export type Thread = {
   provider?: "claude" | "openai";
   prompt?: string;
   attachments?: string[];
-  followUps?: { text: string; attachments: string[] }[];
+  responseTiming: ResponseTiming;
+  followUps?: {
+    text: string;
+    attachments: string[];
+    responseTiming: ResponseTiming;
+  }[];
+  forkedFrom?: { threadId: string; title: string; responseIndex: number };
   scope?: SourceScope;
 };
 
@@ -30,6 +37,10 @@ export const initialThreads: Thread[] = [
     provider: "claude",
     prompt: "Create a summary of these 5 tickets.",
     scope: defaultScope("jira"),
+    responseTiming: {
+      startedAt: "2026-11-03T11:05:00.000Z",
+      completedAt: "2026-11-03T11:06:46.000Z",
+    },
   },
   {
     id: "confluence-knowledge-review",
@@ -41,6 +52,10 @@ export const initialThreads: Thread[] = [
     provider: "claude",
     prompt: "Summarize these 3 pages and their key decisions.",
     scope: defaultScope("confluence"),
+    responseTiming: {
+      startedAt: "2026-11-03T08:30:00.000Z",
+      completedAt: "2026-11-03T08:30:42.000Z",
+    },
   },
   {
     id: "codebeamer-release-readiness",
@@ -52,6 +67,10 @@ export const initialThreads: Thread[] = [
     provider: "claude",
     prompt: "What are the risks in these 4 items?",
     scope: defaultScope("codebeamer"),
+    responseTiming: {
+      startedAt: "2026-11-02T14:10:00.000Z",
+      completedAt: "2026-11-02T14:11:12.000Z",
+    },
   },
 ];
 

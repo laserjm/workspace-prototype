@@ -7,6 +7,7 @@ import {
   ChevronDown,
   FileText,
   Folder,
+  GitFork,
   PanelBottom,
   PanelLeftOpen,
   PanelRight,
@@ -65,10 +66,24 @@ export function WorkspaceScreen() {
   const [sourceOpen, setSourceOpen] = useState(true);
   const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);
   const messagesRef = useRef<HTMLDivElement>(null);
+  const responseTimers = useRef(new Set<ReturnType<typeof setTimeout>>());
   const activeThread = threads.find(
     (thread) => thread.id === history[historyIndex],
   );
   const currentProject = activeThread?.project ?? project;
+  const latestTiming =
+    activeThread?.followUps?.at(-1)?.responseTiming ??
+    activeThread?.responseTiming;
+  const responseWorking = Boolean(
+    activeThread?.scope && latestTiming?.completedAt === null,
+  );
+
+  useEffect(() => {
+    const timers = responseTimers.current;
+    return () => {
+      for (const timer of timers) clearTimeout(timer);
+    };
+  }, []);
 
   useEffect(() => {
     const messages = messagesRef.current;
@@ -109,6 +124,71 @@ export function WorkspaceScreen() {
     setSourceOpen(true);
   }
 
+  function completeSampleResponse(threadId: string, responseIndex: number) {
+    // Give the local sample preparation a short, measurable lifecycle.
+    const timer = setTimeout(() => {
+      responseTimers.current.delete(timer);
+      const completedAt = new Date().toISOString();
+      setThreads((previous) =>
+        previous.map((thread) =>
+          thread.id !== threadId
+            ? thread
+            : responseIndex === 0
+              ? {
+                  ...thread,
+                  responseTiming: { ...thread.responseTiming, completedAt },
+                }
+              : {
+                  ...thread,
+                  followUps: thread.followUps?.map((message, index) =>
+                    index === responseIndex - 1
+                      ? {
+                          ...message,
+                          responseTiming: {
+                            ...message.responseTiming,
+                            completedAt,
+                          },
+                        }
+                      : message,
+                  ),
+                },
+        ),
+      );
+    }, 2400);
+    responseTimers.current.add(timer);
+  }
+
+  function forkFromResponse(responseIndex: number) {
+    if (!activeThread) return;
+    const timing =
+      responseIndex === 0
+        ? activeThread.responseTiming
+        : activeThread.followUps?.[responseIndex - 1]?.responseTiming;
+    if (!timing?.completedAt) return;
+    const fork: Thread = {
+      ...activeThread,
+      id: crypto.randomUUID(),
+      title: `Fork: ${activeThread.title.replace(/^Fork: /, "")}`,
+      age: "now",
+      done: false,
+      scope: activeThread.scope
+        ? {
+            ...activeThread.scope,
+            recordIds: [...activeThread.scope.recordIds],
+          }
+        : undefined,
+      followUps: activeThread.followUps?.slice(0, responseIndex),
+      forkedFrom: {
+        threadId: activeThread.id,
+        title: activeThread.title,
+        responseIndex,
+      },
+    };
+    setThreads((previous) => [fork, ...previous]);
+    setProject(fork.project);
+    navigate(fork.id);
+  }
+
   function toggleSidebar() {
     if (window.matchMedia("(max-width: 767px)").matches)
       setMobileSidebarOpen((open) => !open);
@@ -138,6 +218,11 @@ export function WorkspaceScreen() {
     attachments: string[],
     provider: "claude" | "openai",
   ) {
+    if (responseWorking) return;
+    const responseTiming = {
+      startedAt: new Date().toISOString(),
+      completedAt: null,
+    };
     if (activeThread) {
       setThreads((previous) =>
         previous.map((thread) =>
@@ -147,12 +232,17 @@ export function WorkspaceScreen() {
                 provider,
                 followUps: [
                   ...(thread.followUps ?? []),
-                  { text: prompt, attachments },
+                  { text: prompt, attachments, responseTiming },
                 ],
               }
             : thread,
         ),
       );
+      if (activeThread.scope)
+        completeSampleResponse(
+          activeThread.id,
+          (activeThread.followUps?.length ?? 0) + 1,
+        );
       return;
     }
     const thread: Thread = {
@@ -165,11 +255,13 @@ export function WorkspaceScreen() {
       prompt,
       attachments,
       provider,
+      responseTiming,
       scope: draftScope
         ? { ...draftScope, recordIds: [...draftScope.recordIds] }
         : undefined,
     };
     setThreads((previous) => [thread, ...previous]);
+    if (thread.scope) completeSampleResponse(thread.id, 0);
     navigate(thread.id);
   }
 
@@ -357,6 +449,23 @@ export function WorkspaceScreen() {
               </div>
             ) : (
               <div className="conversation-view">
+                {activeThread.forkedFrom && (
+                  <div className="thread-fork-origin">
+                    <GitFork size={12} />
+                    <span>Forked from</span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        navigate(activeThread.forkedFrom!.threadId)
+                      }
+                    >
+                      {activeThread.forkedFrom.title}
+                    </button>
+                    <span>
+                      · response {activeThread.forkedFrom.responseIndex + 1}
+                    </span>
+                  </div>
+                )}
                 {activeThread.scope && (
                   <div className="session-context-heading">
                     <SourceMark id={activeThread.scope.sourceId} />
@@ -395,9 +504,12 @@ export function WorkspaceScreen() {
                   </div>
                   {activeThread.scope && (
                     <SourceResponse
+                      key={`${activeThread.id}:0`}
                       scope={activeThread.scope}
                       prompt={activeThread.prompt ?? activeThread.title}
                       onOpenRecord={openRecord}
+                      timing={activeThread.responseTiming}
+                      onFork={() => forkFromResponse(0)}
                     />
                   )}
                   {activeThread.followUps?.map((message, index) => (
@@ -416,9 +528,13 @@ export function WorkspaceScreen() {
                       </div>
                       {activeThread.scope && (
                         <SourceResponse
+                          key={`${activeThread.id}:${index + 1}`}
                           scope={activeThread.scope}
                           prompt={message.text}
                           onOpenRecord={openRecord}
+                          timing={message.responseTiming}
+                          continuation
+                          onFork={() => forkFromResponse(index + 1)}
                         />
                       )}
                     </Fragment>
@@ -443,6 +559,7 @@ export function WorkspaceScreen() {
                 <WorkspaceComposer
                   key={activeThread.id}
                   compact
+                  busy={responseWorking}
                   onSend={sendMessage}
                   onSources={() => setDialog("sources")}
                   scope={activeThread.scope}

@@ -1,6 +1,6 @@
 # T3 Code
 
-The workspace screen is inspired by [T3 Code](https://github.com/pingdotgg/t3code). Provider and Linux icon paths are adapted from `apps/web/src/components/Icons.tsx` at commit `cefb544af3c98224874419198c0359b652ca3c94`.
+The workspace screen is inspired by [T3 Code](https://github.com/pingdotgg/t3code). Provider and Linux icon paths are adapted from `apps/web/src/components/Icons.tsx`. Response duration formatting is adapted from `packages/shared/src/orchestrationTiming.ts`; message timing and hover controls follow `TimelineRowParts.tsx`, `TimelineAssistantRows.tsx`, and `MessagesTimeline.tsx` in `apps/web/src/components/chat`. These references are at commit `cefb544af3c98224874419198c0359b652ca3c94`.
 
 MIT License
 

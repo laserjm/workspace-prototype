@@ -35,6 +35,10 @@ The screen adapts the T3 Code shell into an enterprise workspace: a thread sideb
 5. Click a citation in the response to open that record in the explorer. Try **What are the risks?** or **What are the next steps?** as follow-ups.
 6. Start another thread with **Confluence** (three sample pages) or **Codebeamer** (four sample requirements and test items). Each thread keeps its own record scope. The sidebar includes a ready-made session for each source.
 
+Responses now follow T3 Code’s timing pattern: a live **Working for …** row settles into **Worked for …** (or **Continued for …** on a follow-up). Hover or focus the row to reveal its start time in HH:mm; click the chevron to inspect source and timing details. Hover the message body to reveal copy, fork, and completion time beneath it. Touch devices keep the controls visible. Fork creates an independent local thread containing the conversation through that response and preserves its source scope.
+
+New sample responses have a short, measured 2.4-second preparation phase so the running timer can be exercised. Completed sample sessions have fixed fictional timestamps. Clipboard errors are reported beside the copy button.
+
 On smaller screens, **View source** and citations open the explorer in an accessible drawer. Closing it returns to the conversation.
 
 All state is kept in memory for the current session. Refreshing resets it. These are fictional, bundled sample records: no enterprise APIs are called, no external systems are changed, and responses are deterministic summaries, risk lists, or next steps derived from the selected records. Other prompts show an explanatory sample-summary fallback. The model and permission controls are demo preferences. File attachments are held in the browser and only their names are added to a thread; files are not uploaded, parsed, or used in responses. Live authentication, fetches, AI responses, and saved sessions are future integration work.
