@@ -1,39 +1,30 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
-  ArrowLeft,
-  ArrowRight,
   ArrowUpCircle,
   BarChart3,
-  Check,
   CircleCheck,
   ChevronRight,
   FolderGit2,
   FolderPlus,
   GitBranch,
   GitPullRequest,
-  ListFilter,
   PanelLeftClose,
   Search,
   Settings,
   SquarePen,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import type { Thread } from "./workspace-data";
 import { LinuxIcon, ProjectIcon, ProviderIcon } from "./workspace-icons";
 import { IconButton } from "./icon-button";
 import { SourceMark } from "./source-picker";
 import { getSource, scopeLabel } from "./source-data";
+import { ProjectFilter } from "./project-filter";
 
 type SidebarProps = {
   threads: Thread[];
+  projects: string[];
   activeId?: string;
   onSelect: (thread: Thread) => void;
   onNewThread: () => void;
@@ -42,58 +33,41 @@ type SidebarProps = {
   onSettings: () => void;
   onActivity: () => void;
   onSources: () => void;
-  onBack: () => void;
-  onForward: () => void;
-  canGoBack: boolean;
-  canGoForward: boolean;
 };
 
 export function WorkspaceSidebar(props: SidebarProps) {
   const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState("all");
+  const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
+  const searchRow = useRef<HTMLDivElement>(null);
+  const projects = [
+    ...new Set([
+      ...props.projects,
+      ...props.threads.map((thread) => thread.project),
+    ]),
+  ];
   const [expandedArchive, setExpandedArchive] = useState<string | null>(null);
   const filteredThreads = props.threads.filter(
     (thread) =>
       `${thread.title} ${thread.project} ${thread.branch} ${thread.scope ? getSource(thread.scope.sourceId).name : ""}`
         .toLowerCase()
         .includes(query.toLowerCase()) &&
-      (filter === "all" || (filter === "done" ? thread.done : !thread.done)),
+      (selectedProjects.length === 0 ||
+        selectedProjects.includes(thread.project)),
   );
-  const doneThreads = props.threads.filter((thread) => thread.done);
+  const doneThreads = filteredThreads.filter((thread) => thread.done);
 
   return (
     <aside className="workspace-sidebar" aria-label="Workspace sidebar">
       <div className="sidebar-titlebar">
-        <div className="window-controls" aria-hidden="true">
-          <span />
-          <span />
-          <span />
-        </div>
-        <IconButton label="Toggle sidebar" onClick={props.onToggle}>
-          <PanelLeftClose />
-        </IconButton>
         <span className="app-wordmark">
           <strong>Workspace</strong>
         </span>
-        <div className="sidebar-history">
-          <IconButton
-            label="Go back"
-            disabled={!props.canGoBack}
-            onClick={props.onBack}
-          >
-            <ArrowLeft />
-          </IconButton>
-          <IconButton
-            label="Go forward"
-            disabled={!props.canGoForward}
-            onClick={props.onForward}
-          >
-            <ArrowRight />
-          </IconButton>
-        </div>
+        <IconButton label="Toggle sidebar" onClick={props.onToggle}>
+          <PanelLeftClose />
+        </IconButton>
       </div>
 
-      <div className="sidebar-search-row">
+      <div className="sidebar-search-row" ref={searchRow}>
         <label className="sidebar-search">
           <Search aria-hidden="true" />
           <input
@@ -105,35 +79,12 @@ export function WorkspaceSidebar(props: SidebarProps) {
             onChange={(event) => setQuery(event.target.value)}
           />
         </label>
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            render={
-              <Button
-                aria-label="Filter threads"
-                variant="ghost"
-                size="icon-sm"
-                className={`workspace-icon-button ${filter !== "all" ? "is-active" : ""}`}
-              />
-            }
-          >
-            <ListFilter />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-44">
-            {[
-              { id: "all", label: "All threads" },
-              { id: "active", label: "Active threads" },
-              { id: "done", label: "Completed threads" },
-            ].map((item) => (
-              <DropdownMenuItem
-                key={item.id}
-                onClick={() => setFilter(item.id)}
-              >
-                {item.label}
-                {filter === item.id && <Check className="ml-auto" />}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <ProjectFilter
+          projects={projects}
+          selected={selectedProjects}
+          onChange={setSelectedProjects}
+          anchor={searchRow}
+        />
         <IconButton label="Add project" onClick={props.onNewProject}>
           <FolderPlus />
         </IconButton>
@@ -201,7 +152,11 @@ export function WorkspaceSidebar(props: SidebarProps) {
           </button>
         ))}
         {filteredThreads.length === 0 && (
-          <p className="sidebar-empty">No threads found.</p>
+          <p className="sidebar-empty">
+            {query
+              ? "No threads found."
+              : "No threads in the selected projects."}
+          </p>
         )}
       </nav>
 

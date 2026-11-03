@@ -1,5 +1,6 @@
 import { defaultScope, type SourceScope } from "./source-data";
 import type { ResponseTiming } from "./response-timing";
+import type { SkillId } from "./skill-data";
 
 export type ProjectKind =
   "rocket" | "chart" | "conventions" | "automation" | "workspace";
@@ -16,10 +17,12 @@ export type Thread = {
   provider?: "claude" | "openai";
   prompt?: string;
   attachments?: string[];
+  skillId?: SkillId;
   responseTiming: ResponseTiming;
   followUps?: {
     text: string;
     attachments: string[];
+    skillId?: SkillId;
     responseTiming: ResponseTiming;
   }[];
   forkedFrom?: { threadId: string; title: string; responseIndex: number };

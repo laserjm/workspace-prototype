@@ -6,13 +6,11 @@ import {
   Check,
   ChevronDown,
   FileText,
-  Folder,
   GitFork,
   PanelBottom,
   PanelLeftOpen,
   PanelRight,
   Plus,
-  Settings2,
   SquareMenu,
   X,
 } from "lucide-react";
@@ -47,6 +45,9 @@ import {
 import { ScopeDialog, SourceChoices, SourceMark } from "./source-picker";
 import { SourceExplorer } from "./source-explorer";
 import { SourceResponse } from "./source-response";
+import { type SkillId } from "./skill-data";
+import { useSkillPreferences } from "./use-skill-preferences";
+import { WorkspaceSettings, type SettingsSection } from "./workspace-settings";
 
 type DialogKind = "project" | "settings" | "sources" | "activity" | null;
 
@@ -60,6 +61,9 @@ export function WorkspaceScreen() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
   const [dialog, setDialog] = useState<DialogKind>(null);
+  const [settingsSection, setSettingsSection] =
+    useState<SettingsSection>("general");
+  const { enabledSkills, toggleSkill } = useSkillPreferences();
   const [projectName, setProjectName] = useState("");
   const [draftScope, setDraftScope] = useState<SourceScope>();
   const [editingScope, setEditingScope] = useState(false);
@@ -117,6 +121,19 @@ export function WorkspaceScreen() {
       navigate(null);
     }
     setDialog(null);
+  }
+
+  function openSettings(section: SettingsSection = "general") {
+    setSettingsSection(section);
+    setDialog("settings");
+  }
+
+  function clearSource() {
+    setDraftScope(undefined);
+    if (activeThread) {
+      setProject(currentProject);
+      navigate(null);
+    }
   }
 
   function openRecord(id: string) {
@@ -217,6 +234,7 @@ export function WorkspaceScreen() {
     prompt: string,
     attachments: string[],
     provider: "claude" | "openai",
+    skillId?: SkillId,
   ) {
     if (responseWorking) return;
     const responseTiming = {
@@ -232,7 +250,7 @@ export function WorkspaceScreen() {
                 provider,
                 followUps: [
                   ...(thread.followUps ?? []),
-                  { text: prompt, attachments, responseTiming },
+                  { text: prompt, attachments, responseTiming, skillId },
                 ],
               }
             : thread,
@@ -256,6 +274,7 @@ export function WorkspaceScreen() {
       attachments,
       provider,
       responseTiming,
+      skillId,
       scope: draftScope
         ? { ...draftScope, recordIds: [...draftScope.recordIds] }
         : undefined,
@@ -283,6 +302,7 @@ export function WorkspaceScreen() {
         )}
         <WorkspaceSidebar
           threads={threads}
+          projects={projects}
           activeId={activeThread?.id}
           onSelect={(thread) => {
             setProject(thread.project);
@@ -291,15 +311,9 @@ export function WorkspaceScreen() {
           onNewThread={newThread}
           onNewProject={() => setDialog("project")}
           onToggle={toggleSidebar}
-          onSettings={() => setDialog("settings")}
+          onSettings={() => openSettings()}
           onSources={() => setDialog("sources")}
           onActivity={() => setDialog("activity")}
-          onBack={() => setHistoryIndex((index) => Math.max(0, index - 1))}
-          onForward={() =>
-            setHistoryIndex((index) => Math.min(history.length - 1, index + 1))
-          }
-          canGoBack={historyIndex > 0}
-          canGoForward={historyIndex < history.length - 1}
         />
 
         <div className="workspace-canvas" inert={mobileSidebarOpen}>
@@ -330,7 +344,7 @@ export function WorkspaceScreen() {
             <div className="workspace-header-actions">
               <IconButton
                 label="Workspace settings"
-                onClick={() => setDialog("settings")}
+                onClick={() => openSettings()}
               >
                 <SquareMenu />
               </IconButton>
@@ -440,7 +454,9 @@ export function WorkspaceScreen() {
                   scope={draftScope}
                   onScope={() => setEditingScope(true)}
                   onChooseSource={chooseSource}
-                  onClearSource={() => setDraftScope(undefined)}
+                  onClearSource={clearSource}
+                  enabledSkills={enabledSkills}
+                  onManageSkills={() => openSettings("skills")}
                 />
                 <p className="draft-demo-note">
                   Explore with sample data. Live enterprise connections come
@@ -509,6 +525,7 @@ export function WorkspaceScreen() {
                       prompt={activeThread.prompt ?? activeThread.title}
                       onOpenRecord={openRecord}
                       timing={activeThread.responseTiming}
+                      skillId={activeThread.skillId}
                       onFork={() => forkFromResponse(0)}
                     />
                   )}
@@ -533,6 +550,7 @@ export function WorkspaceScreen() {
                           prompt={message.text}
                           onOpenRecord={openRecord}
                           timing={message.responseTiming}
+                          skillId={message.skillId}
                           continuation
                           onFork={() => forkFromResponse(index + 1)}
                         />
@@ -563,6 +581,15 @@ export function WorkspaceScreen() {
                   onSend={sendMessage}
                   onSources={() => setDialog("sources")}
                   scope={activeThread.scope}
+                  enabledSkills={enabledSkills}
+                  initialSkill={
+                    activeThread.followUps?.length
+                      ? activeThread.followUps.at(-1)?.skillId
+                      : activeThread.skillId
+                  }
+                  onManageSkills={() => openSettings("skills")}
+                  onChooseSource={chooseSource}
+                  onClearSource={clearSource}
                   onScope={() => {
                     setSelectedRecordId(null);
                     setSourceOpen(true);
@@ -619,7 +646,9 @@ export function WorkspaceScreen() {
           if (!open) setDialog(null);
         }}
       >
-        <DialogContent className="workspace-dialog sm:max-w-md">
+        <DialogContent
+          className={`workspace-dialog ${dialog === "settings" ? "skills-settings-dialog" : "sm:max-w-md"}`}
+        >
           <DialogHeader>
             <DialogTitle>
               {dialog === "project"
@@ -634,7 +663,7 @@ export function WorkspaceScreen() {
               {dialog === "project"
                 ? "Give your next workspace a name."
                 : dialog === "settings"
-                  ? "A starting point for your connected workspace."
+                  ? "Make this workspace work the way you do."
                   : dialog === "sources"
                     ? activeThread
                       ? "Choose a source to start a new thread. Each thread keeps its own selected records. All sources use sample data."
@@ -690,28 +719,14 @@ export function WorkspaceScreen() {
           )}
 
           {dialog === "settings" && (
-            <div className="workspace-settings">
-              <div>
-                <Settings2 />
-                <span>Appearance</span>
-                <span className="ml-auto text-muted-foreground">Light</span>
-              </div>
-              <div>
-                <Folder />
-                <span>Project</span>
-                <span className="ml-auto max-w-48 truncate text-muted-foreground">
-                  {project ?? "No project"}
-                </span>
-              </div>
-              <Button variant="outline" onClick={() => setDialog("sources")}>
-                <Cable />
-                Manage data sources
-              </Button>
-              <p className="text-xs leading-relaxed text-muted-foreground">
-                Inspired by T3 Code. Conversations and preferences are held
-                locally for this session.
-              </p>
-            </div>
+            <WorkspaceSettings
+              section={settingsSection}
+              onSection={setSettingsSection}
+              enabledSkills={enabledSkills}
+              onToggleSkill={toggleSkill}
+              project={currentProject}
+              onSources={() => setDialog("sources")}
+            />
           )}
 
           {dialog === "activity" && (

@@ -1,6 +1,8 @@
 import { ArrowUpRight, CheckCheck } from "lucide-react";
 import { ResponseTurn } from "./response-turn";
 import type { ResponseTiming } from "./response-timing";
+import { getSkill, type SkillId } from "./skill-data";
+import { SkillIcon } from "./skill-picker";
 import {
   getSource,
   getScopedRecords,
@@ -16,6 +18,7 @@ export function SourceResponse({
   timing,
   continuation = false,
   onFork,
+  skillId,
 }: {
   scope: SourceScope;
   prompt: string;
@@ -23,15 +26,24 @@ export function SourceResponse({
   timing: ResponseTiming;
   continuation?: boolean;
   onFork: () => void;
+  skillId?: SkillId;
 }) {
   const source = getSource(scope.sourceId);
   const records = getScopedRecords(scope);
-  const mode = /risk|block|attention/i.test(prompt)
-    ? "risks"
-    : /next|action|follow.?up/i.test(prompt)
-      ? "actions"
-      : "summary";
+  const mode =
+    skillId === "risk-review"
+      ? "risks"
+      : skillId === "action-plan"
+        ? "actions"
+        : skillId === "summary"
+          ? "summary"
+          : /risk|block|attention/i.test(prompt)
+            ? "risks"
+            : /next|action|follow.?up/i.test(prompt)
+              ? "actions"
+              : "summary";
   const supported =
+    skillId ||
     /summ[ar]+y|summar|overview|risk|block|attention|next|action|follow.?up/i.test(
       prompt,
     );
@@ -49,6 +61,13 @@ export function SourceResponse({
         Read {scopeLabel(scope)} from {source.name}
         <span>Sample snapshot</span>
       </div>
+      {skillId && (
+        <div className="response-skill-receipt">
+          <SkillIcon id={skillId} />
+          {getSkill(skillId).name}
+          <span>Skill applied</span>
+        </div>
+      )}
       <h2>
         {mode === "risks"
           ? "What needs attention"

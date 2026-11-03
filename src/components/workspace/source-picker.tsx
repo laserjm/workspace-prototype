@@ -142,9 +142,11 @@ export function SourcePicker({
 export function SourceContext({
   scope,
   onClick,
+  showSource = true,
 }: {
   scope: SourceScope;
   onClick: () => void;
+  showSource?: boolean;
 }) {
   const source = getSource(scope.sourceId);
   return (
@@ -154,9 +156,13 @@ export function SourceContext({
       onClick={onClick}
       aria-label={`View scope: ${source.name}, ${scope.recordIds.length} ${source.plural}`}
     >
-      <SourceMark id={source.id} />
-      <strong>{source.name}</strong>
-      <span className="scope-divider">/</span>
+      {showSource && (
+        <>
+          <SourceMark id={source.id} />
+          <strong>{source.name}</strong>
+          <span className="scope-divider">/</span>
+        </>
+      )}
       <span className="scope-collection">{source.collection}</span>
       <span className="scope-count">
         {scope.recordIds.length}{" "}

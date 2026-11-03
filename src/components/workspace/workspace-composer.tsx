@@ -26,6 +26,8 @@ import { ProviderIcon } from "./workspace-icons";
 import type { SourceId, SourceScope } from "./source-data";
 import { getSource, scopeLabel } from "./source-data";
 import { SourceContext, SourcePicker } from "./source-picker";
+import { getSkill, type SkillId } from "./skill-data";
+import { SkillPicker } from "./skill-picker";
 
 export function WorkspaceComposer({
   onSend,
@@ -35,12 +37,16 @@ export function WorkspaceComposer({
   onScope,
   onChooseSource,
   onClearSource,
+  enabledSkills,
+  onManageSkills,
+  initialSkill,
   busy = false,
 }: {
   onSend: (
     prompt: string,
     attachments: string[],
     provider: "claude" | "openai",
+    skillId?: SkillId,
   ) => void;
   onSources: () => void;
   compact?: boolean;
@@ -48,6 +54,9 @@ export function WorkspaceComposer({
   onScope?: () => void;
   onChooseSource?: (id: SourceId) => void;
   onClearSource?: () => void;
+  enabledSkills: SkillId[];
+  onManageSkills: () => void;
+  initialSkill?: SkillId;
   busy?: boolean;
 }) {
   const [prompt, setPrompt] = useState("");
@@ -55,6 +64,14 @@ export function WorkspaceComposer({
   const [permission, setPermission] = useState("Full access");
   const [attachments, setAttachments] = useState<File[]>([]);
   const [error, setError] = useState("");
+  const [chosenSkill, setChosenSkill] = useState<SkillId | undefined>(
+    initialSkill,
+  );
+  const selectedSkill =
+    chosenSkill && enabledSkills.includes(chosenSkill)
+      ? chosenSkill
+      : undefined;
+  const skill = selectedSkill ? getSkill(selectedSkill) : undefined;
   const fileInput = useRef<HTMLInputElement>(null);
   const canSend = prompt.trim().length > 0 && !busy;
 
@@ -64,6 +81,7 @@ export function WorkspaceComposer({
       prompt.trim(),
       attachments.map((file) => file.name),
       model.provider,
+      selectedSkill,
     );
     setPrompt("");
     setAttachments([]);
@@ -71,6 +89,42 @@ export function WorkspaceComposer({
 
   return (
     <div className={`composer-stack ${compact ? "composer-compact" : ""}`}>
+      {!compact && scope && (
+        <button
+          type="button"
+          className="example-prompt"
+          onClick={() => {
+            setPrompt(
+              `${skill?.prompt ?? "Create a summary of these"} ${scopeLabel(scope)}.`,
+            );
+            requestAnimationFrame(() =>
+              document
+                .querySelector<HTMLTextAreaElement>(".workspace-draft textarea")
+                ?.focus(),
+            );
+          }}
+        >
+          <span>Try it</span>
+          {skill?.prompt ?? "Create a summary of these"} {scopeLabel(scope)}{" "}
+          <ArrowUp size={12} />
+        </button>
+      )}
+      <div className="composer-source-row">
+        {onChooseSource && onClearSource && (
+          <SourcePicker
+            selected={scope?.sourceId}
+            onSelect={onChooseSource}
+            onClear={onClearSource}
+          />
+        )}
+        {scope && onScope && (
+          <SourceContext
+            scope={scope}
+            onClick={onScope}
+            showSource={!onChooseSource}
+          />
+        )}
+      </div>
       <form
         className="workspace-composer"
         aria-busy={busy}
@@ -79,7 +133,6 @@ export function WorkspaceComposer({
           submit();
         }}
       >
-        {scope && onScope && <SourceContext scope={scope} onClick={onScope} />}
         {attachments.length > 0 && (
           <div className="composer-attachments">
             {attachments.map((file, index) => (
@@ -209,18 +262,12 @@ export function WorkspaceComposer({
         </div>
       </form>
       <div className="composer-footnote">
-        {!compact && onChooseSource && onClearSource && (
-          <SourcePicker
-            selected={scope?.sourceId}
-            onSelect={onChooseSource}
-            onClear={onClearSource}
-          />
-        )}
-        {error && (
-          <p role="alert" className="composer-error">
-            {error}
-          </p>
-        )}
+        <SkillPicker
+          selected={selectedSkill}
+          enabledSkills={enabledSkills}
+          onSelect={setChosenSkill}
+          onManage={onManageSkills}
+        />
         <DropdownMenu>
           <DropdownMenuTrigger
             render={
@@ -248,22 +295,18 @@ export function WorkspaceComposer({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-      {!compact && scope && (
-        <button
-          type="button"
-          className="example-prompt"
-          onClick={() => {
-            setPrompt(`Create a summary of these ${scopeLabel(scope)}.`);
-            requestAnimationFrame(() =>
-              document
-                .querySelector<HTMLTextAreaElement>(".workspace-draft textarea")
-                ?.focus(),
-            );
-          }}
-        >
-          <span>Try it</span>Create a summary of these {scopeLabel(scope)}{" "}
-          <ArrowUp size={12} />
-        </button>
+      {error && (
+        <p role="alert" className="composer-error">
+          {error}
+        </p>
+      )}
+      {skill && (
+        <p className="composer-skill-hint">
+          <span>{skill.name}</span> ·{" "}
+          {scope
+            ? skill.output
+            : "Choose a source to try this skill with sample data"}
+        </p>
       )}
     </div>
   );
