@@ -47,6 +47,8 @@ All state is kept in memory for the current session. Refreshing resets it. These
 
 Make the source and selected record count visible before sending. Once a thread starts, preserve that scope and keep the source snapshot beside the conversation. Citations connect answers to individual records, while source-specific labels and layouts make Jira tickets, Confluence pages, and Codebeamer items recognizable. Choosing a different source from an active session starts a new thread.
 
+On desktop, drag the source panel’s left edge to resize it. The width is remembered in this browser and adjusts to leave room for the conversation. Focus the divider and use Left/Right (Shift for larger steps), Home/End for the limits, or double-click to reset. Narrow screens use a drawer. Panel surfaces, borders, and text follow T3 Code’s neutral GitHub panel styling; record statuses retain their semantic colors.
+
 ## Project structure
 
 - `src/app/page.tsx`: page entry point.

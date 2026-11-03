@@ -19,6 +19,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { SourceMark } from "./source-picker";
+import { ResizableSourcePanel } from "./resizable-source-panel";
 import {
   getSource,
   getScopedRecords,
@@ -69,6 +70,7 @@ export function SourceExplorer({
   );
   const content = (
     <aside
+      id="source-explorer"
       className="source-explorer"
       aria-label={`${source.name} source explorer`}
     >
@@ -281,7 +283,7 @@ export function SourceExplorer({
         </DialogContent>
       </Dialog>
     );
-  return content;
+  return <ResizableSourcePanel>{content}</ResizableSourcePanel>;
 }
 
 function subscribeToViewport(callback: () => void) {
