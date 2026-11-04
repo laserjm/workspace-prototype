@@ -3,6 +3,8 @@
 //
 // Shared by the server tool and the client frame: no React, no Node APIs.
 
+import { z } from "zod";
+
 export const HTML_RENDER_TOOL_NAME = "html_render";
 export const HTML_RENDER_MIN_HEIGHT = 80;
 export const HTML_RENDER_MAX_HEIGHT = 2000;
@@ -145,30 +147,29 @@ export const WORKSPACE_HTML_RENDER_THEME: HtmlRenderTheme = {
 const OPEN_LINK_METHOD = "ui/open-link";
 const SIZE_CHANGED_METHOD = "ui/notifications/size-changed";
 
+// Messages from the sandboxed frame are untrusted: parse them, never cast (NX-TYPE-03).
+const sizeChangedMessageSchema = z.object({
+  jsonrpc: z.literal("2.0"),
+  method: z.literal(SIZE_CHANGED_METHOD),
+  params: z.object({ height: z.number().positive() }),
+});
+
+const openLinkMessageSchema = z.object({
+  jsonrpc: z.literal("2.0"),
+  method: z.literal(OPEN_LINK_METHOD),
+  params: z.object({ url: z.string().regex(/^https?:\/\//i) }),
+});
+
 export function readHtmlRenderContentHeight(data: unknown): number | undefined {
-  if (typeof data !== "object" || data === null) return undefined;
-  const { jsonrpc, method, params } = data as Record<string, unknown>;
-  if (jsonrpc !== "2.0" || method !== SIZE_CHANGED_METHOD) return undefined;
-  const height =
-    typeof params === "object" && params !== null
-      ? (params as { height?: unknown }).height
-      : undefined;
-  return typeof height === "number" && Number.isFinite(height) && height > 0
-    ? height
-    : undefined;
+  const message = sizeChangedMessageSchema.safeParse(data);
+  return message.success ? message.data.params.height : undefined;
 }
 
 export function readHtmlRenderLinkRequest(
   data: unknown,
 ): { readonly url: string } | undefined {
-  if (typeof data !== "object" || data === null) return undefined;
-  const { jsonrpc, method, params } = data as Record<string, unknown>;
-  if (jsonrpc !== "2.0" || method !== OPEN_LINK_METHOD) return undefined;
-  if (typeof params !== "object" || params === null) return undefined;
-  const { url } = params as Record<string, unknown>;
-  return typeof url === "string" && /^https?:\/\//i.test(url)
-    ? { url }
-    : undefined;
+  const message = openLinkMessageSchema.safeParse(data);
+  return message.success ? { url: message.data.params.url } : undefined;
 }
 
 const BASE_CSS =

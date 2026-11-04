@@ -7,3 +7,10 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+## Conventions
+
+Conventions profile `nextjs` 0.3.0, pinned in `ARCHITECTURE.md` (read it first).
+Lint what you change with `pnpm exec conventions lint <files>`, run `pnpm exec conventions check`
+before finishing, and read any rule with `pnpm exec conventions explain <RULE-ID>`. Never disable
+a rule; record a deviation in `ARCHITECTURE.md` instead.

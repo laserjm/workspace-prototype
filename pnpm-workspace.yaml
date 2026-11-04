@@ -12,3 +12,10 @@ minimumReleaseAgeExclude:
   - eslint-config-next@16.4.4
   - lucide-react@1.67.0
   - next@16.4.4
+
+# @conventions/nextjs depends on @conventions/cli by its release-tarball URL, which pnpm treats as
+# an exotic subdependency. Both tarballs are pinned to the same release in package.json.
+blockExoticSubdeps: false
+
+allowBuilds:
+  '@ast-grep/cli': true

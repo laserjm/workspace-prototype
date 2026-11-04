@@ -4,7 +4,7 @@ The workspace screen is inspired by [T3 Code](https://github.com/pingdotgg/t3cod
 
 The source explorer’s neutral surfaces and resize interaction also follow `PullRequestDetailPanel.tsx`, `RightPanelResizeHandle.tsx`, `useResizableWidth.ts`, and `useResizeDrag.ts` in `apps/web/src` at the commit above.
 
-The `html_render` tool is adapted from T3 Code at commit `8b44f42b14c8e273156474a924ccf29680dd7857`: `src/lib/html-render/html-render.ts` from `packages/shared/src/htmlRender.ts` (theme and layout guides, bootstrap injection, frame messages), the viewport height check from `apps/server/src/htmlRender/HtmlRender.ts`, the tool description from `apps/server/src/mcp/toolkits/html/tools.ts`, and `src/components/chat/html-render-*.tsx` from `apps/web/src/components/chat/HtmlRenderFrame.tsx` and `HtmlRenderDocument` in `apps/web/src/components/files/BrowserDocumentFrame.tsx`.
+The `html_render` tool is adapted from T3 Code at commit `8b44f42b14c8e273156474a924ccf29680dd7857`: `src/lib/html-render/html-render.ts` from `packages/shared/src/htmlRender.ts` (theme and layout guides, bootstrap injection, frame messages), the viewport height check from `apps/server/src/htmlRender/HtmlRender.ts`, the tool description from `apps/server/src/mcp/toolkits/html/tools.ts` (used by `src/modules/threads/infra/ai-sdk.html-render-tool.ts`), and `src/components/ui/html-render-*.tsx` from `apps/web/src/components/chat/HtmlRenderFrame.tsx` and `HtmlRenderDocument` in `apps/web/src/components/files/BrowserDocumentFrame.tsx`.
 
 MIT License
 

@@ -1,0 +1,19 @@
+"use client";
+
+import { createContext, useContext } from "react";
+import { bug } from "@conventions/nextjs/core";
+import { findSkill, type Skill } from "../domain/skill";
+
+export const SkillsContext = createContext<readonly Skill[] | null>(null);
+
+/** The skill catalogue the page loaded, provided by `SkillsProvider`. */
+export function useSkills() {
+  const skills = useContext(SkillsContext);
+  if (!skills) bug("useSkills is called outside SkillsProvider");
+  return {
+    skills,
+    skillById(id: string) {
+      return findSkill(skills, id) ?? bug(`unknown skill '${id}'`);
+    },
+  };
+}
