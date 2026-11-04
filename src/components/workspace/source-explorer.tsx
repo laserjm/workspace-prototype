@@ -27,7 +27,7 @@ import {
   scopeLabel,
   type SourceRecord,
   type SourceScope,
-} from "./source-data";
+} from "@/lib/workspace/source-data";
 
 export function RecordStatus({ record }: { record: SourceRecord }) {
   return (

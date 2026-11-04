@@ -1,20 +1,25 @@
 import { Clock, Folder, MessageSquare, Paperclip } from "lucide-react";
 import type { Thread } from "./workspace-data";
-import { getScopedRecords, getSource, scopeLabel } from "./source-data";
+import { getScopedRecords, getSource, scopeLabel } from "@/lib/workspace/source-data";
 import { SourceMark } from "./source-picker";
 import { formatWakeTime, threadShelf } from "./thread-lifecycle";
+import { useChatStore } from "@/lib/chat/chat-store";
 
 export function ThreadContextCard({ thread }: { thread: Thread }) {
   const source = thread.scope ? getSource(thread.scope.sourceId) : undefined;
   const records = thread.scope ? getScopedRecords(thread.scope) : [];
   const shelf = threadShelf(thread);
-  const turns = 1 + (thread.followUps?.length ?? 0);
+  // Read on render: the card only renders while its tooltip is open.
+  const userMessages = useChatStore()
+    .peekMessages(thread.id)
+    .filter((message) => message.role === "user");
+  const turns = (thread.sample ? 1 : 0) + userMessages.length;
   const attachments =
-    (thread.attachments?.length ?? 0) +
-    (thread.followUps?.reduce(
-      (count, turn) => count + turn.attachments.length,
+    (thread.sample?.attachments?.length ?? 0) +
+    userMessages.reduce(
+      (count, message) => count + (message.metadata?.attachments?.length ?? 0),
       0,
-    ) ?? 0);
+    );
   return (
     <div className="thread-context-card">
       <strong className="thread-context-title">{thread.title}</strong>

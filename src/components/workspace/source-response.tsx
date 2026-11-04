@@ -1,7 +1,7 @@
 import { ArrowUpRight, CheckCheck } from "lucide-react";
 import { ResponseTurn } from "./response-turn";
 import type { ResponseTiming } from "./response-timing";
-import { getSkill, type SkillId } from "./skill-data";
+import { getSkill, type SkillId } from "@/lib/workspace/skill-data";
 import { SkillIcon } from "./skill-picker";
 import {
   getSource,
@@ -9,7 +9,7 @@ import {
   recordStatuses,
   scopeLabel,
   type SourceScope,
-} from "./source-data";
+} from "@/lib/workspace/source-data";
 
 export function SourceResponse({
   scope,
@@ -53,7 +53,12 @@ export function SourceResponse({
     <ResponseTurn
       timing={timing}
       continuation={continuation}
-      sourceLabel={`${source.name} · ${scopeLabel(scope)}`}
+      label="Sample assistant response"
+      details={[
+        { label: "Source", value: `${source.name} · ${scopeLabel(scope)}` },
+      ]}
+      note="Sample response prepared locally from the selected records. No AI provider was used for this response."
+      preparingLabel={`Preparing a sample response from ${source.name} · ${scopeLabel(scope)}…`}
       onFork={onFork}
     >
       <div className="response-read-receipt">

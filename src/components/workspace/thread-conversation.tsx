@@ -1,0 +1,168 @@
+"use client";
+
+import { Fragment, useLayoutEffect, useRef } from "react";
+import { FileText } from "lucide-react";
+import { useChat } from "@ai-sdk/react";
+import { useChatStore } from "@/lib/chat/chat-store";
+import type { WorkspaceUIMessage } from "@/lib/chat/message";
+import { LiveResponse } from "./live-response";
+import { SourceResponse } from "./source-response";
+import type { Thread } from "./workspace-data";
+
+export type ForkTarget =
+  | { kind: "sample" }
+  | { kind: "live"; messageId: string; responseIndex: number };
+
+// Keep following the stream while the reader is within this distance of the end.
+const PINNED_DISTANCE = 80;
+
+/** The thread's messages: its sample turn, if any, then the live chat. */
+export function ThreadConversation({
+  thread,
+  onOpenRecord,
+  onFork,
+}: {
+  thread: Thread;
+  onOpenRecord: (id: string) => void;
+  onFork: (target: ForkTarget) => void;
+}) {
+  const store = useChatStore();
+  const { messages, status, error } = useChat({
+    chat: store.getChat(thread.id),
+  });
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const pinned = useRef(messages.length > 0);
+  const lastUserId = messages.findLast((message) => message.role === "user")?.id;
+
+  // Follow new messages and streamed text unless the reader scrolled up;
+  // sending a message always returns to the end.
+  const followedUserId = useRef(lastUserId);
+  useLayoutEffect(() => {
+    const element = scrollRef.current;
+    if (!element) return;
+    if (lastUserId !== followedUserId.current) {
+      followedUserId.current = lastUserId;
+      pinned.current = true;
+    }
+    if (pinned.current) element.scrollTop = element.scrollHeight;
+  }, [messages, lastUserId]);
+
+  const inFlight = status === "submitted" || status === "streaming";
+  const last = messages.at(-1);
+  let responseIndex = thread.sample ? 1 : 0;
+
+  return (
+    <div
+      className="conversation-messages"
+      ref={scrollRef}
+      onScroll={(event) => {
+        const element = event.currentTarget;
+        pinned.current =
+          element.scrollHeight - element.scrollTop - element.clientHeight <
+          PINNED_DISTANCE;
+      }}
+    >
+      {thread.sample && (
+        <>
+          <UserMessage
+            text={thread.sample.prompt}
+            attachments={thread.sample.attachments}
+          />
+          {thread.scope && (
+            <SourceResponse
+              scope={thread.scope}
+              prompt={thread.sample.prompt}
+              onOpenRecord={onOpenRecord}
+              timing={thread.sample.responseTiming}
+              skillId={thread.sample.skillId}
+              onFork={() => onFork({ kind: "sample" })}
+            />
+          )}
+        </>
+      )}
+      {messages.map((message, index) => {
+        if (message.role === "user") {
+          const reply = messages[index + 1];
+          const awaitingReply = reply?.role !== "assistant";
+          return (
+            <Fragment key={message.id}>
+              <UserMessage
+                text={textOf(message)}
+                attachments={message.metadata?.attachments}
+              />
+              {awaitingReply && inFlight && message === last && (
+                <LiveResponse
+                  requestedAt={requestedAt(message)}
+                  working
+                  continuation={responseIndex > 0}
+                  scope={thread.scope}
+                  onFork={() => undefined}
+                />
+              )}
+            </Fragment>
+          );
+        }
+        if (message.role !== "assistant") return null;
+        const currentIndex = responseIndex++;
+        const request = messages[index - 1];
+        return (
+          <LiveResponse
+            key={message.id}
+            message={message}
+            requestedAt={
+              request ? requestedAt(request) : new Date().toISOString()
+            }
+            working={inFlight && message === last}
+            continuation={currentIndex > 0}
+            scope={thread.scope}
+            onFork={() =>
+              onFork({
+                kind: "live",
+                messageId: message.id,
+                responseIndex: currentIndex,
+              })
+            }
+          />
+        );
+      })}
+      {error && !inFlight && (
+        <div className="response-error" role="alert">
+          <span>The response did not finish. {error.message}</span>
+          <button type="button" onClick={() => void store.retry(thread.id)}>
+            Try again
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function UserMessage({
+  text,
+  attachments,
+}: {
+  text: string;
+  attachments?: string[];
+}) {
+  return (
+    <div className="user-message">
+      <p>{text}</p>
+      {attachments?.map((name, index) => (
+        <span className="attachment-chip" key={`${name}-${index}`}>
+          <FileText size={14} />
+          {name}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function textOf(message: WorkspaceUIMessage) {
+  return message.parts
+    .map((part) => (part.type === "text" ? part.text : ""))
+    .join("");
+}
+
+function requestedAt(message: WorkspaceUIMessage) {
+  return message.metadata?.createdAt ?? new Date().toISOString();
+}

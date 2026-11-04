@@ -1,4 +1,5 @@
-export type SourceId = "jira" | "confluence" | "codebeamer";
+export const sourceIds = ["jira", "confluence", "codebeamer"] as const;
+export type SourceId = (typeof sourceIds)[number];
 export type RecordStatus = "To do" | "In progress" | "In review" | "Done";
 export type SourceRecord = {
   id: string;
