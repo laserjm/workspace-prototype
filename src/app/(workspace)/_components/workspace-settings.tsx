@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Cable, Folder, Settings2, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SkillSettingsPanel } from "@/modules/skills";
@@ -21,6 +22,7 @@ export function WorkspaceSettings({
   project: string | null;
   onSources: () => void;
 }) {
+  const [skillQuery, setSkillQuery] = useState("");
   return (
     <div className="settings-layout">
       <nav className="settings-navigation" aria-label="Settings sections">
@@ -69,6 +71,8 @@ export function WorkspaceSettings({
         <SkillSettingsPanel
           enabledSkills={enabledSkills}
           onToggleSkill={onToggleSkill}
+          query={skillQuery}
+          onQueryChange={setSkillQuery}
         />
       )}
     </div>

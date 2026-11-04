@@ -1,14 +1,16 @@
 "use client";
 
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 
 export function ProjectForm({
+  name,
+  onNameChange,
   onCreate,
 }: {
+  name: string;
+  onNameChange: (name: string) => void;
   onCreate: (name: string) => void;
 }) {
-  const [name, setName] = useState("");
   return (
     <form
       className="workspace-dialog-form"
@@ -16,7 +18,6 @@ export function ProjectForm({
         event.preventDefault();
         if (!name.trim()) return;
         onCreate(name);
-        setName("");
       }}
     >
       <label htmlFor="project-name">Project name</label>
@@ -25,7 +26,7 @@ export function ProjectForm({
         autoFocus
         placeholder="my-workspace"
         value={name}
-        onChange={(event) => setName(event.target.value)}
+        onChange={(event) => onNameChange(event.target.value)}
         maxLength={80}
         required
       />

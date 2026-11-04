@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { Search } from "lucide-react";
 import { SkillIcon } from "./skill-icon";
 import { useSkills } from "./use-skills";
@@ -9,12 +8,15 @@ import { useSkills } from "./use-skills";
 export function SkillSettingsPanel({
   enabledSkills,
   onToggleSkill,
+  query,
+  onQueryChange,
 }: {
   enabledSkills: string[];
   onToggleSkill: (id: string) => void;
+  query: string;
+  onQueryChange: (query: string) => void;
 }) {
   const { skills } = useSkills();
-  const [query, setQuery] = useState("");
   const visible = skills.filter((skill) =>
     `${skill.name} ${skill.description}`
       .toLowerCase()
@@ -42,7 +44,7 @@ export function SkillSettingsPanel({
           aria-label="Search skills"
           placeholder="Find a skill…"
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={(event) => onQueryChange(event.target.value)}
         />
       </label>
       <div className="skill-settings-list">

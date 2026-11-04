@@ -98,6 +98,7 @@ export function WorkspaceShell({
   const [settingsSection, setSettingsSection] =
     useState<SettingsSection>("general");
   const { enabledSkills, toggleSkill } = useSkillPreferences();
+  const [projectName, setProjectName] = useState("");
   const [draftScope, setDraftScope] = useState<ThreadScope>();
   const [editingScope, setEditingScope] = useState(false);
   const [sourceOpen, setSourceOpen] = useState(true);
@@ -317,7 +318,7 @@ export function WorkspaceShell({
           projects={projects}
           activeId={activeThread?.id}
           onSelect={(thread) => {
-            acknowledgeWake(thread.id);
+            if (thread.wokeAt) acknowledgeWake(thread.id);
             setProject(thread.project);
             navigate(thread.id);
           }}
@@ -541,11 +542,14 @@ export function WorkspaceShell({
 
           {dialog === "project" && (
             <ProjectForm
+              name={projectName}
+              onNameChange={setProjectName}
               onCreate={(name) => {
                 const added = addProject(projects, name);
                 if (!added.ok) return;
                 setProjects(added.value.projects);
                 setProject(added.value.name);
+                setProjectName("");
                 navigate(null);
                 setDialog(null);
               }}
