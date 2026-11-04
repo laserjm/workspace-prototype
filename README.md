@@ -17,7 +17,9 @@ Open [localhost:3000](http://localhost:3000).
 
 ```sh
 pnpm lint
+pnpm check
 pnpm typecheck
+pnpm test
 pnpm build
 pnpm start
 ```
@@ -73,23 +75,40 @@ On desktop, drag the source panel’s left edge to resize it. The width is remem
 
 ## Project structure
 
-- `src/app/page.tsx`: page entry point.
-- `src/app/layout.tsx`: root layout, fonts, and metadata.
-- `src/app/globals.css`: Tailwind imports and shadcn theme tokens.
-- `src/components/workspace/`: screen, sidebar, composer, demo data, and scoped workspace styles.
-- `project-filter.tsx`: searchable sidebar project filter with keyboard navigation and multiple selection.
-- `workspace-thread-row.tsx`, `thread-context-card.tsx`: session actions and full-title/source-context previews.
-- `thread-lifecycle.ts`, `use-snooze-wake.ts`, `custom-snooze-dialog.tsx`: shelf state, return-time scheduling, and custom snoozes.
-- `source-data.ts`: source definitions, fictional enterprise records, and scope helpers.
-- `source-picker.tsx`: compact source dropdown, catalog cards, and record selection dialog.
-- `source-explorer.tsx`: source list, Jira grouped board, record details, and responsive drawer.
-- `source-response.tsx`: deterministic sample responses with source citations.
-- `skill-data.ts`, `skill-picker.tsx`: bundled skill definitions and per-message selection.
-- `workspace-settings.tsx`, `use-skill-preferences.ts`: settings and browser-persisted skill activation.
-- `src/components/ui/`: shadcn Button, Dialog, Dropdown Menu, and Tooltip components.
-- `components.json`: shadcn configuration, using the Base UI Nova style.
+The app follows the [`nextjs` conventions profile](https://github.com/laserjm/conventions) 0.3.0.
+[ARCHITECTURE.md](ARCHITECTURE.md) pins the version and records how this project applies the
+rules. Paths below are relative to `src/`, which `@/` points to.
 
-Imports use the `@/*` alias for `src/*`. Add components with:
+```
+app/
+  layout.tsx                    root layout, fonts, metadata, globals.css
+  (workspace)/
+    page.tsx                    server component: reads every catalogue, renders the shell
+    layout.tsx, workspace.css   the workspace styles
+    _components/                shell, sidebar, settings and new-thread heading (this route only)
+modules/
+  threads/                      sessions: follow-ups, settle, snooze, wake, fork, sample responses
+  sources/                      Jira, Confluence and Codebeamer sample records, picker, explorer
+  skills/                       skill catalogue, picker, settings panel, browser-stored activation
+  projects/                     project list, add-project form, sidebar filter
+components/ui/                  shadcn primitives and other feature-agnostic UI
+lib/utils.ts                    `cn`
+tests/                          test factories and support
+```
+
+Each module has the same shape: `domain/` holds plain types and pure functions with their
+tests, `infra/sample.*.ts` holds the bundled sample data, `queries.ts` and `server.ts` read it
+on the server, `components/` holds the browser UI, and `index.ts` is the public API. A module
+reaches another one only through `index.ts` or `server.ts`.
+
+```sh
+pnpm lint          # conventions lint: ESLint, ast-grep and ls-lint; every finding carries a rule id
+pnpm check         # conventions check: module shape, tests, header, deviations
+pnpm test          # unit tests (Vitest)
+pnpm exec conventions explain NX-LAYER-05   # print a rule
+```
+
+Add shadcn components with:
 
 ```sh
 pnpm exec shadcn add card input
