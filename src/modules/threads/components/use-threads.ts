@@ -1,62 +1,37 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import type { Result } from "@conventions/nextjs/core";
-import type {
-  ResponseNotFinished,
-  SnoozeTimeInPast,
-  ThreadStillWorking,
-} from "../domain/errors";
+import type { SnoozeTimeInPast, ThreadStillWorking } from "../domain/errors";
 import {
   acknowledgeWake,
-  addFollowUp,
-  completeResponse,
+  continueThread,
   forkThread,
   restore,
   settle,
   snooze,
   startThread,
   withPlacement,
-  type NewFollowUp,
+  type ModelProvider,
   type NewThread,
   type Thread,
   type ThreadPlacement,
 } from "../domain/thread";
 import { useSnoozeWake } from "./use-snooze-wake";
 
-/** How long a sample response takes to prepare, so the running timer can be seen. */
-const SAMPLE_PREPARATION_MS = 2400;
-
 /**
  * The threads of this browser session. Every change goes through a domain function; the
- * session keeps them in memory until threads are stored per owner.
+ * session keeps them in memory until threads are stored per owner. Conversations live in
+ * the `ChatStore`; `working` comes from there.
  */
 export function useThreads(initialThreads: Thread[]) {
   const [threads, setThreads] = useState(initialThreads);
-  const responseTimers = useRef(new Set<ReturnType<typeof setTimeout>>());
   useSnoozeWake(threads, setThreads);
-
-  useEffect(() => {
-    const timers = responseTimers.current;
-    return () => {
-      for (const timer of timers) clearTimeout(timer);
-    };
-  }, []);
 
   function update(id: string, change: (thread: Thread) => Thread) {
     setThreads((previous) =>
       previous.map((thread) => (thread.id === id ? change(thread) : thread)),
     );
-  }
-
-  function prepareSampleResponse(threadId: string, responseIndex: number) {
-    const timer = setTimeout(() => {
-      responseTimers.current.delete(timer);
-      update(threadId, (thread) =>
-        completeResponse(thread, responseIndex, new Date()),
-      );
-    }, SAMPLE_PREPARATION_MS);
-    responseTimers.current.add(timer);
   }
 
   return {
@@ -69,8 +44,9 @@ export function useThreads(initialThreads: Thread[]) {
     snoozeThread(
       thread: Thread,
       until: Date,
+      working: boolean,
     ): Result<Thread, SnoozeTimeInPast | ThreadStillWorking> {
-      const result = snooze(thread, until, new Date());
+      const result = snooze(thread, until, new Date(), working);
       if (result.ok)
         update(thread.id, (latest) =>
           withPlacement(latest, { snoozedUntil: result.value.snoozedUntil }),
@@ -92,35 +68,29 @@ export function useThreads(initialThreads: Thread[]) {
     },
 
     startThread(input: NewThread) {
-      const thread = startThread(input, new Date());
+      const thread = startThread(input);
       setThreads((previous) => [thread, ...previous]);
-      if (thread.scope) prepareSampleResponse(thread.id, 0);
       return thread;
     },
 
-    addFollowUp(
+    continueThread(
       thread: Thread,
-      input: NewFollowUp,
+      provider: ModelProvider,
+      working: boolean,
     ): Result<Thread, ThreadStillWorking> {
-      const now = new Date();
-      const result = addFollowUp(thread, input, now);
-      if (!result.ok) return result;
-      update(thread.id, (latest) => {
-        const next = addFollowUp(latest, input, now);
-        return next.ok ? next.value : latest;
-      });
-      if (thread.scope)
-        prepareSampleResponse(thread.id, (thread.followUps?.length ?? 0) + 1);
+      const result = continueThread(thread, provider, working);
+      if (result.ok)
+        update(thread.id, (latest) => {
+          const next = continueThread(latest, provider, working);
+          return next.ok ? next.value : latest;
+        });
       return result;
     },
 
-    forkThread(
-      thread: Thread,
-      responseIndex: number,
-    ): Result<Thread, ResponseNotFinished> {
-      const result = forkThread(thread, responseIndex, crypto.randomUUID());
-      if (result.ok) setThreads((previous) => [result.value, ...previous]);
-      return result;
+    forkThread(thread: Thread, responseIndex: number) {
+      const fork = forkThread(thread, responseIndex, crypto.randomUUID());
+      setThreads((previous) => [fork, ...previous]);
+      return fork;
     },
   };
 }

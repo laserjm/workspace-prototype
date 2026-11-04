@@ -30,14 +30,16 @@ import {
   useSources,
 } from "@/modules/sources";
 import {
+  ChatStore,
+  ChatStoreProvider,
   createScope,
-  isAwaitingResponse,
   placementOf,
   PromptForm,
   ThreadConversation,
   useThreads,
+  useThreadWorking,
+  type ForkTarget,
   type ModelChoice,
-  type ModelProvider,
   type SnoozeTimeInPast,
   type Thread,
   type ThreadPlacement,
@@ -76,9 +78,10 @@ export function WorkspaceShell({
     returnThread,
     acknowledgeWake,
     startThread,
-    addFollowUp,
+    continueThread,
     forkThread,
   } = useThreads(initialThreads);
+  const [chatStore] = useState(() => new ChatStore());
   const [threadNotice, setThreadNotice] = useState<{
     message: string;
     undo?: {
@@ -107,9 +110,7 @@ export function WorkspaceShell({
     (thread) => thread.id === history[historyIndex],
   );
   const currentProject = activeThread?.project ?? project;
-  const responseWorking = activeThread
-    ? isAwaitingResponse(activeThread)
-    : false;
+  const responseWorking = useThreadWorking(activeThread?.id, chatStore);
 
   useEffect(() => {
     if (!threadNotice) return;
@@ -171,7 +172,11 @@ export function WorkspaceShell({
   function handleSnooze(id: string, until: string, nextId: string | null) {
     const thread = threads.find((item) => item.id === id);
     if (!thread) return;
-    const result = snoozeThread(thread, new Date(until));
+    const result = snoozeThread(
+      thread,
+      new Date(until),
+      chatStore.isWorking(thread.id),
+    );
     if (!result.ok) {
       setThreadNotice({ message: SNOOZE_REFUSED[result.error._tag] });
       return;
@@ -231,12 +236,19 @@ export function WorkspaceShell({
     setSourceOpen(true);
   }
 
-  function handleFork(responseIndex: number) {
+  function handleFork(target: ForkTarget) {
     if (!activeThread) return;
-    const fork = forkThread(activeThread, responseIndex);
-    if (!fork.ok) return;
-    setProject(fork.value.project);
-    navigate(fork.value.id);
+    const fork = forkThread(
+      activeThread,
+      target.kind === "sample" ? 0 : target.responseIndex,
+    );
+    chatStore.fork(
+      activeThread.id,
+      fork.id,
+      target.kind === "live" ? target.messageId : undefined,
+    );
+    setProject(fork.project);
+    navigate(fork.id);
   }
 
   function toggleSidebar() {
@@ -266,28 +278,39 @@ export function WorkspaceShell({
   function sendMessage(
     prompt: string,
     attachments: string[],
-    provider: ModelProvider,
+    modelId: string,
     skillId?: string,
   ) {
+    const model = models.find((item) => item.id === modelId);
+    if (!model) return;
+    const message = { text: prompt, attachments };
     if (activeThread) {
-      const sent = addFollowUp(activeThread, {
-        text: prompt,
-        attachments,
-        provider,
-        skillId,
-      });
-      if (sent.ok && threadNotice?.undo?.threadId === activeThread.id)
+      const continued = continueThread(
+        activeThread,
+        model.provider,
+        responseWorking,
+      );
+      if (!continued.ok) return;
+      if (threadNotice?.undo?.threadId === activeThread.id)
         setThreadNotice(undefined);
+      void chatStore.send(activeThread.id, message, {
+        modelId,
+        skillId,
+        scope: activeThread.scope,
+      });
       return;
     }
     const thread = startThread({
       id: crypto.randomUUID(),
       project: project ?? "No project",
       prompt,
-      attachments,
-      provider,
-      skillId,
+      provider: model.provider,
       scope: draftScope,
+    });
+    void chatStore.send(thread.id, message, {
+      modelId,
+      skillId,
+      scope: thread.scope,
     });
     navigate(thread.id);
   }
@@ -298,322 +321,333 @@ export function WorkspaceShell({
   }
 
   return (
-    <TooltipProvider delay={450}>
-      <div
-        className={`workspace-app ${sidebarOpen ? "" : "sidebar-collapsed"} ${mobileSidebarOpen ? "mobile-sidebar-open" : ""}`}
-      >
-        <a className="workspace-skip-link" href="#workspace-main">
-          Skip to workspace
-        </a>
-        {mobileSidebarOpen && (
-          <button
-            type="button"
-            className="sidebar-backdrop"
-            aria-label="Close sidebar"
-            onClick={() => setMobileSidebarOpen(false)}
+    <ChatStoreProvider store={chatStore}>
+      <TooltipProvider delay={450}>
+        <div
+          className={`workspace-app ${sidebarOpen ? "" : "sidebar-collapsed"} ${mobileSidebarOpen ? "mobile-sidebar-open" : ""}`}
+        >
+          <a className="workspace-skip-link" href="#workspace-main">
+            Skip to workspace
+          </a>
+          {mobileSidebarOpen && (
+            <button
+              type="button"
+              className="sidebar-backdrop"
+              aria-label="Close sidebar"
+              onClick={() => setMobileSidebarOpen(false)}
+            />
+          )}
+          <WorkspaceSidebar
+            threads={threads}
+            projects={projects}
+            activeId={activeThread?.id}
+            onSelect={(thread) => {
+              if (thread.wokeAt) acknowledgeWake(thread.id);
+              setProject(thread.project);
+              navigate(thread.id);
+            }}
+            onNewThread={newThread}
+            onNewProject={() => setDialog("project")}
+            onToggle={toggleSidebar}
+            onSettings={() => openSettings()}
+            onSources={() => setDialog("sources")}
+            onActivity={() => setDialog("activity")}
+            onSettle={handleSettle}
+            onSnooze={handleSnooze}
+            onRestore={handleRestore}
+            notice={
+              threadNotice
+                ? {
+                    message: threadNotice.message,
+                    onUndo: threadNotice.undo ? undoThreadPlacement : undefined,
+                  }
+                : undefined
+            }
           />
-        )}
-        <WorkspaceSidebar
-          threads={threads}
-          projects={projects}
-          activeId={activeThread?.id}
-          onSelect={(thread) => {
-            if (thread.wokeAt) acknowledgeWake(thread.id);
-            setProject(thread.project);
-            navigate(thread.id);
-          }}
-          onNewThread={newThread}
-          onNewProject={() => setDialog("project")}
-          onToggle={toggleSidebar}
-          onSettings={() => openSettings()}
-          onSources={() => setDialog("sources")}
-          onActivity={() => setDialog("activity")}
-          onSettle={handleSettle}
-          onSnooze={handleSnooze}
-          onRestore={handleRestore}
-          notice={
-            threadNotice
-              ? {
-                  message: threadNotice.message,
-                  onUndo: threadNotice.undo ? undoThreadPlacement : undefined,
-                }
-              : undefined
-          }
-        />
 
-        <div className="workspace-canvas" inert={mobileSidebarOpen}>
-          <header className="workspace-header">
-            <div className="sidebar-reopen">
-              <IconButton label="Open sidebar" onClick={toggleSidebar}>
-                <PanelLeftOpen />
-              </IconButton>
-            </div>
-            <div className="workspace-breadcrumb" aria-label="Current project">
-              {currentProject && (
-                <>
-                  <button
-                    type="button"
-                    className="breadcrumb-project"
-                    onClick={newThread}
-                  >
-                    <ProjectIcon />
-                    <span>{currentProject}</span>
-                  </button>
-                  <span className="breadcrumb-divider">/</span>
-                </>
-              )}
-              <span className="breadcrumb-thread">
-                {activeThread?.title ?? "New thread"}
-              </span>
-            </div>
-            <div className="workspace-header-actions">
-              <IconButton
-                label="Workspace settings"
-                onClick={() => openSettings()}
-              >
-                <SquareMenu />
-              </IconButton>
-              <IconButton
-                label={panelOpen ? "Hide bottom panel" : "Show bottom panel"}
-                className={panelOpen ? "is-active" : ""}
-                aria-pressed={panelOpen}
-                onClick={() => setPanelOpen((open) => !open)}
-              >
-                <PanelBottom />
-              </IconButton>
-              <IconButton
-                label={
-                  activeThread?.scope
-                    ? sourceOpen
-                      ? "Hide source explorer"
-                      : "Show source explorer"
-                    : "Choose data source"
-                }
-                aria-pressed={activeThread?.scope ? sourceOpen : undefined}
-                className={activeThread?.scope && sourceOpen ? "is-active" : ""}
-                onClick={() =>
-                  activeThread?.scope
-                    ? setSourceOpen((open) => !open)
-                    : setDialog("sources")
-                }
-              >
-                <PanelRight />
-              </IconButton>
-            </div>
-          </header>
-
-          <main
-            id="workspace-main"
-            className={`workspace-main ${activeThread?.scope ? "source-session" : ""} ${activeThread?.scope && sourceOpen ? "source-session-open" : ""}`}
-            tabIndex={-1}
-          >
-            {!activeThread ? (
-              <div className="workspace-draft enterprise-draft">
-                <NewThreadHeading
-                  project={project}
-                  projects={projects}
-                  onProject={setProject}
-                  onAddProject={() => setDialog("project")}
-                />
-                <PromptForm
-                  key={project ?? "no-project"}
-                  models={models}
-                  onSend={sendMessage}
-                  onSources={() => setDialog("sources")}
-                  scope={draftScope}
-                  onScope={() => setEditingScope(true)}
-                  onChooseSource={chooseSource}
-                  onClearSource={clearSource}
-                  enabledSkills={enabledSkills}
-                  onManageSkills={() => openSettings("skills")}
-                />
-                <p className="draft-demo-note">
-                  Explore with sample data. Live enterprise connections come
-                  next.
-                </p>
+          <div className="workspace-canvas" inert={mobileSidebarOpen}>
+            <header className="workspace-header">
+              <div className="sidebar-reopen">
+                <IconButton label="Open sidebar" onClick={toggleSidebar}>
+                  <PanelLeftOpen />
+                </IconButton>
               </div>
-            ) : (
-              <ThreadConversation
-                thread={activeThread}
-                onRestore={() => handleRestore(activeThread.id)}
-                onOpenThread={navigate}
-                onViewSource={showSource}
-                onOpenRecord={openRecord}
-                onFork={handleFork}
-                onExploreSources={() => setDialog("sources")}
-                composer={
+              <div
+                className="workspace-breadcrumb"
+                aria-label="Current project"
+              >
+                {currentProject && (
+                  <>
+                    <button
+                      type="button"
+                      className="breadcrumb-project"
+                      onClick={newThread}
+                    >
+                      <ProjectIcon />
+                      <span>{currentProject}</span>
+                    </button>
+                    <span className="breadcrumb-divider">/</span>
+                  </>
+                )}
+                <span className="breadcrumb-thread">
+                  {activeThread?.title ?? "New thread"}
+                </span>
+              </div>
+              <div className="workspace-header-actions">
+                <IconButton
+                  label="Workspace settings"
+                  onClick={() => openSettings()}
+                >
+                  <SquareMenu />
+                </IconButton>
+                <IconButton
+                  label={panelOpen ? "Hide bottom panel" : "Show bottom panel"}
+                  className={panelOpen ? "is-active" : ""}
+                  aria-pressed={panelOpen}
+                  onClick={() => setPanelOpen((open) => !open)}
+                >
+                  <PanelBottom />
+                </IconButton>
+                <IconButton
+                  label={
+                    activeThread?.scope
+                      ? sourceOpen
+                        ? "Hide source explorer"
+                        : "Show source explorer"
+                      : "Choose data source"
+                  }
+                  aria-pressed={activeThread?.scope ? sourceOpen : undefined}
+                  className={
+                    activeThread?.scope && sourceOpen ? "is-active" : ""
+                  }
+                  onClick={() =>
+                    activeThread?.scope
+                      ? setSourceOpen((open) => !open)
+                      : setDialog("sources")
+                  }
+                >
+                  <PanelRight />
+                </IconButton>
+              </div>
+            </header>
+
+            <main
+              id="workspace-main"
+              className={`workspace-main ${activeThread?.scope ? "source-session" : ""} ${activeThread?.scope && sourceOpen ? "source-session-open" : ""}`}
+              tabIndex={-1}
+            >
+              {!activeThread ? (
+                <div className="workspace-draft enterprise-draft">
+                  <NewThreadHeading
+                    project={project}
+                    projects={projects}
+                    onProject={setProject}
+                    onAddProject={() => setDialog("project")}
+                  />
                   <PromptForm
-                    key={activeThread.id}
-                    compact
-                    busy={responseWorking}
+                    key={project ?? "no-project"}
                     models={models}
                     onSend={sendMessage}
                     onSources={() => setDialog("sources")}
-                    scope={activeThread.scope}
-                    enabledSkills={enabledSkills}
-                    initialSkill={
-                      activeThread.followUps?.length
-                        ? activeThread.followUps.at(-1)?.skillId
-                        : activeThread.skillId
-                    }
-                    onManageSkills={() => openSettings("skills")}
+                    scope={draftScope}
+                    onScope={() => setEditingScope(true)}
                     onChooseSource={chooseSource}
                     onClearSource={clearSource}
-                    onScope={showSource}
+                    enabledSkills={enabledSkills}
+                    onManageSkills={() => openSettings("skills")}
                   />
-                }
-              />
-            )}
-            {activeThread?.scope && sourceOpen && (
-              <SourceExplorer
-                key={activeThread.id}
-                sourceId={activeThread.scope.sourceId}
-                recordIds={activeThread.scope.recordIds}
-                selectedId={selectedRecordId}
-                onSelect={setSelectedRecordId}
-                onClose={() => setSourceOpen(false)}
-              />
-            )}
-          </main>
+                  <p className="draft-demo-note">
+                    Explore with sample data. Live enterprise connections come
+                    next.
+                  </p>
+                </div>
+              ) : (
+                <ThreadConversation
+                  thread={activeThread}
+                  models={models}
+                  onRestore={() => handleRestore(activeThread.id)}
+                  onOpenThread={navigate}
+                  onViewSource={showSource}
+                  onOpenRecord={openRecord}
+                  onFork={handleFork}
+                  composer={
+                    <PromptForm
+                      key={activeThread.id}
+                      compact
+                      busy={responseWorking}
+                      onStop={() => void chatStore.stop(activeThread.id)}
+                      models={models}
+                      onSend={sendMessage}
+                      onSources={() => setDialog("sources")}
+                      scope={activeThread.scope}
+                      enabledSkills={enabledSkills}
+                      initialSkill={
+                        chatStore
+                          .peekMessages(activeThread.id)
+                          .findLast((message) => message.role === "user")
+                          ?.metadata?.skillId ?? activeThread.sample?.skillId
+                      }
+                      onManageSkills={() => openSettings("skills")}
+                      onChooseSource={chooseSource}
+                      onClearSource={clearSource}
+                      onScope={showSource}
+                    />
+                  }
+                />
+              )}
+              {activeThread?.scope && sourceOpen && (
+                <SourceExplorer
+                  key={activeThread.id}
+                  sourceId={activeThread.scope.sourceId}
+                  recordIds={activeThread.scope.recordIds}
+                  selectedId={selectedRecordId}
+                  onSelect={setSelectedRecordId}
+                  onClose={() => setSourceOpen(false)}
+                />
+              )}
+            </main>
 
-          {panelOpen && (
-            <section
-              className="workspace-bottom-panel"
-              aria-label="Project panel"
-            >
-              <div className="bottom-panel-header">
-                <span>Thread context</span>
-                <IconButton
-                  label="Close bottom panel"
-                  onClick={() => setPanelOpen(false)}
-                >
-                  <X />
-                </IconButton>
-              </div>
-              <div className="bottom-panel-content">
-                <Cable />
-                <p>
-                  {activeThread?.scope
-                    ? `${describeScope(activeThread.scope)} in this thread’s read-only snapshot.`
-                    : draftScope
-                      ? `${describeScope(draftScope)} selected for your next thread.`
-                      : "Choose a source to add context to your thread."}
-                </p>
-                <button type="button" onClick={() => setDialog("sources")}>
-                  Explore data sources <ChevronDown />
-                </button>
-              </div>
-            </section>
-          )}
+            {panelOpen && (
+              <section
+                className="workspace-bottom-panel"
+                aria-label="Project panel"
+              >
+                <div className="bottom-panel-header">
+                  <span>Thread context</span>
+                  <IconButton
+                    label="Close bottom panel"
+                    onClick={() => setPanelOpen(false)}
+                  >
+                    <X />
+                  </IconButton>
+                </div>
+                <div className="bottom-panel-content">
+                  <Cable />
+                  <p>
+                    {activeThread?.scope
+                      ? `${describeScope(activeThread.scope)} in this thread’s read-only snapshot.`
+                      : draftScope
+                        ? `${describeScope(draftScope)} selected for your next thread.`
+                        : "Choose a source to add context to your thread."}
+                  </p>
+                  <button type="button" onClick={() => setDialog("sources")}>
+                    Explore data sources <ChevronDown />
+                  </button>
+                </div>
+              </section>
+            )}
+          </div>
         </div>
-      </div>
 
-      <Dialog
-        open={dialog !== null}
-        onOpenChange={(open) => {
-          if (!open) setDialog(null);
-        }}
-      >
-        <DialogContent
-          className={`workspace-dialog ${dialog === "settings" ? "skills-settings-dialog" : "sm:max-w-md"}`}
-        >
-          <DialogHeader>
-            <DialogTitle>
-              {dialog === "project"
-                ? "Add a project"
-                : dialog === "settings"
-                  ? "Workspace settings"
-                  : dialog === "sources"
-                    ? "Choose a data source"
-                    : "Workspace activity"}
-            </DialogTitle>
-            <DialogDescription>
-              {dialog === "project"
-                ? "Give your next workspace a name."
-                : dialog === "settings"
-                  ? "Make this workspace work the way you do."
-                  : dialog === "sources"
-                    ? activeThread
-                      ? "Choose a source to start a new thread. Each thread keeps its own selected records. All sources use sample data."
-                      : "Pick a sample enterprise source. You can choose which records to include before sending your first message."
-                    : "Recent conversations in this workspace."}
-            </DialogDescription>
-          </DialogHeader>
-
-          {dialog === "project" && (
-            <ProjectForm
-              name={projectName}
-              onNameChange={setProjectName}
-              onCreate={(name) => {
-                const added = addProject(projects, name);
-                if (!added.ok) return;
-                setProjects(added.value.projects);
-                setProject(added.value.name);
-                setProjectName("");
-                navigate(null);
-                setDialog(null);
-              }}
-            />
-          )}
-
-          {dialog === "sources" && (
-            <>
-              <SourceChoiceList
-                selected={activeThread?.scope?.sourceId ?? draftScope?.sourceId}
-                onSelect={chooseSource}
-              />
-              <p className="source-catalog-note">
-                More enterprise systems can follow the same pattern: choose a
-                source, scope the records, then work with a source-specific
-                view.
-              </p>
-            </>
-          )}
-
-          {dialog === "settings" && (
-            <WorkspaceSettings
-              section={settingsSection}
-              onSection={setSettingsSection}
-              enabledSkills={enabledSkills}
-              onToggleSkill={toggleSkill}
-              project={currentProject}
-              onSources={() => setDialog("sources")}
-            />
-          )}
-
-          {dialog === "activity" && (
-            <div className="activity-list">
-              {threads.slice(0, 5).map((thread) => (
-                <button
-                  type="button"
-                  key={thread.id}
-                  onClick={() => {
-                    setProject(thread.project);
-                    navigate(thread.id);
-                    setDialog(null);
-                  }}
-                >
-                  <ProjectIcon />
-                  <span>{thread.title}</span>
-                  <ChevronDown />
-                </button>
-              ))}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-      {editingScope && draftScope && (
-        <SourceScopeDialog
-          sourceId={draftScope.sourceId}
-          recordIds={draftScope.recordIds}
-          onClose={() => setEditingScope(false)}
-          onApply={(recordIds) => {
-            const scope = createScope(draftScope.sourceId, recordIds);
-            if (scope.ok) setDraftScope(scope.value);
-            setEditingScope(false);
+        <Dialog
+          open={dialog !== null}
+          onOpenChange={(open) => {
+            if (!open) setDialog(null);
           }}
-        />
-      )}
-    </TooltipProvider>
+        >
+          <DialogContent
+            className={`workspace-dialog ${dialog === "settings" ? "skills-settings-dialog" : "sm:max-w-md"}`}
+          >
+            <DialogHeader>
+              <DialogTitle>
+                {dialog === "project"
+                  ? "Add a project"
+                  : dialog === "settings"
+                    ? "Workspace settings"
+                    : dialog === "sources"
+                      ? "Choose a data source"
+                      : "Workspace activity"}
+              </DialogTitle>
+              <DialogDescription>
+                {dialog === "project"
+                  ? "Give your next workspace a name."
+                  : dialog === "settings"
+                    ? "Make this workspace work the way you do."
+                    : dialog === "sources"
+                      ? activeThread
+                        ? "Choose a source to start a new thread. Each thread keeps its own selected records. All sources use sample data."
+                        : "Pick a sample enterprise source. You can choose which records to include before sending your first message."
+                      : "Recent conversations in this workspace."}
+              </DialogDescription>
+            </DialogHeader>
+
+            {dialog === "project" && (
+              <ProjectForm
+                name={projectName}
+                onNameChange={setProjectName}
+                onCreate={(name) => {
+                  const added = addProject(projects, name);
+                  if (!added.ok) return;
+                  setProjects(added.value.projects);
+                  setProject(added.value.name);
+                  setProjectName("");
+                  navigate(null);
+                  setDialog(null);
+                }}
+              />
+            )}
+
+            {dialog === "sources" && (
+              <>
+                <SourceChoiceList
+                  selected={
+                    activeThread?.scope?.sourceId ?? draftScope?.sourceId
+                  }
+                  onSelect={chooseSource}
+                />
+                <p className="source-catalog-note">
+                  More enterprise systems can follow the same pattern: choose a
+                  source, scope the records, then work with a source-specific
+                  view.
+                </p>
+              </>
+            )}
+
+            {dialog === "settings" && (
+              <WorkspaceSettings
+                section={settingsSection}
+                onSection={setSettingsSection}
+                enabledSkills={enabledSkills}
+                onToggleSkill={toggleSkill}
+                project={currentProject}
+                onSources={() => setDialog("sources")}
+              />
+            )}
+
+            {dialog === "activity" && (
+              <div className="activity-list">
+                {threads.slice(0, 5).map((thread) => (
+                  <button
+                    type="button"
+                    key={thread.id}
+                    onClick={() => {
+                      setProject(thread.project);
+                      navigate(thread.id);
+                      setDialog(null);
+                    }}
+                  >
+                    <ProjectIcon />
+                    <span>{thread.title}</span>
+                    <ChevronDown />
+                  </button>
+                ))}
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+        {editingScope && draftScope && (
+          <SourceScopeDialog
+            sourceId={draftScope.sourceId}
+            recordIds={draftScope.recordIds}
+            onClose={() => setEditingScope(false)}
+            onApply={(recordIds) => {
+              const scope = createScope(draftScope.sourceId, recordIds);
+              if (scope.ok) setDraftScope(scope.value);
+              setEditingScope(false);
+            }}
+          />
+        )}
+      </TooltipProvider>
+    </ChatStoreProvider>
   );
 }

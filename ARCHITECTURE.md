@@ -46,8 +46,8 @@ the `auth` and `database` rulesets.
 
 ### Modules
 
-**Decision.** Four modules. `threads` (rich: sessions, follow-ups, settle, snooze, wake, fork,
-sample responses), `sources` (the enterprise systems and their records; a read-only domain),
+**Decision.** Four modules. `threads` (rich: sessions, settle, snooze, wake, fork, the live
+chat and its answers, sample turns), `sources` (the enterprise systems and their records; a read-only domain),
 `skills` (the skill catalogue and its activation in this browser) and `projects` (the project
 list, the add-project rule and the sidebar filter). `app/(workspace)/` composes them; its
 `_components/` hold the shell, sidebar, settings and new-thread heading, which only that route
@@ -65,35 +65,54 @@ title, breadcrumb, board view, list label) is data on the source, not a branch o
 **Enforced by.** `boundaries/element-types`.
 **Recorded in.** This entry.
 
-### No backend yet: sample data and client-side session state
+### No database or sign-in yet: sample data and client-side session state
 
-**Decision.** The prototype has no database, auth or model provider. Read-only sample data
-(sources and their records, skills, seed threads, projects, models) lives in each module's
+**Decision.** The prototype has no database or auth. Read-only sample data (sources and their
+records, skills, seed threads with their sample turn, projects) lives in each module's
 `infra/sample.*.ts` adapter. It is read through `queries.ts` and `server.ts` in
 `app/(workspace)/page.tsx`, a server component. The catalogues reach the browser through
-`SourcesProvider` and `SkillsProvider`; the rest arrives as props. Session state (new threads,
-follow-ups, settle, snooze, wake, fork, projects added) lives in the browser for the session.
-It changes only through the pure functions in `modules/threads/domain/` and
+`SourcesProvider` and `SkillsProvider`; the rest arrives as props. Thread metadata (new
+threads, settle, snooze, wake, fork, projects added) lives in the browser for the session and
+changes only through the pure functions in `modules/threads/domain/` and
 `modules/projects/domain/`, which return `Result` where a change can be refused; `useThreads`
-applies them. Skill activation and the source panel width persist in `localStorage`; the
+applies them. Live conversations live in the `ChatStore`, one AI SDK `Chat` per thread, also
+for the session. Skill activation and the source panel width persist in `localStorage`; the
 stored skill ids are parsed with `storedSkillIdsSchema` (NX-TYPE-03).
 
-With the backend, the sample adapters become repositories with integration tests
-(NX-TEST-02), the session writes become use cases wired in `commands.ts` and called from
-`actions.ts`, and the starters `conventions init` writes (`lib/env.ts`, `lib/safe-action.ts`,
-`lib/db/client.ts`, `lib/auth/requester.ts`) come back. They were removed in the first commit
-because nothing uses them yet.
+With the database, the sample adapters become repositories with integration tests
+(NX-TEST-02), the session writes become use cases wired in `commands.ts`, and the starters
+`conventions init` writes (`lib/env.ts`, `lib/safe-action.ts`, `lib/db/client.ts`,
+`lib/auth/requester.ts`) come back. They were removed in the first commit because nothing uses
+them yet.
 **Enforced by.** `boundaries/element-types` (components never import `infra/` or `queries.ts`);
-the `server-only` import in every `queries.ts` and `server.ts`.
+the `server-only` import in every `queries.ts`, `commands.ts` and `server.ts`.
+**Recorded in.** This entry.
+
+### Answers come from the Vercel AI Gateway
+
+**Decision.** `POST /api/chat` (`app/api/chat/route.ts`) only hands the body to
+`answerThread` from `modules/threads/server.ts`. `modules/threads/commands.ts` validates it
+with `chatTurnDtoSchema` at the edge and runs the use case `application/answer-thread.ts`.
+The use case resolves the model, skill and records from their ids against the server's
+catalogues (unknown ids are `NotFound`, answered with a 400) and asks the `ResponseAgent`
+port to stream. `infra/ai-gateway.response-agent.ts` implements the port with an AI SDK
+`ToolLoopAgent` on the gateway, with the instructions in `infra/ai-gateway.instructions.ts`,
+the model allowlist in `infra/ai-gateway.model-catalog.ts` and the `html_render` tool in
+`infra/ai-sdk.html-render-tool.ts`. The tool's input and output schemas are in
+`contracts.ts`, so the browser's message types never import `infra/`. There is no sign-in, so
+the command takes no `Requester` yet (NX-LAYER-11); it becomes the first argument with the
+`auth` ruleset. The frame that shows an `html_render` page is feature-agnostic and lives in
+`components/ui/html-render-*.tsx`; the helpers both sides share are in `lib/html-render/`.
+**Enforced by.** `conventions check` (`use-case-test`, `rich-shape`), `boundaries/element-types`,
+`boundaries/external` (the ORM-free, framework-free `application/`).
 **Recorded in.** This entry.
 
 ### Sample responses
 
-**Decision.** The deterministic sample answers (summary, risks, next steps) are chosen by
-`modules/threads/domain/sample-response.ts` from the prompt and the skill, and rendered by
-`modules/threads/components/sample-response.tsx` from the records in scope. Both run in the
-browser, so a response needs no server round trip. A model call replaces them with a port in
-`application/` and an adapter (`infra/<provider>.response-generator.ts`) behind an action.
+**Decision.** The seeded threads keep one sample turn, answered locally. Its kind (summary,
+risks, next steps) is chosen by `modules/threads/domain/sample-response.ts` from the prompt
+and the skill, and rendered by `modules/threads/components/sample-response.tsx` from the
+records in scope. Every message after it goes to the model.
 **Enforced by.** `boundaries/external` (the domain imports no framework).
 **Recorded in.** This entry.
 

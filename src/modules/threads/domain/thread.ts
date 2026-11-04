@@ -1,6 +1,5 @@
 import { err, ok, type Result } from "@conventions/nextjs/core";
 import type {
-  ResponseNotFinished,
   ScopeHasNoRecords,
   SnoozeTimeInPast,
   ThreadStillWorking,
@@ -14,9 +13,13 @@ export type ResponseTiming = { startedAt: string; completedAt: string | null };
 /** The source records a thread may use, by id. The sources module owns what they are. */
 export type ThreadScope = { sourceId: string; recordIds: string[] };
 
-export type FollowUp = {
-  text: string;
-  attachments: string[];
+/**
+ * A seeded demo turn, answered locally from the selected sample records. Live turns are not
+ * stored on the thread: they live in its chat (see `components/chat-store.ts`).
+ */
+export type SampleTurn = {
+  prompt: string;
+  attachments?: string[];
   skillId?: string;
   responseTiming: ResponseTiming;
 };
@@ -30,6 +33,7 @@ export type ThreadPlacement = {
 
 export type ThreadShelf = "active" | "snoozed" | "settled";
 
+/** Sidebar and session metadata. Conversation content lives in the thread's chat. */
 export type Thread = ThreadPlacement & {
   id: string;
   project: string;
@@ -37,12 +41,7 @@ export type Thread = ThreadPlacement & {
   branch: string;
   age: string;
   provider?: ModelProvider;
-  prompt?: string;
-  attachments?: string[];
-  skillId?: string;
-  /** The first response; follow-ups carry their own. */
-  responseTiming: ResponseTiming;
-  followUps?: FollowUp[];
+  sample?: SampleTurn;
   forkedFrom?: { threadId: string; title: string; responseIndex: number };
   scope?: ThreadScope;
 };
@@ -82,37 +81,20 @@ export function withPlacement(
   return { ...thread, ...ACTIVE, ...placement };
 }
 
-/** The timing of response `index`: 0 is the first response, 1 the first follow-up's. */
-export function responseTimingAt(thread: Thread, index: number) {
-  return index === 0
-    ? thread.responseTiming
-    : thread.followUps?.[index - 1]?.responseTiming;
-}
-
-export function latestResponseTiming(thread: Thread) {
-  return thread.followUps?.at(-1)?.responseTiming ?? thread.responseTiming;
-}
-
-/** A thread with a source gets responses; it is working until the latest one finishes. */
-export function isAwaitingResponse(thread: Thread) {
-  return Boolean(
-    thread.scope && latestResponseTiming(thread).completedAt === null,
-  );
-}
-
 export function settle(thread: Thread, now: Date): Thread {
   return { ...thread, ...ACTIVE, settledAt: now.toISOString() };
 }
 
+/** `working`: a response to this thread is in flight; the chat knows, not the thread. */
 export function snooze(
   thread: Thread,
   until: Date,
   now: Date,
+  working: boolean,
 ): Result<Thread, SnoozeTimeInPast | ThreadStillWorking> {
   if (!Number.isFinite(until.getTime()) || until.getTime() <= now.getTime())
     return err({ _tag: "SnoozeTimeInPast" });
-  if (isAwaitingResponse(thread))
-    return err({ _tag: "ThreadStillWorking", threadId: thread.id });
+  if (working) return err({ _tag: "ThreadStillWorking", threadId: thread.id });
   return ok({ ...thread, ...ACTIVE, snoozedUntil: until.toISOString() });
 }
 
@@ -140,95 +122,49 @@ export function acknowledgeWake(thread: Thread): Thread {
 export type NewThread = {
   id: string;
   project: string;
+  /** The first message; it titles the thread. */
   prompt: string;
-  attachments: string[];
   provider: ModelProvider;
-  skillId?: string;
   scope?: ThreadScope;
 };
 
-export function startThread(input: NewThread, now: Date): Thread {
+export function startThread(input: NewThread): Thread {
   return {
     id: input.id,
     project: input.project,
     title: input.prompt,
     branch: "main",
     age: "now",
-    prompt: input.prompt,
-    attachments: input.attachments,
     provider: input.provider,
-    responseTiming: { startedAt: now.toISOString(), completedAt: null },
-    skillId: input.skillId,
     scope: input.scope
       ? { ...input.scope, recordIds: [...input.scope.recordIds] }
       : undefined,
   };
 }
 
-export type NewFollowUp = {
-  text: string;
-  attachments: string[];
-  provider: ModelProvider;
-  skillId?: string;
-};
-
-/** Asking again returns a parked thread to active. */
-export function addFollowUp(
+/**
+ * Asking again: the thread records the provider it now talks to and, if it was parked,
+ * returns to active. Refused while the last response is still in flight.
+ */
+export function continueThread(
   thread: Thread,
-  input: NewFollowUp,
-  now: Date,
+  provider: ModelProvider,
+  working: boolean,
 ): Result<Thread, ThreadStillWorking> {
-  if (isAwaitingResponse(thread))
-    return err({ _tag: "ThreadStillWorking", threadId: thread.id });
-  return ok({
-    ...thread,
-    ...ACTIVE,
-    provider: input.provider,
-    followUps: [
-      ...(thread.followUps ?? []),
-      {
-        text: input.text,
-        attachments: input.attachments,
-        responseTiming: { startedAt: now.toISOString(), completedAt: null },
-        skillId: input.skillId,
-      },
-    ],
-  });
+  if (working) return err({ _tag: "ThreadStillWorking", threadId: thread.id });
+  return ok({ ...thread, ...ACTIVE, provider });
 }
 
-export function completeResponse(
-  thread: Thread,
-  index: number,
-  now: Date,
-): Thread {
-  const completedAt = now.toISOString();
-  if (index === 0)
-    return {
-      ...thread,
-      responseTiming: { ...thread.responseTiming, completedAt },
-    };
-  return {
-    ...thread,
-    followUps: thread.followUps?.map((followUp, followUpIndex) =>
-      followUpIndex === index - 1
-        ? {
-            ...followUp,
-            responseTiming: { ...followUp.responseTiming, completedAt },
-          }
-        : followUp,
-    ),
-  };
-}
-
-/** An independent copy of the conversation through response `responseIndex`, same scope. */
+/**
+ * An independent copy of the thread through response `responseIndex`, with the same scope and
+ * sample turn. The chat copies its messages separately.
+ */
 export function forkThread(
   thread: Thread,
   responseIndex: number,
   id: string,
-): Result<Thread, ResponseNotFinished> {
-  if (!responseTimingAt(thread, responseIndex)?.completedAt)
-    return err({ _tag: "ResponseNotFinished" });
-  return ok({
+): Thread {
+  return {
     ...thread,
     ...ACTIVE,
     id,
@@ -237,7 +173,6 @@ export function forkThread(
     scope: thread.scope
       ? { ...thread.scope, recordIds: [...thread.scope.recordIds] }
       : undefined,
-    followUps: thread.followUps?.slice(0, responseIndex),
     forkedFrom: { threadId: thread.id, title: thread.title, responseIndex },
-  });
+  };
 }

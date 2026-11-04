@@ -1,12 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { aThread, aWorkingThread } from "@/tests/factories/thread";
+import { aThread } from "@/tests/factories/thread";
 import {
   acknowledgeWake,
-  addFollowUp,
-  completeResponse,
+  continueThread,
   createScope,
   forkThread,
-  isAwaitingResponse,
   isWakeDue,
   placementOf,
   restore,
@@ -37,37 +35,6 @@ describe("shelfOf", () => {
     },
   ])("puts $placement on the $shelf shelf", ({ placement, shelf }) => {
     expect(shelfOf(placement)).toBe(shelf);
-  });
-});
-
-describe("isAwaitingResponse", () => {
-  it.each([
-    { name: "a finished thread", thread: aThread(), working: false },
-    {
-      name: "a thread preparing its first response",
-      thread: aWorkingThread(),
-      working: true,
-    },
-    {
-      name: "a thread without a source, which gets no response",
-      thread: aWorkingThread({ scope: undefined }),
-      working: false,
-    },
-    {
-      name: "a thread preparing a follow-up",
-      thread: aThread({
-        followUps: [
-          {
-            text: "Risks?",
-            attachments: [],
-            responseTiming: { startedAt: now.toISOString(), completedAt: null },
-          },
-        ],
-      }),
-      working: true,
-    },
-  ])("is $working for $name", ({ thread, working }) => {
-    expect(isAwaitingResponse(thread)).toBe(working);
   });
 });
 
@@ -102,6 +69,7 @@ describe("settle, snooze, restore and wake", () => {
       aThread({ settledAt: earlier.toISOString() }),
       later,
       now,
+      false,
     );
     expect(result.ok && placementOf(result.value)).toEqual({
       settledAt: undefined,
@@ -115,14 +83,14 @@ describe("settle, snooze, restore and wake", () => {
     { name: "a past time", until: earlier },
     { name: "an invalid date", until: new Date(Number.NaN) },
   ])("refuses to snooze until $name", ({ until }) => {
-    expect(snooze(aThread(), until, now)).toEqual({
+    expect(snooze(aThread(), until, now, false)).toEqual({
       ok: false,
       error: { _tag: "SnoozeTimeInPast" },
     });
   });
 
   it("refuses to snooze while a response is being prepared", () => {
-    expect(snooze(aWorkingThread(), later, now)).toEqual({
+    expect(snooze(aThread(), later, now, true)).toEqual({
       ok: false,
       error: { _tag: "ThreadStillWorking", threadId: "thread-1" },
     });
@@ -162,130 +130,67 @@ describe("settle, snooze, restore and wake", () => {
 });
 
 describe("startThread", () => {
-  it("titles the thread with its prompt and starts preparing a response", () => {
+  it("titles the thread with its first message and copies the scope", () => {
     const scope = { sourceId: "jira", recordIds: ["PLAT-124"] };
-    const thread = startThread(
-      {
-        id: "new",
-        project: "workspace-prototype",
-        prompt: "Summarize",
-        attachments: ["notes.txt"],
-        provider: "openai",
-        skillId: "summary",
-        scope,
-      },
-      now,
-    );
-    expect(thread).toMatchObject({
+    const thread = startThread({
+      id: "new",
+      project: "workspace-prototype",
+      prompt: "Summarize",
+      provider: "openai",
+      scope,
+    });
+    expect(thread).toEqual({
+      id: "new",
+      project: "workspace-prototype",
       title: "Summarize",
+      branch: "main",
       age: "now",
-      responseTiming: { startedAt: now.toISOString(), completedAt: null },
+      provider: "openai",
       scope,
     });
     expect(thread.scope?.recordIds).not.toBe(scope.recordIds);
   });
 });
 
-describe("addFollowUp", () => {
-  const followUp = {
-    text: "Risks?",
-    attachments: [],
-    provider: "openai" as const,
-  };
-
-  it("returns a settled thread to active and starts the next response", () => {
-    const result = addFollowUp(
-      aThread({ settledAt: earlier.toISOString() }),
-      followUp,
-      now,
+describe("continueThread", () => {
+  it("returns a settled thread to active and records the provider", () => {
+    const result = continueThread(
+      aThread({ settledAt: earlier.toISOString(), provider: "claude" }),
+      "openai",
+      false,
     );
     expect(result.ok && shelfOf(result.value)).toBe("active");
-    expect(result.ok && result.value.followUps).toEqual([
-      {
-        text: "Risks?",
-        attachments: [],
-        responseTiming: { startedAt: now.toISOString(), completedAt: null },
-        skillId: undefined,
-      },
-    ]);
     expect(result.ok && result.value.provider).toBe("openai");
   });
 
-  it("refuses a follow-up while the last response is being prepared", () => {
-    expect(addFollowUp(aWorkingThread(), followUp, now)).toEqual({
+  it("refuses while the last response is in flight", () => {
+    expect(continueThread(aThread(), "claude", true)).toEqual({
       ok: false,
       error: { _tag: "ThreadStillWorking", threadId: "thread-1" },
     });
   });
 });
 
-describe("completeResponse", () => {
-  it("finishes the first response", () => {
-    expect(
-      completeResponse(aWorkingThread(), 0, now).responseTiming.completedAt,
-    ).toBe(now.toISOString());
-  });
-
-  it("finishes a follow-up's response and leaves the others", () => {
-    const pending = { startedAt: earlier.toISOString(), completedAt: null };
-    const thread = aThread({
-      followUps: [
-        { text: "a", attachments: [], responseTiming: pending },
-        { text: "b", attachments: [], responseTiming: pending },
-      ],
-    });
-    const completed = completeResponse(thread, 2, now);
-    expect(
-      completed.followUps?.map((item) => item.responseTiming.completedAt),
-    ).toEqual([null, now.toISOString()]);
-  });
-});
-
 describe("forkThread", () => {
-  const done = {
-    startedAt: earlier.toISOString(),
-    completedAt: now.toISOString(),
-  };
-  const thread = aThread({
-    title: "Fork: Sprint 24 summary",
-    settledAt: now.toISOString(),
-    followUps: [
-      { text: "a", attachments: [], responseTiming: done },
-      {
-        text: "b",
-        attachments: [],
-        responseTiming: { ...done, completedAt: null },
-      },
-    ],
-  });
-
-  it("copies the conversation through the chosen response, active and with its scope", () => {
-    const result = forkThread(thread, 1, "fork-1");
-    expect(result.ok && result.value).toMatchObject({
+  it("copies the thread as active, keeps its sample turn and scope, and names its origin", () => {
+    const thread = aThread({
+      title: "Fork: Sprint 24 summary",
+      settledAt: now.toISOString(),
+    });
+    const fork = forkThread(thread, 2, "fork-1");
+    expect(fork).toMatchObject({
       id: "fork-1",
       title: "Fork: Sprint 24 summary",
       age: "now",
       settledAt: undefined,
-      followUps: [{ text: "a" }],
+      sample: thread.sample,
+      scope: thread.scope,
       forkedFrom: {
         threadId: "thread-1",
         title: "Fork: Sprint 24 summary",
-        responseIndex: 1,
+        responseIndex: 2,
       },
-      scope: thread.scope,
     });
-    expect(result.ok && result.value.scope?.recordIds).not.toBe(
-      thread.scope?.recordIds,
-    );
+    expect(fork.scope?.recordIds).not.toBe(thread.scope?.recordIds);
   });
-
-  it.each([2, 5])(
-    "refuses to fork from response %i, which has not finished",
-    (index) => {
-      expect(forkThread(thread, index, "fork-1")).toEqual({
-        ok: false,
-        error: { _tag: "ResponseNotFinished" },
-      });
-    },
-  );
 });

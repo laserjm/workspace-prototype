@@ -45,7 +45,10 @@ export function SampleResponse({
     <ResponseTurn
       timing={timing}
       continuation={continuation}
-      sourceLabel={`${source.name} · ${scopeLabel}`}
+      label="Sample assistant response"
+      details={[{ label: "Source", value: `${source.name} · ${scopeLabel}` }]}
+      note="Sample response prepared locally from the selected records. No AI provider was used for this response."
+      preparingLabel={`Preparing a sample response from ${source.name} · ${scopeLabel}…`}
       onFork={onFork}
     >
       <div className="response-read-receipt">

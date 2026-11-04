@@ -18,15 +18,25 @@ import {
 export function ResponseTurn({
   timing,
   continuation,
-  sourceLabel,
   onFork,
   children,
+  label = "Assistant response",
+  details = [],
+  note,
+  preparingLabel,
+  streaming = false,
 }: {
   timing: ResponseTiming;
   continuation: boolean;
-  sourceLabel: string;
   onFork: () => void;
   children: ReactNode;
+  label?: string;
+  /** Rows shown above Started/Finished in the expanded work details. */
+  details?: { label: string; value: string }[];
+  note?: string;
+  preparingLabel: string;
+  /** While working, show the partial response instead of the placeholder. */
+  streaming?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [now, setNow] = useState(() => Date.parse(timing.startedAt));
@@ -47,7 +57,7 @@ export function ResponseTurn({
       ? `${Math.floor(elapsed / 1000)}s`
       : formatResponseDuration(Math.floor(elapsed / 1000) * 1000)
     : formatResponseDuration(elapsed);
-  const label = `${working ? "Working for" : continuation ? "Continued for" : "Worked for"} ${duration}`;
+  const durationLabel = `${working ? "Working for" : continuation ? "Continued for" : "Worked for"} ${duration}`;
 
   useEffect(() => {
     if (!working) return;
@@ -74,11 +84,7 @@ export function ResponseTurn({
   }
 
   return (
-    <article
-      className="source-response"
-      aria-label="Sample assistant response"
-      aria-busy={working}
-    >
+    <article className="source-response" aria-label={label} aria-busy={working}>
       <div className="response-work-group">
         <div className="response-duration-row">
           <button
@@ -89,7 +95,7 @@ export function ResponseTurn({
             onClick={() => setExpanded((value) => !value)}
           >
             <span className={working ? "response-working-label" : ""}>
-              {label}
+              {durationLabel}
             </span>
             <ChevronRight
               size={14}
@@ -103,10 +109,12 @@ export function ResponseTurn({
           />
         </div>
         <div id={workId} className="response-work-details" hidden={!expanded}>
-          <div>
-            <span>Source</span>
-            <strong>{sourceLabel}</strong>
-          </div>
+          {details.map((detail) => (
+            <div key={detail.label}>
+              <span>{detail.label}</span>
+              <strong>{detail.value}</strong>
+            </div>
+          ))}
           <div>
             <span>Started</span>
             <time dateTime={timing.startedAt}>
@@ -121,16 +129,19 @@ export function ResponseTurn({
               </time>
             </div>
           )}
-          <p>
-            Sample response prepared locally from the selected records. No live
-            services or AI provider are connected.
-          </p>
+          {note && <p>{note}</p>}
         </div>
       </div>
-      {working ? (
+      {working && streaming ? (
+        <div className="response-message">
+          <div className="response-body" ref={bodyRef}>
+            {children}
+          </div>
+        </div>
+      ) : working ? (
         <div className="response-preparing" role="status">
           <span className="response-preparing-dot" />
-          Preparing a sample response from {sourceLabel}…
+          {preparingLabel}
         </div>
       ) : (
         <div className="response-message">

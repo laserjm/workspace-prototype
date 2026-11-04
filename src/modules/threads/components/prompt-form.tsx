@@ -10,6 +10,7 @@ import {
   Plug,
   Shield,
   ShieldOff,
+  Square,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -29,7 +30,7 @@ import {
   useSources,
 } from "@/modules/sources";
 import type { ModelChoice } from "../domain/model-choice";
-import type { ModelProvider, ThreadScope } from "../domain/thread";
+import type { ThreadScope } from "../domain/thread";
 import { ProviderIcon } from "./provider-icon";
 
 /** The message composer: source and scope, attachments, model, skill and permissions. */
@@ -46,12 +47,13 @@ export function PromptForm({
   onManageSkills,
   initialSkill,
   busy = false,
+  onStop,
 }: {
   models: ModelChoice[];
   onSend: (
     prompt: string,
     attachments: string[],
-    provider: ModelProvider,
+    modelId: string,
     skillId?: string,
   ) => void;
   onSources: () => void;
@@ -64,6 +66,8 @@ export function PromptForm({
   onManageSkills: () => void;
   initialSkill?: string;
   busy?: boolean;
+  /** Shown in place of send while busy. */
+  onStop?: () => void;
 }) {
   const { sourceById } = useSources();
   const { skillById } = useSkills();
@@ -91,7 +95,7 @@ export function PromptForm({
     onSend(
       prompt.trim(),
       attachments.map((file) => file.name),
-      model.provider,
+      model.id,
       selectedSkill,
     );
     setPrompt("");
@@ -263,14 +267,25 @@ export function PromptForm({
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
-          <IconButton
-            label="Send message"
-            type="submit"
-            className={`send-button ${canSend ? "send-button-ready" : ""}`}
-            disabled={!canSend}
-          >
-            {busy ? <LoaderCircle className="animate-spin" /> : <ArrowUp />}
-          </IconButton>
+          {busy && onStop ? (
+            <IconButton
+              label="Stop response"
+              type="button"
+              className="send-button send-button-ready"
+              onClick={onStop}
+            >
+              <Square className="fill-current" />
+            </IconButton>
+          ) : (
+            <IconButton
+              label="Send message"
+              type="submit"
+              className={`send-button ${canSend ? "send-button-ready" : ""}`}
+              disabled={!canSend}
+            >
+              {busy ? <LoaderCircle className="animate-spin" /> : <ArrowUp />}
+            </IconButton>
+          )}
         </div>
       </form>
       <div className="composer-footnote">
@@ -302,7 +317,8 @@ export function PromptForm({
             ))}
             <DropdownMenuSeparator />
             <p className="px-2 py-1.5 text-xs leading-relaxed text-muted-foreground">
-              Demo preferences. No tools or external services are connected.
+              Demo preferences. Responses are read-only and cannot change your
+              source systems.
             </p>
           </DropdownMenuContent>
         </DropdownMenu>

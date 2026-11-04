@@ -21,10 +21,11 @@ import {
 import { ProjectIcon } from "@/modules/projects";
 import { recordCountLabel, SourceIcon, useSources } from "@/modules/sources";
 import { snoozePresets } from "../domain/snooze";
-import { isAwaitingResponse, shelfOf, type Thread } from "../domain/thread";
+import { shelfOf, type Thread } from "../domain/thread";
 import { ProviderIcon } from "./provider-icon";
 import { ThreadContextCard } from "./thread-context-card";
 import { formatWakeTime } from "./time-format";
+import { useThreadWorking } from "./use-chat-store";
 
 export function ThreadRow({
   thread,
@@ -50,7 +51,7 @@ export function ThreadRow({
   const { sourceById } = useSources();
   const source = thread.scope ? sourceById(thread.scope.sourceId) : undefined;
   const shelf = shelfOf(thread);
-  const working = isAwaitingResponse(thread);
+  const working = useThreadWorking(thread.id);
   const restoreLabel = shelf === "snoozed" ? "Wake thread" : "Un-settle thread";
   return (
     <div

@@ -1,44 +1,35 @@
 "use client";
 
-import { Fragment, useEffect, useRef, type ReactNode } from "react";
-import { Cable, ChevronDown, FileText, GitFork } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import type { ReactNode } from "react";
+import { ChevronDown, GitFork } from "lucide-react";
 import { recordCountLabel, SourceIcon, useSources } from "@/modules/sources";
+import type { ModelChoice } from "../domain/model-choice";
 import { shelfOf, type Thread } from "../domain/thread";
-import { SampleResponse } from "./sample-response";
+import { ThreadMessages, type ForkTarget } from "./thread-messages";
 import { formatWakeTime } from "./time-format";
 
 /** An open thread: its placement, origin, source, messages and responses, then the composer. */
 export function ThreadConversation({
   thread,
+  models,
   composer,
   onRestore,
   onOpenThread,
   onViewSource,
   onOpenRecord,
   onFork,
-  onExploreSources,
 }: {
   thread: Thread;
+  models: ModelChoice[];
   composer: ReactNode;
   onRestore: () => void;
   onOpenThread: (id: string) => void;
   onViewSource: () => void;
   onOpenRecord: (id: string) => void;
-  onFork: (responseIndex: number) => void;
-  onExploreSources: () => void;
+  onFork: (target: ForkTarget) => void;
 }) {
   const { sourceById } = useSources();
   const source = thread.scope ? sourceById(thread.scope.sourceId) : undefined;
-  const messagesRef = useRef<HTMLDivElement>(null);
-  const followUpCount = thread.followUps?.length;
-
-  useEffect(() => {
-    const messages = messagesRef.current;
-    if (messages)
-      messages.scrollTop = followUpCount ? messages.scrollHeight : 0;
-  }, [thread.id, followUpCount]);
-
   return (
     <div className="conversation-view">
       {shelfOf(thread) !== "active" && (
@@ -81,77 +72,14 @@ export function ThreadConversation({
           </button>
         </div>
       )}
-      <div className="conversation-messages" ref={messagesRef}>
-        <UserMessage
-          text={thread.prompt ?? thread.title}
-          attachments={thread.attachments ?? []}
-        />
-        {thread.scope && (
-          <SampleResponse
-            key={`${thread.id}:0`}
-            scope={thread.scope}
-            prompt={thread.prompt ?? thread.title}
-            onOpenRecord={onOpenRecord}
-            timing={thread.responseTiming}
-            skillId={thread.skillId}
-            onFork={() => onFork(0)}
-          />
-        )}
-        {thread.followUps?.map((message, index) => (
-          <Fragment key={index}>
-            <UserMessage
-              text={message.text}
-              attachments={message.attachments}
-            />
-            {thread.scope && (
-              <SampleResponse
-                key={`${thread.id}:${index + 1}`}
-                scope={thread.scope}
-                prompt={message.text}
-                onOpenRecord={onOpenRecord}
-                timing={message.responseTiming}
-                skillId={message.skillId}
-                continuation
-                onFork={() => onFork(index + 1)}
-              />
-            )}
-          </Fragment>
-        ))}
-        {!thread.scope && (
-          <div className="conversation-empty">
-            <Cable />
-            <h2>Bring your workspace into the conversation.</h2>
-            <p>
-              Connect a data source and an AI provider to continue. Your draft
-              stays here for this session.
-            </p>
-            <Button variant="outline" onClick={onExploreSources}>
-              Explore data sources
-            </Button>
-          </div>
-        )}
-      </div>
+      <ThreadMessages
+        key={`conversation:${thread.id}`}
+        thread={thread}
+        models={models}
+        onOpenRecord={onOpenRecord}
+        onFork={onFork}
+      />
       {composer}
-    </div>
-  );
-}
-
-function UserMessage({
-  text,
-  attachments,
-}: {
-  text: string;
-  attachments: string[];
-}) {
-  return (
-    <div className="user-message">
-      <p>{text}</p>
-      {attachments.map((name, index) => (
-        <span className="attachment-chip" key={`${name}-${index}`}>
-          <FileText size={14} />
-          {name}
-        </span>
-      ))}
     </div>
   );
 }

@@ -9,6 +9,7 @@ import {
 } from "@/modules/sources";
 import { shelfOf, type Thread } from "../domain/thread";
 import { formatWakeTime } from "./time-format";
+import { useChatStore } from "./use-chat-store";
 
 /** A thread's full title, project, shelf and the exact records it uses. */
 export function ThreadContextCard({ thread }: { thread: Thread }) {
@@ -17,13 +18,17 @@ export function ThreadContextCard({ thread }: { thread: Thread }) {
   const records =
     source && thread.scope ? recordsIn(source, thread.scope.recordIds) : [];
   const shelf = shelfOf(thread);
-  const turns = 1 + (thread.followUps?.length ?? 0);
+  // Read on render: the card only renders while its tooltip is open.
+  const userMessages = useChatStore()
+    .peekMessages(thread.id)
+    .filter((message) => message.role === "user");
+  const turns = (thread.sample ? 1 : 0) + userMessages.length;
   const attachments =
-    (thread.attachments?.length ?? 0) +
-    (thread.followUps?.reduce(
-      (count, turn) => count + turn.attachments.length,
+    (thread.sample?.attachments?.length ?? 0) +
+    userMessages.reduce(
+      (count, message) => count + (message.metadata?.attachments?.length ?? 0),
       0,
-    ) ?? 0);
+    );
   return (
     <div className="thread-context-card">
       <strong className="thread-context-title">{thread.title}</strong>
