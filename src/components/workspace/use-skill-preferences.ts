@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useSyncExternalStore } from "react";
-import { defaultEnabledSkills, isSkillId, type SkillId } from "./skill-data";
+import { defaultEnabledSkills, isSkillId, type SkillId } from "@/lib/workspace/skill-data";
 
 const storageKey = "workspace:enabled-skills";
 const defaultSnapshot = JSON.stringify(defaultEnabledSkills);

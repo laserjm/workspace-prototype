@@ -10,7 +10,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import type { Thread } from "./workspace-data";
-import { isThreadWorking, toLocalDateTime } from "./thread-lifecycle";
+import { toLocalDateTime } from "./thread-lifecycle";
+import { useChatStore } from "@/lib/chat/chat-store";
 
 export function CustomSnoozeDialog({
   thread,
@@ -21,6 +22,7 @@ export function CustomSnoozeDialog({
   onClose: () => void;
   onSnooze: (until: string) => void;
 }) {
+  const chatStore = useChatStore();
   const [mode, setMode] = useState<"date" | "duration">("date");
   const [date, setDate] = useState(() =>
     toLocalDateTime(new Date(Date.now() + 3_600_000)),
@@ -63,7 +65,7 @@ export function CustomSnoozeDialog({
               );
               return;
             }
-            if (isThreadWorking(thread)) {
+            if (chatStore.isWorking(thread.id)) {
               setError("Wait for the response to finish before snoozing.");
               return;
             }

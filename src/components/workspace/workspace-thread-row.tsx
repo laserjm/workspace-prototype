@@ -21,14 +21,14 @@ import {
 import type { Thread } from "./workspace-data";
 import { ProjectIcon, ProviderIcon } from "./workspace-icons";
 import { SourceMark } from "./source-picker";
-import { getSource, scopeLabel } from "./source-data";
+import { getSource, scopeLabel } from "@/lib/workspace/source-data";
 import {
   formatWakeTime,
-  isThreadWorking,
   snoozePresets,
   threadShelf,
 } from "./thread-lifecycle";
 import { ThreadContextCard } from "./thread-context-card";
+import { useThreadWorking } from "@/lib/chat/chat-store";
 
 export function WorkspaceThreadRow({
   thread,
@@ -52,7 +52,7 @@ export function WorkspaceThreadRow({
   const [snoozeOpen, setSnoozeOpen] = useState(false);
   const [presets, setPresets] = useState<ReturnType<typeof snoozePresets>>([]);
   const shelf = threadShelf(thread);
-  const working = isThreadWorking(thread);
+  const working = useThreadWorking(thread.id);
   const restoreLabel = shelf === "snoozed" ? "Wake thread" : "Un-settle thread";
   return (
     <div

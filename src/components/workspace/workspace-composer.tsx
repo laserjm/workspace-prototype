@@ -10,6 +10,7 @@ import {
   Plug,
   Shield,
   ShieldOff,
+  Square,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -21,12 +22,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { IconButton } from "./icon-button";
-import { models } from "./workspace-data";
+import { models, type ModelId } from "@/lib/chat/models";
 import { ProviderIcon } from "./workspace-icons";
-import type { SourceId, SourceScope } from "./source-data";
-import { getSource, scopeLabel } from "./source-data";
+import type { SourceId, SourceScope } from "@/lib/workspace/source-data";
+import { getSource, scopeLabel } from "@/lib/workspace/source-data";
 import { SourceContext, SourcePicker } from "./source-picker";
-import { getSkill, type SkillId } from "./skill-data";
+import { getSkill, type SkillId } from "@/lib/workspace/skill-data";
 import { SkillPicker } from "./skill-picker";
 
 export function WorkspaceComposer({
@@ -41,11 +42,12 @@ export function WorkspaceComposer({
   onManageSkills,
   initialSkill,
   busy = false,
+  onStop,
 }: {
   onSend: (
     prompt: string,
     attachments: string[],
-    provider: "claude" | "openai",
+    modelId: ModelId,
     skillId?: SkillId,
   ) => void;
   onSources: () => void;
@@ -58,9 +60,11 @@ export function WorkspaceComposer({
   onManageSkills: () => void;
   initialSkill?: SkillId;
   busy?: boolean;
+  /** Shown in place of send while busy. */
+  onStop?: () => void;
 }) {
   const [prompt, setPrompt] = useState("");
-  const [model, setModel] = useState(models[0]);
+  const [model, setModel] = useState<(typeof models)[number]>(models[0]);
   const [permission, setPermission] = useState("Full access");
   const [attachments, setAttachments] = useState<File[]>([]);
   const [error, setError] = useState("");
@@ -80,7 +84,7 @@ export function WorkspaceComposer({
     onSend(
       prompt.trim(),
       attachments.map((file) => file.name),
-      model.provider,
+      model.id,
       selectedSkill,
     );
     setPrompt("");
@@ -251,14 +255,25 @@ export function WorkspaceComposer({
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
-          <IconButton
-            label="Send message"
-            type="submit"
-            className={`send-button ${canSend ? "send-button-ready" : ""}`}
-            disabled={!canSend}
-          >
-            {busy ? <LoaderCircle className="animate-spin" /> : <ArrowUp />}
-          </IconButton>
+          {busy && onStop ? (
+            <IconButton
+              label="Stop response"
+              type="button"
+              className="send-button send-button-ready"
+              onClick={onStop}
+            >
+              <Square className="fill-current" />
+            </IconButton>
+          ) : (
+            <IconButton
+              label="Send message"
+              type="submit"
+              className={`send-button ${canSend ? "send-button-ready" : ""}`}
+              disabled={!canSend}
+            >
+              {busy ? <LoaderCircle className="animate-spin" /> : <ArrowUp />}
+            </IconButton>
+          )}
         </div>
       </form>
       <div className="composer-footnote">
@@ -290,7 +305,8 @@ export function WorkspaceComposer({
             ))}
             <DropdownMenuSeparator />
             <p className="px-2 py-1.5 text-xs leading-relaxed text-muted-foreground">
-              Demo preferences. No tools or external services are connected.
+              Demo preferences. Responses are read-only and cannot change
+              your source systems.
             </p>
           </DropdownMenuContent>
         </DropdownMenu>

@@ -15,7 +15,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { getSkill, skills, type SkillId } from "./skill-data";
+import { getSkill, skills, type SkillId } from "@/lib/workspace/skill-data";
 
 export function SkillIcon({ id }: { id?: SkillId }) {
   const Icon =

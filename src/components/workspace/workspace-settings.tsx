@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Cable, Folder, Search, Settings2, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { skills, type SkillId } from "./skill-data";
+import { skills, type SkillId } from "@/lib/workspace/skill-data";
 import { SkillIcon } from "./skill-picker";
 
 export type SettingsSection = "general" | "skills";

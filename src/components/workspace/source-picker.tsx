@@ -30,7 +30,7 @@ import {
   sources,
   type SourceId,
   type SourceScope,
-} from "./source-data";
+} from "@/lib/workspace/source-data";
 
 export function SourceMark({ id }: { id: SourceId }) {
   const Icon =

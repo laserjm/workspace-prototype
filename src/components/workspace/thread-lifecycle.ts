@@ -11,12 +11,6 @@ export function threadShelf(thread: Thread): ThreadShelf {
   return thread.settledAt ? "settled" : "active";
 }
 
-export function isThreadWorking(thread: Thread) {
-  const timing =
-    thread.followUps?.at(-1)?.responseTiming ?? thread.responseTiming;
-  return Boolean(thread.scope && timing.completedAt === null);
-}
-
 export function formatWakeTime(timestamp: string) {
   return new Intl.DateTimeFormat(undefined, {
     weekday: "short",

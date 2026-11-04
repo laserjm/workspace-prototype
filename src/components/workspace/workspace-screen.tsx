@@ -1,11 +1,10 @@
 "use client";
 
-import { Fragment, useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Cable,
   Check,
   ChevronDown,
-  FileText,
   GitFork,
   PanelBottom,
   PanelLeftOpen,
@@ -41,16 +40,21 @@ import {
   scopeLabel,
   type SourceId,
   type SourceScope,
-} from "./source-data";
+} from "@/lib/workspace/source-data";
 import { ScopeDialog, SourceChoices, SourceMark } from "./source-picker";
 import { SourceExplorer } from "./source-explorer";
-import { SourceResponse } from "./source-response";
-import { type SkillId } from "./skill-data";
+import { type SkillId } from "@/lib/workspace/skill-data";
+import {
+  ChatStore,
+  ChatStoreProvider,
+  useThreadWorking,
+} from "@/lib/chat/chat-store";
+import { getModel, type ModelId } from "@/lib/chat/models";
+import { ThreadConversation, type ForkTarget } from "./thread-conversation";
 import { useSkillPreferences } from "./use-skill-preferences";
 import { WorkspaceSettings, type SettingsSection } from "./workspace-settings";
 import {
   formatWakeTime,
-  isThreadWorking,
   threadShelf,
   type ThreadPlacement,
 } from "./thread-lifecycle";
@@ -85,39 +89,18 @@ export function WorkspaceScreen() {
   const [editingScope, setEditingScope] = useState(false);
   const [sourceOpen, setSourceOpen] = useState(true);
   const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);
-  const messagesRef = useRef<HTMLDivElement>(null);
-  const responseTimers = useRef(new Set<ReturnType<typeof setTimeout>>());
+  const [chatStore] = useState(() => new ChatStore());
   const activeThread = threads.find(
     (thread) => thread.id === history[historyIndex],
   );
   const currentProject = activeThread?.project ?? project;
-  const latestTiming =
-    activeThread?.followUps?.at(-1)?.responseTiming ??
-    activeThread?.responseTiming;
-  const responseWorking = Boolean(
-    activeThread?.scope && latestTiming?.completedAt === null,
-  );
+  const responseWorking = useThreadWorking(activeThread?.id, chatStore);
 
   useEffect(() => {
     if (!threadNotice) return;
     const timer = setTimeout(() => setThreadNotice(undefined), 8_000);
     return () => clearTimeout(timer);
   }, [threadNotice]);
-
-  useEffect(() => {
-    const timers = responseTimers.current;
-    return () => {
-      for (const timer of timers) clearTimeout(timer);
-    };
-  }, []);
-
-  useEffect(() => {
-    const messages = messagesRef.current;
-    if (messages)
-      messages.scrollTop = activeThread?.followUps?.length
-        ? messages.scrollHeight
-        : 0;
-  }, [activeThread?.id, activeThread?.followUps?.length]);
 
   function navigate(threadId: string | null) {
     setSelectedRecordId(null);
@@ -195,7 +178,7 @@ export function WorkspaceScreen() {
       });
       return;
     }
-    if (isThreadWorking(thread)) {
+    if (chatStore.isWorking(thread.id)) {
       setThreadNotice({
         message: "Wait for the response to finish before snoozing.",
       });
@@ -260,47 +243,8 @@ export function WorkspaceScreen() {
     setSourceOpen(true);
   }
 
-  function completeSampleResponse(threadId: string, responseIndex: number) {
-    // Give the local sample preparation a short, measurable lifecycle.
-    const timer = setTimeout(() => {
-      responseTimers.current.delete(timer);
-      const completedAt = new Date().toISOString();
-      setThreads((previous) =>
-        previous.map((thread) =>
-          thread.id !== threadId
-            ? thread
-            : responseIndex === 0
-              ? {
-                  ...thread,
-                  responseTiming: { ...thread.responseTiming, completedAt },
-                }
-              : {
-                  ...thread,
-                  followUps: thread.followUps?.map((message, index) =>
-                    index === responseIndex - 1
-                      ? {
-                          ...message,
-                          responseTiming: {
-                            ...message.responseTiming,
-                            completedAt,
-                          },
-                        }
-                      : message,
-                  ),
-                },
-        ),
-      );
-    }, 2400);
-    responseTimers.current.add(timer);
-  }
-
-  function forkFromResponse(responseIndex: number) {
+  function forkFromResponse(target: ForkTarget) {
     if (!activeThread) return;
-    const timing =
-      responseIndex === 0
-        ? activeThread.responseTiming
-        : activeThread.followUps?.[responseIndex - 1]?.responseTiming;
-    if (!timing?.completedAt) return;
     const fork: Thread = {
       ...activeThread,
       id: crypto.randomUUID(),
@@ -316,13 +260,17 @@ export function WorkspaceScreen() {
             recordIds: [...activeThread.scope.recordIds],
           }
         : undefined,
-      followUps: activeThread.followUps?.slice(0, responseIndex),
       forkedFrom: {
         threadId: activeThread.id,
         title: activeThread.title,
-        responseIndex,
+        responseIndex: target.kind === "sample" ? 0 : target.responseIndex,
       },
     };
+    chatStore.fork(
+      activeThread.id,
+      fork.id,
+      target.kind === "live" ? target.messageId : undefined,
+    );
     setThreads((previous) => [fork, ...previous]);
     setProject(fork.project);
     navigate(fork.id);
@@ -355,14 +303,12 @@ export function WorkspaceScreen() {
   function sendMessage(
     prompt: string,
     attachments: string[],
-    provider: "claude" | "openai",
+    modelId: ModelId,
     skillId?: SkillId,
   ) {
     if (responseWorking) return;
-    const responseTiming = {
-      startedAt: new Date().toISOString(),
-      completedAt: null,
-    };
+    const { provider } = getModel(modelId);
+    const message = { text: prompt, attachments };
     if (activeThread) {
       if (threadNotice?.undo?.threadId === activeThread.id)
         setThreadNotice(undefined);
@@ -375,19 +321,15 @@ export function WorkspaceScreen() {
                 settledAt: undefined,
                 snoozedUntil: undefined,
                 wokeAt: undefined,
-                followUps: [
-                  ...(thread.followUps ?? []),
-                  { text: prompt, attachments, responseTiming, skillId },
-                ],
               }
             : thread,
         ),
       );
-      if (activeThread.scope)
-        completeSampleResponse(
-          activeThread.id,
-          (activeThread.followUps?.length ?? 0) + 1,
-        );
+      void chatStore.send(activeThread.id, message, {
+        modelId,
+        skillId,
+        scope: activeThread.scope,
+      });
       return;
     }
     const thread: Thread = {
@@ -397,21 +339,22 @@ export function WorkspaceScreen() {
       title: prompt,
       branch: "main",
       age: "now",
-      prompt,
-      attachments,
       provider,
-      responseTiming,
-      skillId,
       scope: draftScope
         ? { ...draftScope, recordIds: [...draftScope.recordIds] }
         : undefined,
     };
     setThreads((previous) => [thread, ...previous]);
-    if (thread.scope) completeSampleResponse(thread.id, 0);
+    void chatStore.send(thread.id, message, {
+      modelId,
+      skillId,
+      scope: thread.scope,
+    });
     navigate(thread.id);
   }
 
   return (
+    <ChatStoreProvider store={chatStore}>
     <TooltipProvider delay={450}>
       <div
         className={`workspace-app ${sidebarOpen ? "" : "sidebar-collapsed"} ${mobileSidebarOpen ? "mobile-sidebar-open" : ""}`}
@@ -666,87 +609,26 @@ export function WorkspaceScreen() {
                     </button>
                   </div>
                 )}
-                <div className="conversation-messages" ref={messagesRef}>
-                  <div className="user-message">
-                    <p>{activeThread.prompt ?? activeThread.title}</p>
-                    {activeThread.attachments?.map((name, index) => (
-                      <span
-                        className="attachment-chip"
-                        key={`${name}-${index}`}
-                      >
-                        <FileText size={14} />
-                        {name}
-                      </span>
-                    ))}
-                  </div>
-                  {activeThread.scope && (
-                    <SourceResponse
-                      key={`${activeThread.id}:0`}
-                      scope={activeThread.scope}
-                      prompt={activeThread.prompt ?? activeThread.title}
-                      onOpenRecord={openRecord}
-                      timing={activeThread.responseTiming}
-                      skillId={activeThread.skillId}
-                      onFork={() => forkFromResponse(0)}
-                    />
-                  )}
-                  {activeThread.followUps?.map((message, index) => (
-                    <Fragment key={index}>
-                      <div className="user-message" key={index}>
-                        <p>{message.text}</p>
-                        {message.attachments.map((name, attachmentIndex) => (
-                          <span
-                            className="attachment-chip"
-                            key={`${name}-${attachmentIndex}`}
-                          >
-                            <FileText size={14} />
-                            {name}
-                          </span>
-                        ))}
-                      </div>
-                      {activeThread.scope && (
-                        <SourceResponse
-                          key={`${activeThread.id}:${index + 1}`}
-                          scope={activeThread.scope}
-                          prompt={message.text}
-                          onOpenRecord={openRecord}
-                          timing={message.responseTiming}
-                          skillId={message.skillId}
-                          continuation
-                          onFork={() => forkFromResponse(index + 1)}
-                        />
-                      )}
-                    </Fragment>
-                  ))}
-                  {!activeThread.scope && (
-                    <div className="conversation-empty">
-                      <Cable />
-                      <h2>Bring your workspace into the conversation.</h2>
-                      <p>
-                        Connect a data source and an AI provider to continue.
-                        Your draft stays here for this session.
-                      </p>
-                      <Button
-                        variant="outline"
-                        onClick={() => setDialog("sources")}
-                      >
-                        Explore data sources
-                      </Button>
-                    </div>
-                  )}
-                </div>
+                <ThreadConversation
+                  key={`conversation:${activeThread.id}`}
+                  thread={activeThread}
+                  onOpenRecord={openRecord}
+                  onFork={forkFromResponse}
+                />
                 <WorkspaceComposer
-                  key={activeThread.id}
+                  key={`composer:${activeThread.id}`}
                   compact
                   busy={responseWorking}
+                  onStop={() => void chatStore.stop(activeThread.id)}
                   onSend={sendMessage}
                   onSources={() => setDialog("sources")}
                   scope={activeThread.scope}
                   enabledSkills={enabledSkills}
                   initialSkill={
-                    activeThread.followUps?.length
-                      ? activeThread.followUps.at(-1)?.skillId
-                      : activeThread.skillId
+                    chatStore
+                      .peekMessages(activeThread.id)
+                      .findLast((message) => message.role === "user")?.metadata
+                      ?.skillId ?? activeThread.sample?.skillId
                   }
                   onManageSkills={() => openSettings("skills")}
                   onChooseSource={chooseSource}
@@ -922,5 +804,6 @@ export function WorkspaceScreen() {
         />
       )}
     </TooltipProvider>
+    </ChatStoreProvider>
   );
 }

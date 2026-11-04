@@ -1,4 +1,5 @@
-export type SkillId = "summary" | "risk-review" | "action-plan";
+export const skillIds = ["summary", "risk-review", "action-plan"] as const;
+export type SkillId = (typeof skillIds)[number];
 
 export const skills = [
   {

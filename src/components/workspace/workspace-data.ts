@@ -1,10 +1,24 @@
-import { defaultScope, type SourceScope } from "./source-data";
+import { defaultScope, type SourceScope } from "@/lib/workspace/source-data";
 import type { ResponseTiming } from "./response-timing";
-import type { SkillId } from "./skill-data";
+import type { SkillId } from "@/lib/workspace/skill-data";
+import type { ModelProvider } from "@/lib/chat/models";
 
 export type ProjectKind =
   "rocket" | "chart" | "conventions" | "automation" | "workspace";
 
+/**
+ * A seeded demo turn, answered locally from the selected sample records.
+ * Live turns are not stored here: they live in the thread's chat (see
+ * `@/lib/chat/chat-store`).
+ */
+export type SampleTurn = {
+  prompt: string;
+  attachments?: string[];
+  skillId?: SkillId;
+  responseTiming: ResponseTiming;
+};
+
+/** Sidebar and session metadata. Conversation content lives in the chat store. */
 export type Thread = {
   id: string;
   project: string;
@@ -17,17 +31,8 @@ export type Thread = {
   settledAt?: string;
   snoozedUntil?: string;
   wokeAt?: string;
-  provider?: "claude" | "openai";
-  prompt?: string;
-  attachments?: string[];
-  skillId?: SkillId;
-  responseTiming: ResponseTiming;
-  followUps?: {
-    text: string;
-    attachments: string[];
-    skillId?: SkillId;
-    responseTiming: ResponseTiming;
-  }[];
+  provider?: ModelProvider;
+  sample?: SampleTurn;
   forkedFrom?: { threadId: string; title: string; responseIndex: number };
   scope?: SourceScope;
 };
@@ -41,11 +46,13 @@ export const initialThreads: Thread[] = [
     branch: "main",
     age: "2h",
     provider: "claude",
-    prompt: "Create a summary of these 5 tickets.",
     scope: defaultScope("jira"),
-    responseTiming: {
-      startedAt: "2026-11-03T11:05:00.000Z",
-      completedAt: "2026-11-03T11:06:46.000Z",
+    sample: {
+      prompt: "Create a summary of these 5 tickets.",
+      responseTiming: {
+        startedAt: "2026-11-03T11:05:00.000Z",
+        completedAt: "2026-11-03T11:06:46.000Z",
+      },
     },
   },
   {
@@ -56,11 +63,13 @@ export const initialThreads: Thread[] = [
     branch: "main",
     age: "5h",
     provider: "claude",
-    prompt: "Summarize these 3 pages and their key decisions.",
     scope: defaultScope("confluence"),
-    responseTiming: {
-      startedAt: "2026-11-03T08:30:00.000Z",
-      completedAt: "2026-11-03T08:30:42.000Z",
+    sample: {
+      prompt: "Summarize these 3 pages and their key decisions.",
+      responseTiming: {
+        startedAt: "2026-11-03T08:30:00.000Z",
+        completedAt: "2026-11-03T08:30:42.000Z",
+      },
     },
   },
   {
@@ -71,11 +80,13 @@ export const initialThreads: Thread[] = [
     branch: "main",
     age: "1d",
     provider: "claude",
-    prompt: "What are the risks in these 4 items?",
     scope: defaultScope("codebeamer"),
-    responseTiming: {
-      startedAt: "2026-11-02T14:10:00.000Z",
-      completedAt: "2026-11-02T14:11:12.000Z",
+    sample: {
+      prompt: "What are the risks in these 4 items?",
+      responseTiming: {
+        startedAt: "2026-11-02T14:10:00.000Z",
+        completedAt: "2026-11-02T14:11:12.000Z",
+      },
     },
   },
 ];
@@ -84,20 +95,4 @@ export const initialProjects = [
   "workspace-prototype",
   "enterprise-platform",
   "battery-management",
-];
-
-export const models = [
-  {
-    id: "opus",
-    label: "Opus 5.5",
-    effort: "High",
-    provider: "claude" as const,
-  },
-  {
-    id: "sonnet",
-    label: "Sonnet 5.5",
-    effort: "High",
-    provider: "claude" as const,
-  },
-  { id: "gpt", label: "GPT-6.1", effort: "High", provider: "openai" as const },
 ];

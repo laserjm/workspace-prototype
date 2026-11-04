@@ -3295,3 +3295,112 @@
     padding: 12px;
   }
 }
+
+/* Live responses (AI Gateway) */
+.response-body .message-text {
+  color: #32323b;
+  font-size: 14px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.response-body .message-text + .message-text {
+  margin-top: 12px;
+}
+.source-session .response-body .message-text {
+  font-size: 13px;
+}
+.response-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  border: 1px solid #f3d6d6;
+  border-radius: 10px;
+  background: #fdf6f6;
+  padding: 10px 14px;
+  color: #9b2c2c;
+  font-size: 12px;
+}
+.response-error button {
+  border-radius: 6px;
+  border: 1px solid #ebc4c4;
+  background: #fff;
+  padding: 3px 10px;
+  color: #7f1d1d;
+  font-size: 12px;
+}
+.response-error button:hover {
+  background: #fbeaea;
+}
+
+/* html_render pages (adapted from T3 Code's HtmlRenderFrame) */
+.html-render-frame {
+  position: relative;
+  margin: 4px 0 16px;
+}
+.html-render-document {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+.html-render-actions {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 150ms;
+}
+.html-render-frame:hover .html-render-actions,
+.html-render-actions:focus-within {
+  opacity: 1;
+}
+@media (pointer: coarse) {
+  .html-render-actions {
+    opacity: 1;
+  }
+}
+.html-render-actions .html-render-action {
+  border: 1px solid #e5e5e7;
+  background: rgb(255 255 255 / 0.85);
+  backdrop-filter: blur(6px);
+}
+.html-render-pending {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 16px;
+  border: 1px dashed #e2e2e8;
+  border-radius: 10px;
+  padding: 14px 16px;
+  color: #92929c;
+  font-size: 12px;
+}
+.html-render-error {
+  margin: 4px 0 12px;
+  color: #9b2c2c;
+  font-size: 12px;
+}
+.html-render-dialog.html-render-dialog {
+  display: flex;
+  width: min(1200px, calc(100vw - 48px));
+  max-width: none;
+  height: calc(100svh - 48px);
+  flex-direction: column;
+  gap: 12px;
+  background: #fdfdfd;
+}
+.html-render-dialog-title {
+  padding-right: 32px;
+  font-size: 14px;
+  font-weight: 500;
+}
+.html-render-dialog-document {
+  min-height: 0;
+  flex: 1;
+  width: 100%;
+  border: 0;
+}

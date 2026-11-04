@@ -22,7 +22,7 @@ import {
 import type { Thread } from "./workspace-data";
 import { IconButton } from "./icon-button";
 import { ProjectFilter } from "./project-filter";
-import { getSource } from "./source-data";
+import { getSource } from "@/lib/workspace/source-data";
 import { threadShelf } from "./thread-lifecycle";
 import { WorkspaceThreadRow } from "./workspace-thread-row";
 import { ThreadContextCard } from "./thread-context-card";
