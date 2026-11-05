@@ -153,7 +153,7 @@ the requester); `boundaries/external`. The check constraint `users_id_is_keycloa
 Auth's startup schema check, which refuses to run when `schema.ts` and its fields disagree.
 **Recorded in.** This entry; `docs/adr/0001-auth-library-for-keycloak-sign-in.md`.
 
-### Stored projects, threads and conversations; session-only placement
+### Stored projects, threads, conversations and placement
 
 **Decision.** Projects, threads and their conversations are stored per owner (see "Data
 ownership"); creating a project or thread and forking a thread are use cases
@@ -182,9 +182,17 @@ it. A fork is stored first, with the conversation through the chosen response, t
 (`forkPoint`; a question or a response not stored yet is a `NotFound`); its origin is a snapshot
 in `forked_from_*`, not a reference.
 
-Not stored yet: settle, snooze and wake, which change the thread in the browser through the
-pure functions in `modules/threads/domain/` and are lost on reload. A stored thread reads as
-active. Read-only sample data (sources and their records, skills) lives in each module's
+Placement is stored on the thread: `settled_at`, `snoozed_until` and `woke_at`, at most one
+set (`threads_one_placement`), none for active. Settle, snooze, restore, undo and opening a
+woken thread are one action, `placeThreadAction`, whose input names the change (`kind`), not
+the timestamps: `threads/application/place-thread.ts` applies the domain function with the
+server's clock, so the browser cannot date a change; an undo (`return`) puts back the placement
+the browser saw before. The browser shows the change at once and puts the thread back when the
+action fails (`useThreads`). Nothing runs at a snooze's deadline: a due snooze reads as woken
+at its deadline (`wakeIfDue`, in `listThreads` and before each change), and the browser wakes
+an open page's threads live (`useSnoozeWake`). Asking again returns a parked thread to active
+and stores the provider it now talks to (`answerThread`). Whether a response is in flight only
+the browser knows, so it refuses a snooze while one is. Read-only sample data (sources and their records, skills) lives in each module's
 `infra/sample.*.ts` adapter, read through `queries.ts` and `server.ts`; the catalogues reach the
 browser through `SourcesProvider` and `SkillsProvider`. Skill activation and the source panel
 width persist in `localStorage`; the stored skill ids are parsed with `storedSkillIdsSchema`
@@ -192,7 +200,8 @@ width persist in `localStorage`; the stored skill ids are parsed with `storedSki
 stored, which the browser adds to its state.
 **Enforced by.** `boundaries/element-types` (components never import `infra/` or `queries.ts`);
 the `server-only` import in every `queries.ts`, `commands.ts` and `server.ts`; the
-`thread_messages_thread_id_owner_id_fkey` constraint; the command tests.
+`thread_messages_thread_id_owner_id_fkey` and `threads_one_placement` constraints; the command
+tests.
 **Recorded in.** This entry.
 
 ### Threads without a project
@@ -233,7 +242,7 @@ The use case resolves the model, skill and records from their ids against the se
 catalogues (unknown ids are `NotFound`, answered with a 400), finds the thread among the
 requester's (another user's thread is a `NotFound` like a missing one, answered with a 404) and
 asks the `ResponseAgent` port to stream the stored conversation with the new message, then to
-store it when the reply ends (see "Stored projects, threads and conversations"). `infra/ai-gateway.response-agent.ts` implements the port with an AI SDK
+store it when the reply ends (see "Stored projects, threads, conversations and placement"). `infra/ai-gateway.response-agent.ts` implements the port with an AI SDK
 `ToolLoopAgent` on the gateway, with the instructions in `infra/ai-gateway.instructions.ts`,
 the model allowlist in `infra/ai-gateway.model-catalog.ts` and the `html_render` tool in
 `infra/ai-sdk.html-render-tool.ts`. The tool's input and output schemas are in

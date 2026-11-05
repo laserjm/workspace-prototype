@@ -3,15 +3,18 @@ import type { OwnerRequester } from "@conventions/nextjs/core";
 import { z } from "zod";
 import type { WorkspaceUIMessage } from "./contracts";
 import type { ModelChoice } from "./domain/model-choice";
-import type { Thread } from "./domain/thread";
+import { wakeIfDue, type Thread } from "./domain/thread";
 import { aiGatewayModelCatalog } from "./infra/ai-gateway.model-catalog";
 import { threadRepository } from "./infra/thread.repository";
 
-/** The signed-in user's threads, newest first. */
+/** The signed-in user's threads, newest first, as they read now: a due snooze has woken. */
 export async function listThreads(
   requester: OwnerRequester,
 ): Promise<Thread[]> {
-  return threadRepository.listByOwner(requester.ownerId);
+  const now = new Date();
+  return (await threadRepository.listByOwner(requester.ownerId)).map((thread) =>
+    wakeIfDue(thread, now),
+  );
 }
 
 /**

@@ -13,6 +13,7 @@ import {
   snooze,
   startThread,
   wake,
+  wakeIfDue,
   withPlacement,
 } from "./thread";
 
@@ -126,6 +127,29 @@ describe("settle, snooze, restore and wake", () => {
     expect(
       placementOf(withPlacement(settle(thread, now), placementOf(thread))),
     ).toEqual(placementOf(thread));
+  });
+});
+
+describe("wakeIfDue", () => {
+  it("reads a snooze whose time has come as woken at its deadline", () => {
+    expect(
+      wakeIfDue(aThread({ snoozedUntil: earlier.toISOString() }), now),
+    ).toMatchObject({ snoozedUntil: undefined, wokeAt: earlier.toISOString() });
+  });
+
+  it.each([
+    {
+      name: "a snooze still running",
+      placement: { snoozedUntil: later.toISOString() },
+    },
+    {
+      name: "a settled thread",
+      placement: { settledAt: earlier.toISOString() },
+    },
+    { name: "an active thread", placement: {} },
+  ])("leaves $name as it is", ({ placement }) => {
+    const thread = aThread(placement);
+    expect(wakeIfDue(thread, now)).toBe(thread);
   });
 });
 

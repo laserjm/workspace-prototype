@@ -106,6 +106,16 @@ export function wake(thread: Thread, now: Date): Thread {
   return { ...thread, ...ACTIVE, wokeAt: now.toISOString() };
 }
 
+/**
+ * A thread as it reads at `now`: a snooze whose time has come reads as woken at its deadline.
+ * Nothing needs to run at the deadline; the browser wakes an open page's threads live.
+ */
+export function wakeIfDue(thread: Thread, now: Date): Thread {
+  return isWakeDue(thread, now)
+    ? wake(thread, new Date(thread.snoozedUntil!))
+    : thread;
+}
+
 /** Opening a woken thread clears its "Woke" mark. */
 export function acknowledgeWake(thread: Thread): Thread {
   return thread.wokeAt ? { ...thread, wokeAt: undefined } : thread;

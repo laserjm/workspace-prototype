@@ -24,6 +24,10 @@ export function inMemoryThreadRepository() {
       threads.set(thread.id, { ownerId, thread });
       conversations.set(thread.id, [...messages]);
     },
+    async update(ownerId, thread) {
+      if (owned(ownerId, thread.id))
+        threads.set(thread.id, { ownerId, thread });
+    },
     async listMessages(ownerId, threadId) {
       return owned(ownerId, threadId)
         ? [...(conversations.get(threadId) ?? [])]
@@ -34,5 +38,6 @@ export function inMemoryThreadRepository() {
       conversations.set(threadId, [...messages]);
     },
   };
-  return { repository, conversations };
+  const threadOf = (id: string) => threads.get(id)?.thread;
+  return { repository, conversations, threadOf };
 }

@@ -3,11 +3,16 @@
 import { useState } from "react";
 import type { Result } from "@conventions/nextjs/core";
 import type { SnoozeTimeInPast, ThreadStillWorking } from "../domain/errors";
-import { forkThreadAction, startThreadAction } from "../actions";
-import type { StartThreadInput } from "../contracts";
+import {
+  forkThreadAction,
+  placeThreadAction,
+  startThreadAction,
+} from "../actions";
+import type { StartThreadInput, ThreadChange } from "../contracts";
 import {
   acknowledgeWake,
   continueThread,
+  placementOf,
   restore,
   settle,
   snooze,
@@ -20,10 +25,15 @@ import { useSnoozeWake } from "./use-snooze-wake";
 
 /**
  * The user's threads in this browser. A new thread and a fork are stored on the server first.
- * Settle, snooze and wake are not stored yet: they go through a domain function and last for the
- * session. Conversations live in the `ChatStore`; `working` comes from there.
+ * Settle, snooze, restore, undo and acknowledging a wake show at once through a domain function
+ * and are then stored; a thread the server would not change goes back where it was, and
+ * `onPlacementNotStored` says so. A snooze wakes here at its deadline, and the server reads it as
+ * woken from then on. Conversations live in the `ChatStore`; `working` comes from there.
  */
-export function useThreads(initialThreads: Thread[]) {
+export function useThreads(
+  initialThreads: Thread[],
+  { onPlacementNotStored }: { onPlacementNotStored?: () => void } = {},
+) {
   const [threads, setThreads] = useState(initialThreads);
   useSnoozeWake(threads, setThreads);
 
@@ -33,11 +43,32 @@ export function useThreads(initialThreads: Thread[]) {
     );
   }
 
+  /** Stores a change already shown; `before` is the thread as it was. */
+  function store(before: Thread, change: ThreadChange) {
+    void placeThreadAction({ threadId: before.id, change })
+      .then((result) => result?.data?.ok === true)
+      .catch(() => false)
+      .then((stored) => {
+        if (stored) return;
+        update(before.id, (latest) =>
+          withPlacement(latest, placementOf(before)),
+        );
+        onPlacementNotStored?.();
+      });
+  }
+
+  function find(id: string) {
+    return threads.find((thread) => thread.id === id);
+  }
+
   return {
     threads,
 
     settleThread(id: string) {
+      const before = find(id);
+      if (!before) return;
       update(id, (thread) => settle(thread, new Date()));
+      store(before, { kind: "settle" });
     },
 
     snoozeThread(
@@ -46,24 +77,35 @@ export function useThreads(initialThreads: Thread[]) {
       working: boolean,
     ): Result<Thread, SnoozeTimeInPast | ThreadStillWorking> {
       const result = snooze(thread, until, new Date(), working);
-      if (result.ok)
+      if (result.ok) {
         update(thread.id, (latest) =>
           withPlacement(latest, { snoozedUntil: result.value.snoozedUntil }),
         );
+        store(thread, { kind: "snooze", until: until.toISOString() });
+      }
       return result;
     },
 
     restoreThread(id: string) {
+      const before = find(id);
+      if (!before) return;
       update(id, restore);
+      store(before, { kind: "restore" });
     },
 
     /** Puts a thread back where it was before a settle, snooze or restore. */
     returnThread(id: string, placement: ThreadPlacement) {
+      const before = find(id);
+      if (!before) return;
       update(id, (thread) => withPlacement(thread, placement));
+      store(before, { kind: "return", placement });
     },
 
     acknowledgeWake(id: string) {
+      const before = find(id);
+      if (!before?.wokeAt) return;
       update(id, acknowledgeWake);
+      store(before, { kind: "acknowledgeWake" });
     },
 
     /** Stores the thread, then lists it. Null when the server refused or could not be reached. */

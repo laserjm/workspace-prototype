@@ -1,5 +1,6 @@
 // Use case: defineUseCase pins (input, deps) => Promise<Result> (NX-LAYER-07, NX-ERR-01).
 import {
+  bug,
   defineUseCase,
   err,
   notFound,
@@ -14,6 +15,7 @@ import {
   withLatestMessage,
   type ConversationMessage,
 } from "../domain/conversation";
+import { continueThread } from "../domain/thread";
 import type {
   AttachedRecords,
   GatewayModel,
@@ -34,7 +36,8 @@ export type AnswerThreadDeps = {
 
 /**
  * Answers the latest message of one of the requester's threads and stores the conversation once
- * the reply ends. The request names the model, skill and records by id; they are resolved here,
+ * the reply ends. Asking returns a parked thread to active and records the provider it now talks
+ * to. The request names the model, skill and records by id; they are resolved here,
  * so the prompt only ever holds what the server offers. The conversation before the message is
  * the stored one, not the browser's.
  */
@@ -69,6 +72,10 @@ export const answerThread = defineUseCase<
   const { ownerId } = requester;
   const thread = await threads.findById(ownerId, input.id);
   if (!thread) return err(notFound("Thread", input.id));
+  // The browser refuses a send while a response is in flight; here nothing is in flight.
+  const continued = continueThread(thread, model.provider, false);
+  if (!continued.ok) bug("a thread with no response in flight was refused");
+  await threads.update(ownerId, continued.value);
   const stored = await threads.listMessages(ownerId, thread.id);
 
   return agent.answer({

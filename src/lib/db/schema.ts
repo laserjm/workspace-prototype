@@ -158,7 +158,9 @@ export const projectsTable = pgTable(
  * `owner_id`, so a thread can only belong to a project of the same owner. The browser picks `id`
  * (its chat needs it before the server answers). A fork names the thread and response it was
  * forked from: a snapshot, not a reference, so the fork reads the same if its origin changes.
- * The conversation is in `thread_messages`.
+ * Placement: at most one of `settled_at`, `snoozed_until` and `woke_at` is set; none is active.
+ * A snooze whose time has passed reads as woken at `snoozed_until`, so nothing writes at the
+ * deadline. The conversation is in `thread_messages`.
  */
 export const threadsTable = pgTable(
   "threads",
@@ -175,11 +177,18 @@ export const threadsTable = pgTable(
     forkedFromThreadId: uuid("forked_from_thread_id"),
     forkedFromTitle: text("forked_from_title"),
     forkedFromResponseIndex: integer("forked_from_response_index"),
+    settledAt: timestamp("settled_at", { withTimezone: true }),
+    snoozedUntil: timestamp("snoozed_until", { withTimezone: true }),
+    wokeAt: timestamp("woke_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
   },
   (table) => [
+    check(
+      "threads_one_placement",
+      sql`num_nonnulls(${table.settledAt}, ${table.snoozedUntil}, ${table.wokeAt}) <= 1`,
+    ),
     foreignKey({
       name: "threads_project_id_owner_id_fkey",
       columns: [table.projectId, table.ownerId],

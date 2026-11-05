@@ -4,6 +4,7 @@ import { aSkill } from "@/tests/factories/skill";
 import { aSource, aSourceRecord } from "@/tests/factories/source";
 import { aThread } from "@/tests/factories/thread";
 import type { WorkspaceUIMessage } from "../contracts";
+import type { Thread } from "../domain/thread";
 import { inMemoryResponseAgent } from "./__fakes__/response-agent.fake";
 import { inMemoryThreadRepository } from "./__fakes__/thread-repository.fake";
 import { answerThread, type AnswerThreadInput } from "./answer-thread";
@@ -40,10 +41,17 @@ const reply = (id: string): WorkspaceUIMessage => ({
   parts: [{ type: "text", text: "Done." }],
 });
 
-async function setup(stored: WorkspaceUIMessage[] = []) {
+async function setup(
+  stored: WorkspaceUIMessage[] = [],
+  thread: Partial<Thread> = {},
+) {
   const { agent, requests } = inMemoryResponseAgent();
-  const { repository, conversations } = inMemoryThreadRepository();
-  await repository.save(ana.ownerId, aThread({ id: threadId }), stored);
+  const { repository, conversations, threadOf } = inMemoryThreadRepository();
+  await repository.save(
+    ana.ownerId,
+    aThread({ id: threadId, ...thread }),
+    stored,
+  );
   const deps = {
     requester: ana,
     threads: repository,
@@ -52,7 +60,7 @@ async function setup(stored: WorkspaceUIMessage[] = []) {
     sources: [jira],
     agent,
   };
-  return { deps, requests, conversations };
+  return { deps, requests, conversations, threadOf };
 }
 
 const request: AnswerThreadInput = {
@@ -106,6 +114,30 @@ describe("answerThread", () => {
     await requests[0]!.onEnd(conversation);
     expect(conversations.get(threadId)).toEqual(conversation);
   });
+
+  it.each([
+    { name: "settled", placement: { settledAt: "2026-11-04T09:00:00.000Z" } },
+    {
+      name: "snoozed",
+      placement: { snoozedUntil: "2026-11-09T09:00:00.000Z" },
+    },
+    { name: "woken", placement: { wokeAt: "2026-11-04T09:00:00.000Z" } },
+  ])(
+    "returns a $name thread to active, talking to the model's provider",
+    async ({ placement }) => {
+      const { deps, threadOf } = await setup([], {
+        ...placement,
+        provider: "openai",
+      });
+      await answerThread(request, deps);
+      expect(threadOf(threadId)).toMatchObject({
+        settledAt: undefined,
+        snoozedUntil: undefined,
+        wokeAt: undefined,
+        provider: "claude",
+      });
+    },
+  );
 
   it("refuses another user's thread as if it did not exist", async () => {
     const { deps, requests } = await setup();

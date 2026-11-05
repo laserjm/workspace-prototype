@@ -53,6 +53,8 @@ export type ThreadRepository = {
     thread: Thread,
     messages?: readonly WorkspaceUIMessage[],
   ): Promise<void>;
+  /** Stores what changes as a thread is used: its placement and the provider it talks to. */
+  update(ownerId: OwnerId, thread: Thread): Promise<void>;
   /** The thread's conversation in order; empty for a thread the owner does not have. */
   listMessages(
     ownerId: OwnerId,

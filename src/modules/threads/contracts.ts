@@ -56,6 +56,37 @@ export const forkThreadInputSchema = z.object({
 });
 export type ForkThreadInput = z.infer<typeof forkThreadInputSchema>;
 
+const isoTimestampSchema = z.iso.datetime({ offset: true });
+
+/** Where a thread sat before a change, for the undo: active, settled, snoozed or woken. */
+export const threadPlacementSchema = z
+  .object({
+    settledAt: isoTimestampSchema.optional(),
+    snoozedUntil: isoTimestampSchema.optional(),
+    wokeAt: isoTimestampSchema.optional(),
+  })
+  .refine(
+    (placement) => Object.values(placement).filter(Boolean).length <= 1,
+    "A thread has one placement.",
+  );
+
+/**
+ * A change to where a thread sits in the sidebar. The server applies it with its own clock;
+ * `return` puts the thread back where it was (an undo).
+ */
+export const placeThreadInputSchema = z.object({
+  threadId: z.uuid(),
+  change: z.discriminatedUnion("kind", [
+    z.object({ kind: z.literal("settle") }),
+    z.object({ kind: z.literal("snooze"), until: isoTimestampSchema }),
+    z.object({ kind: z.literal("restore") }),
+    z.object({ kind: z.literal("acknowledgeWake") }),
+    z.object({ kind: z.literal("return"), placement: threadPlacementSchema }),
+  ]),
+});
+export type PlaceThreadInput = z.infer<typeof placeThreadInputSchema>;
+export type ThreadChange = PlaceThreadInput["change"];
+
 /** The `html_render` tool: the model shows a self-contained HTML page above its reply. */
 export const htmlRenderInputSchema = z.object({
   html: z
