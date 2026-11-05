@@ -1,8 +1,8 @@
 import "server-only";
-// The module's reads, straight on Drizzle. Every query names the requester's owner id
+// The module's reads, straight on Drizzle. Every query names the user's id
 // (ARCHITECTURE.md, "Data ownership").
 import { and, asc, eq } from "drizzle-orm";
-import type { OwnerRequester } from "@conventions/nextjs/core";
+import type { User } from "@/lib/auth/user";
 import { db } from "@/lib/db/client";
 import { projectsTable } from "@/lib/db/schema";
 import type { Project } from "./contracts";
@@ -11,18 +11,18 @@ const columns = { id: projectsTable.id, name: projectsTable.name };
 
 /** The signed-in user's projects, oldest first. */
 export async function listProjects(
-  requester: OwnerRequester,
+  user: User,
 ): Promise<Project[]> {
   return db()
     .select(columns)
     .from(projectsTable)
-    .where(eq(projectsTable.ownerId, requester.ownerId))
+    .where(eq(projectsTable.userId, user.id))
     .orderBy(asc(projectsTable.createdAt), asc(projectsTable.name));
 }
 
 /** One of the user's projects, or null when they have none with this id. */
 export async function findProject(
-  requester: OwnerRequester,
+  user: User,
   id: string,
 ): Promise<Project | null> {
   const [row] = await db()
@@ -30,7 +30,7 @@ export async function findProject(
     .from(projectsTable)
     .where(
       and(
-        eq(projectsTable.ownerId, requester.ownerId),
+        eq(projectsTable.userId, user.id),
         eq(projectsTable.id, id),
       ),
     );

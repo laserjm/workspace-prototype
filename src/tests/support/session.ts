@@ -1,23 +1,23 @@
 // A session for tests that call server actions. Swap it in for the real one, which reads the
 // request's cookie, at the top of the test file:
 //
-//   vi.mock("@/lib/auth/requester", () => import("@/tests/support/session"));
+//   vi.mock("@/lib/auth/session", () => import("@/tests/support/session"));
 //
 // then call an action as a user, or as a visitor with `null`:
 //
 //   await callAs(ana, createProjectAction, { name: "battery management" });
-import type { OwnerRequester } from "@conventions/nextjs/core";
+import type { User } from "@/lib/auth/user";
 
-let current: OwnerRequester | null = null;
+let current: User | null = null;
 
-/** Calls `serverAction` with `input` as `requester` would through the app. Null calls as a visitor. */
+/** Calls `serverAction` with `input` as `user` would through the app. Null calls as a visitor. */
 export async function callAs<Input, Output>(
-  requester: OwnerRequester | null,
+  user: User | null,
   serverAction: (input: Input) => Promise<Output>,
   input: Input,
 ): Promise<Output> {
   const previous = current;
-  current = requester;
+  current = user;
   try {
     return await serverAction(input);
   } finally {
@@ -25,15 +25,7 @@ export async function callAs<Input, Output>(
   }
 }
 
-// The same exports as lib/auth/requester.ts, answering from `callAs`.
-
-export async function getRequester(): Promise<OwnerRequester | null> {
+/** The same export as lib/auth/session.ts, answering from `callAs`. */
+export async function getUser(): Promise<User | null> {
   return current;
-}
-
-export async function getSignedInUser(): Promise<{
-  name: string;
-  email: string;
-} | null> {
-  return current && { name: current.userId, email: `${current.userId}@test.invalid` };
 }

@@ -1,5 +1,5 @@
 // Every page needs a signed-in user. This is the optimistic check (cookie present); the real one
-// is `getRequester()` next to the data, which also covers a cookie whose session has ended.
+// is `getUser()` next to the data, which also covers a cookie whose session has ended.
 import { NextResponse, type NextRequest } from "next/server";
 import { hasSessionCookie } from "@/lib/auth/session-cookie";
 

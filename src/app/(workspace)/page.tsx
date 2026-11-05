@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
-import { getRequester, getSignedInUser } from "@/lib/auth/requester";
+import { getUser } from "@/lib/auth/session";
 import { listProjects } from "@/modules/projects/server";
 import { SkillsProvider } from "@/modules/skills";
 import { listSkills } from "@/modules/skills/server";
@@ -22,16 +22,13 @@ export default function WorkspacePage() {
 
 async function Workspace() {
   // proxy.ts only saw a cookie; an ended or revoked session lands here.
-  const [requester, user] = await Promise.all([
-    getRequester(),
-    getSignedInUser(),
-  ]);
-  if (!requester || !user) redirect("/sign-in");
+  const user = await getUser();
+  if (!user) redirect("/sign-in");
   const [sources, skills, threads, projects, models] = await Promise.all([
     listSources(),
     listSkills(),
-    listThreads(requester),
-    listProjects(requester),
+    listThreads(user),
+    listProjects(user),
     listModelChoices(),
   ]);
   return (
@@ -41,7 +38,8 @@ async function Workspace() {
           initialThreads={threads}
           initialProjects={projects}
           models={models}
-          user={user}
+          // Name and email only: the id stays on the server.
+          user={{ name: user.name, email: user.email }}
         />
       </SkillsProvider>
     </SourcesProvider>

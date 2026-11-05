@@ -7,7 +7,7 @@ import { usersTable } from "@/lib/db/schema";
  * Signs up users with these ids for the file's tests, as a first sign-in would, and deletes them
  * (and everything they own) afterwards. Give each test file its own ids: files run in parallel.
  */
-export function withOwners(...ids: string[]) {
+export function withUsers(...ids: string[]) {
   beforeAll(async () => {
     await db()
       .insert(usersTable)

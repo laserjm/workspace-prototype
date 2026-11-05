@@ -4,30 +4,30 @@ import { z } from "zod";
 import { err, ok } from "@/lib/result";
 import { createActions } from "./define";
 
-const requester = { userId: "ana" };
+const user = { id: "ana" };
 const nameSchema = z.object({ name: z.string().min(1) });
 
-function setUp(signedIn: typeof requester | null = requester) {
+function setUp(signedIn: typeof user | null = user) {
   const log = vi.fn();
   const handler = vi.fn(
-    async (input: { name: string }, context: { requester: typeof requester }) =>
-      ok({ greeted: input.name, by: context.requester.userId }),
+    async (input: { name: string }, context: { user: typeof user }) =>
+      ok({ greeted: input.name, by: context.user.id }),
   );
   const { action, publicAction } = createActions({
-    getRequester: async () => signedIn,
+    getUser: async () => signedIn,
     log,
   });
   return { log, handler, action, publicAction };
 }
 
 describe("action", () => {
-  it("runs the handler with the parsed input and the requester", async () => {
+  it("runs the handler with the parsed input and the user", async () => {
     const { action, handler } = setUp();
     const greet = action(nameSchema, handler);
     expect(await greet({ name: "Ben" })).toEqual(
       ok({ greeted: "Ben", by: "ana" }),
     );
-    expect(handler).toHaveBeenCalledWith({ name: "Ben" }, { requester });
+    expect(handler).toHaveBeenCalledWith({ name: "Ben" }, { user });
   });
 
   it("passes the handler's refusal through as is", async () => {
@@ -76,7 +76,7 @@ describe("action", () => {
   it("answers Unexpected when the session cannot be read", async () => {
     const log = vi.fn();
     const { action } = createActions({
-      getRequester: async () => {
+      getUser: async () => {
         throw new Error("auth unavailable");
       },
       log,

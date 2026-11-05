@@ -78,16 +78,17 @@ preferences; there are no shared workspaces. The enterprise source catalogue and
 catalogue are shared data (NX-AUTH-05). Shared workspaces, such as a team seeing each other's
 threads or source connections configured once per organisation, would make this a `tenant`
 app, recorded here as a migration.
-The owner is the signed-in Keycloak user: `ownerId` is their `sub`, which is also `users.id`
-(see the sign-in). The four sign-in tables are Better Auth's, not owned data the app reads. The
-owned tables are `projects`, `threads` and `thread_messages`: each row has an `owner_id`
-referencing `users.id` (deleting a user deletes what they own); a message's reference
-`(thread_id, owner_id)` → `threads(id, owner_id)` lets it belong only to a thread of its own
-owner. Every repository method takes the `OwnerId` first and names it in its query.
-**Enforced by.** `OwnerId` from `lib/auth/requester.ts` and `tsc` through the brand;
-`conventions check` (`owner-id-type`); `assertIsolation()` in each module's command test (see
-"Command tests").
-**Recorded in.** This entry; `lib/auth/requester.ts`.
+The owner is the signed-in Keycloak user, so the code says user: `User.id` (a `UserId`) is their
+`sub`, which is also `users.id` (see the sign-in). The four sign-in tables are Better Auth's,
+not owned data the app reads. The owned tables are `projects`, `threads` and `thread_messages`:
+each row has a `user_id` referencing `users.id`, like `sessions` and `accounts` (deleting a user
+deletes what they own); a message's reference `(thread_id, user_id)` → `threads(id, user_id)`
+lets it belong only to a thread of the same user. Every query and repository method on owned
+data takes the user (or their `UserId`) first and names it in its query.
+**Enforced by.** The `UserId` brand from `lib/auth/user.ts` (a zod brand) and `tsc`;
+`conventions check` (`owner-id-type`); `assertIsolation()` in each module's command or action
+test (see "Command tests").
+**Recorded in.** This entry; `lib/auth/user.ts`; `drizzle/0005_rename-owner-to-user.sql`.
 
 ### Modules
 
@@ -118,13 +119,14 @@ editing in the app. A user's first sign-in creates their `users` row, and every 
 name and email from Keycloak.
 
 - **One place.** `lib/auth/` is the only importer of `better-auth`. `auth.ts` builds the instance
-  lazily on `db()` (NX-TYPE-06). `requester.ts` turns the session into an `OwnerRequester`.
-  `handlers.ts` serves the routes. `session-cookie.ts` is the proxy's cookie check. The settings
-  are validated in `lib/env.ts`.
-- **`ownerId` is the Keycloak `sub`.** Better Auth drops the provider's id when it creates a
+  lazily on `db()` (NX-TYPE-06). `session.ts` has `getUser()`, which turns the session into a
+  `User` (`{ id, name, email }`, `user.ts`), once per request (`cache`). `handlers.ts` serves the
+  routes. `session-cookie.ts` is the proxy's cookie check. The settings are validated in
+  `lib/env.ts`.
+- **A user's id is the Keycloak `sub`.** Better Auth drops the provider's id when it creates a
   user. `mapProfileToUser` therefore copies `sub` into `users.keycloak_sub`, and the
   `user.create.before` hook makes it `users.id`. The `users_id_is_keycloak_sub` check keeps the
-  two equal. The realm's users have fixed ids, so a user's `ownerId` survives `pnpm stack:reset`.
+  two equal. The realm's users have fixed ids, so a user's id survives `pnpm stack:reset`.
   Account linking is off: a user deleted and re-created in Keycloak gets a new `sub` and cannot
   take over the old row by email.
 - **Tables.** `users`, `sessions`, `accounts` and `verifications` are declared in
@@ -143,29 +145,29 @@ name and email from Keycloak.
   - `/update-user`, `/change-email` and `/delete-user` are disabled.
 - **Who checks what.** `proxy.ts` checks only that a session cookie exists, the optimistic check
   Next.js recommends for Proxy. Without one, a page goes to `/sign-in` and `/api/*` gets 401. The
-  real check is `getRequester()` next to the data: `app/(workspace)/page.tsx` redirects a visitor
-  whose session has ended, and `/api/chat` and `/api/threads/[id]/messages` answer 401. Every
-  server action is `action(…)` from `lib/actions/server.ts`, which calls the same
-  `getRequester()`: a visitor gets `SignedOut` and the action does not run, and the browser goes
-  to `/sign-in` and back (see "Server actions").
+  real check is `getUser()` next to the data: `app/(workspace)/page.tsx` redirects a visitor
+  whose session has ended (and hands the shell only name and email), and `/api/chat` and
+  `/api/threads/[id]/messages` answer 401. Every server action is `action(…)` from
+  `lib/actions/server.ts`, which calls the same `getUser()`: a visitor gets `SignedOut` and the
+  action does not run, and the browser goes to `/sign-in` and back (see "Server actions").
 
-**Enforced by.** The `auth` ruleset (NX-AUTH-01: only `app/`, `lib/` and `queries.ts` import
-the requester), narrowed by ACTION-03 (`scripts/check-actions.mjs`: only `lib/actions/server.ts`,
-`lib/auth/` and `app/`); `boundaries/external`. The check constraint `users_id_is_keycloak_sub`. Better
+**Enforced by.** The `auth` ruleset (NX-AUTH-01: only `app/`, `lib/` and `queries.ts` read the
+session), narrowed by ACTION-03 (`scripts/check-actions.mjs`: only `lib/actions/server.ts`,
+`lib/auth/` and `app/` import `lib/auth/session`); `boundaries/external`. The check constraint `users_id_is_keycloak_sub`. Better
 Auth's startup schema check, which refuses to run when `schema.ts` and its fields disagree.
 **Recorded in.** This entry; `docs/adr/0001-auth-library-for-keycloak-sign-in.md`.
 
 ### Stored projects, threads, conversations and placement
 
-**Decision.** Projects, threads and their conversations are stored per owner (see "Data
+**Decision.** Projects, threads and their conversations are stored per user (see "Data
 ownership"); creating a project is `createProjectAction` in `projects/actions.ts`, which
 writes itself (no command, use case or repository, see "Leaving `@conventions/nextjs`"), and
 creating and forking a thread are use cases (`threads/application/start-thread.ts`,
 `threads/application/fork-thread.ts`) wired in the module's `commands.ts` and called from its
 `actions.ts`. The module's components call the actions (`ProjectForm`, `useThreads`).
-`app/(workspace)/page.tsx` reads the requester once and passes it to `listProjects` and
+`app/(workspace)/page.tsx` reads the user once and passes them to `listProjects` and
 `listThreads`. A name the user already uses answers with that project instead of adding it
-twice; the `projects_owner_id_name_key` index catches a race, answered as `Conflict`. The
+twice; the `projects_user_id_name_key` index catches a race, answered as `Conflict`. The
 browser picks a new thread's id (its chat needs it before the server answers) and stores the
 thread before it sends the first message; a taken id is a `Conflict`, a project that is not
 the user's a `NotFound`.
@@ -203,7 +205,7 @@ width persist in `localStorage`; the stored skill ids are parsed with `storedSki
 stored, which the browser adds to its state.
 **Enforced by.** `boundaries/element-types` (components never import `infra/` or `queries.ts`);
 the `server-only` import in every `queries.ts`, `commands.ts` and `server.ts`; the
-`thread_messages_thread_id_owner_id_fkey` and `threads_one_placement` constraints; the command
+`thread_messages_thread_id_user_id_fkey` and `threads_one_placement` constraints; the command
 tests.
 **Recorded in.** This entry.
 
@@ -211,13 +213,13 @@ tests.
 
 **Decision.** A thread's `project_id` is nullable: null is a thread without a project, not a
 hidden per-user default project, which would need creating at sign-in and hiding from every
-list. The reference `(project_id, owner_id)` → `projects(id, owner_id)` lets a thread belong
-only to a project of its own owner; with a null `project_id` it does not apply. In the domain,
+list. The reference `(project_id, user_id)` → `projects(id, user_id)` lets a thread belong
+only to a project of the same user; with a null `project_id` it does not apply. In the domain,
 `Thread.projectId` is the project's id (cross-module references are ids); the workspace
 resolves it to a name through the project list, and the sidebar filter lists threads without
 a project under "No project". A new thread starts without a project unless one is picked.
-**Enforced by.** The `threads_project_id_owner_id_fkey` constraint; `startThread` answers
-`NotFound` for a project the requester does not own.
+**Enforced by.** The `threads_project_id_user_id_fkey` constraint; `startThread` answers
+`NotFound` for a project the user does not own.
 **Recorded in.** This entry.
 
 ### Command tests
@@ -225,13 +227,13 @@ a project under "No project". A new thread starts without a project unless one i
 **Decision.** A thin write use case is tested at the command level, not by a unit test with
 fakes plus a repository integration test: each module with stored data has one
 `commands.integration.test.ts` that calls its commands and queries against the compose
-Postgres with a requester the test builds (`tests/factories/requester.ts`), so no session or
-auth mocking is needed. `withOwners()` (`tests/support/owners.ts`) signs the test's users up and
+Postgres with a user the test builds (`aUser`, `tests/factories/user.ts`), so no session or
+auth mocking is needed. `withUsers()` (`tests/support/users.ts`) signs the test's users up and
 deletes them afterwards. The same file calls `assertIsolation()` through the commands and
 queries (NX-AUTH-03). In a module with `commands.ts` the actions are not tested: they only
-validate and hand the requester to the command. A module whose actions write themselves (`projects`) has `actions.integration.test.ts`
-instead, which calls the actions as the browser does: `vi.mock("@/lib/auth/requester", () =>
-import("@/tests/support/session"))` swaps in a fake session, and `callAs(requester, action,
+validate and hand the user to the command. A module whose actions write themselves (`projects`) has `actions.integration.test.ts`
+instead, which calls the actions as the browser does: `vi.mock("@/lib/auth/session", () =>
+import("@/tests/support/session"))` swaps in a fake session, and `callAs(user, action,
 input)` calls as that user, or as a visitor with `null`, so the test covers the sign-in check
 and the validation too. A use case with rules worth example tables keeps its unit test (`answer-thread.test.ts`);
 pure domain rules are tested by example in `domain/*.test.ts` (NX-TEST-06). Conventions 0.3.2
@@ -242,20 +244,20 @@ command tests skip loudly without the stack (NX-TEST-03).
 
 ### Answers come from the Vercel AI Gateway
 
-**Decision.** `POST /api/chat` (`app/api/chat/route.ts`) only reads the requester and hands it
+**Decision.** `POST /api/chat` (`app/api/chat/route.ts`) only reads the user and hands them
 and the body to `answerThread` from `modules/threads/server.ts`. `modules/threads/commands.ts` validates it
 with `chatTurnDtoSchema` at the edge and runs the use case `application/answer-thread.ts`.
 The use case resolves the model, skill and records from their ids against the server's
 catalogues (unknown ids are `NotFound`, answered with a 400), finds the thread among the
-requester's (another user's thread is a `NotFound` like a missing one, answered with a 404) and
+user's (another user's thread is a `NotFound` like a missing one, answered with a 404) and
 asks the `ResponseAgent` port to stream the stored conversation with the new message, then to
 store it when the reply ends (see "Stored projects, threads, conversations and placement"). `infra/ai-gateway.response-agent.ts` implements the port with an AI SDK
 `ToolLoopAgent` on the gateway, with the instructions in `infra/ai-gateway.instructions.ts`,
 the model allowlist in `infra/ai-gateway.model-catalog.ts` and the `html_render` tool in
 `infra/ai-sdk.html-render-tool.ts`. The tool's input and output schemas are in
 `contracts.ts`, so the browser's message types never import `infra/`. The route reads the
-requester and answers 401 without one. The command takes it as its first argument
-(NX-LAYER-11), and the use case answers and stores only the requester's threads. The frame that shows an `html_render` page is feature-agnostic and lives in
+user and answers 401 without one. The command takes them as its first argument
+(NX-LAYER-11), and the use case answers and stores only the user's threads. The frame that shows an `html_render` page is feature-agnostic and lives in
 `components/ui/html-render-*.tsx`; the helpers both sides share are in `lib/html-render/`.
 Message text renders as Markdown through `components/ui/markdown.tsx`: GitHub-flavoured, `$$`
 math, raw HTML shown as text, a user's single newlines kept. `lib/markdown/` holds the plugins,
@@ -302,11 +304,11 @@ variables, and the VS Code brand colour in `components/ui/vscode-icon.tsx`.
 ### Server actions
 
 **Decision.** Server actions are the project's own `lib/actions/`, not next-safe-action. A
-module's `actions.ts` exports `export const <name>Action = action(schema, (input, { requester })
-=> command(requester, input))`, or does the write in the handler itself when the module has no
+module's `actions.ts` exports `export const <name>Action = action(schema, (input, { user })
+=> command(user, input))`, or does the write in the handler itself when the module has no
 `commands.ts` (`projects`). Every export of a `"use server"` file can be called from the browser,
 so `actions.ts` exports nothing but actions; a helper the handlers share stays unexported. `action` (`lib/actions/define.ts`, bound to the session in
-`lib/actions/server.ts`) runs four steps in order: it reads the requester and answers
+`lib/actions/server.ts`) runs four steps in order: it reads the user (`getUser()`) and answers
 `SignedOut` without one, before the input is looked at; it parses the input with the schema and
 answers `ValidationFailed` (`issues: [{ path: "change.until", message }]`); it runs the handler,
 whose `Result` reaches the caller as is; and it turns anything thrown into `Unexpected` with a
@@ -327,7 +329,7 @@ needs to work before hydration; that would be a `formAction` beside `action`.
 **Enforced by.** `scripts/check-actions.mjs` (`pnpm lint`, CI): ACTION-01 `"use server"` only
 in `modules/*/actions.ts`, ACTION-02 every export of it is `action(…)` or `publicAction(…)` from
 `@/lib/actions/server` (a public one with a comment saying why), ACTION-03 only
-`lib/actions/server.ts`, `lib/auth/` and `app/` import the requester. The unit tests of
+`lib/actions/server.ts`, `lib/auth/` and `app/` import `lib/auth/session`. The unit tests of
 `define.ts`, `client.ts` and `messages.ts`. Next.js's own Origin check on server actions (CSRF).
 **Recorded in.** This entry.
 
@@ -347,19 +349,21 @@ command together.
 
 A module whose writes hold no rule worth a layer of its own drops `domain/`, `application/`,
 `infra/` and `commands.ts`: `contracts.ts` (types, errors, rules, input schemas), `queries.ts`
-(reads, each taking the requester first) and `actions.ts` (writes: `action(…)` signs the caller
+(reads, each taking the user first) and `actions.ts` (writes: `action(…)` signs the caller
 in and validates, and the handler queries Drizzle) are the whole module. `projects` has this
 shape; `server.ts` re-exports its actions for other modules' tests and its queries for pages.
-Every query names `requester.ownerId`. Without a repository, `conventions check` no longer
+Every query names `user.id`. Without a repository, `conventions check` no longer
 requires the isolation test (NX-AUTH-03 looks at repositories only); the action test keeps its
 `assertIsolation()` call regardless. A handler reads a refused constraint with
 `violatedConstraint` and returns `err(conflict(...))` itself, with no `ConstraintViolation` in
 between. `actions.ts` cannot import `queries.ts` (NX-LAYER-01), so a read only a write needs
 lives in `actions.ts`, unexported.
 
-Order: (1) `projects`, done except `OwnerId`/`OwnerRequester` and the test helpers; (2) `threads`,
-`skills`, `sources`, which also need `NotFound`, `ValidationFailed`, `notFound`, `bug` and `map`;
-(3) `OwnerId`/`OwnerRequester` into `lib/auth/requester.ts`; (4) `@conventions/nextjs/drizzle`
+Order: (1) `projects`, done; (2) `threads`, `skills`, `sources`, which also need `NotFound`,
+`ValidationFailed`, `notFound`, `bug` and `map`; (3) `OwnerId`/`OwnerRequester`, done: the
+project's own `User` and `UserId` (`lib/auth/user.ts`, see "Data ownership"), without the
+package's unused `kind`, `roles` and `systemRequester`; a background job, when there is one,
+passes the `UserId` of the user it works for; (4) `@conventions/nextjs/drizzle`
 (`createTransactionRunner`) and `/testing` into `lib/` and `tests/support/`
 (`/next-safe-action` is done: `lib/actions/`); (5) the ESLint config, the CLI and this file's
 header.
@@ -374,7 +378,8 @@ migration goes and leave with the profile.
 | Rule | Deviation | Why | Until |
 | --- | --- | --- | --- |
 | NX-LAYER-03 | `modules/projects/queries.ts` and `modules/projects/actions.ts` import `drizzle-orm` and `lib/db` instead of going through `infra/` | Leaving `@conventions/nextjs`: a module without rules worth a layer queries Drizzle in `queries.ts` and `actions.ts` | The profile is removed (step 5) |
-| NX-AUTH-01 | `lib/actions/server.ts` reads the session (through `getRequester`), where the rule names `lib/safe-action.ts` | Server actions are `lib/actions/`, not next-safe-action ("Server actions"); ACTION-03 keeps the requester's importers to this file, `lib/auth/` and `app/` | The profile is removed (step 5) |
+| NX-AUTH-01 | `lib/actions/server.ts` reads the session (through `getUser`), where the rule names `lib/safe-action.ts` | Server actions are `lib/actions/`, not next-safe-action ("Server actions"); ACTION-03 keeps the session's importers to this file, `lib/auth/` and `app/` | The profile is removed (step 5) |
+| NX-LAYER-01 | `modules/threads/application/*.ts` import the `User` and `UserId` types from `lib/auth/user.ts` | Leaving `@conventions/nextjs`: they replace the package's `OwnerRequester` and `OwnerId`; `user.ts` holds types and the zod brand only, no session or framework | `threads` drops `application/` (step 2) |
 | NX-NAME-50 | `lib/actions/*.ts`: `action`, `publicAction`, `callAction` and `useAction` end in `Action` outside an `actions.ts` | They are the action API itself; ACTION-02 names the server actions (`<name>Action` in `actions.ts`) | The profile is removed (step 5) |
 | NX-ERR-03 | `lib/errors.ts` defines `Conflict`, `NotFound`, `ValidationFailed`, `SignedOut` and `Unexpected` instead of importing them from `@conventions/nextjs/core` | Leaving `@conventions/nextjs`: the standard errors move into `lib/` | The profile is removed (step 5) |
 

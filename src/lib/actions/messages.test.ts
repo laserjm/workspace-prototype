@@ -16,7 +16,7 @@ describe("errorMessage", () => {
 
   it("has a message for each standard error", () => {
     const errors: CreateError[] = [
-      { _tag: "Conflict", constraint: "projects_owner_id_name_key" },
+      { _tag: "Conflict", constraint: "projects_user_id_name_key" },
       { _tag: "SignedOut" },
       { _tag: "Unreachable" },
     ];

@@ -1,8 +1,8 @@
 import type {
-  OwnerId,
   Result,
   ValidationFailed,
 } from "@conventions/nextjs/core";
+import type { UserId } from "@/lib/auth/user";
 import type { Skill } from "@/modules/skills";
 import type { Source, SourceRecord } from "@/modules/sources";
 import type { WorkspaceUIMessage } from "../contracts";
@@ -39,25 +39,25 @@ export type ResponseAgent = {
   answer(request: ResponseRequest): Promise<Result<Response, ValidationFailed>>;
 };
 
-/** The signed-in user's threads. Owned methods take the OwnerId first (NX-AUTH-03). */
+/** The signed-in user's threads. Owned methods take the UserId first (NX-AUTH-03). */
 export type ThreadRepository = {
   /** Newest first. */
-  listByOwner(ownerId: OwnerId): Promise<Thread[]>;
-  findById(ownerId: OwnerId, id: string): Promise<Thread | null>;
+  listByUser(userId: UserId): Promise<Thread[]>;
+  findById(userId: UserId, id: string): Promise<Thread | null>;
   /**
    * Adds a thread with the conversation it starts with (a fork's copy), in one transaction.
    * Throws a `ConstraintViolation` when its id is taken.
    */
   save(
-    ownerId: OwnerId,
+    userId: UserId,
     thread: Thread,
     messages?: readonly WorkspaceUIMessage[],
   ): Promise<void>;
   /** Stores what changes as a thread is used: its placement and the provider it talks to. */
-  update(ownerId: OwnerId, thread: Thread): Promise<void>;
+  update(userId: UserId, thread: Thread): Promise<void>;
   /** The thread's conversation in order; empty for a thread the owner does not have. */
   listMessages(
-    ownerId: OwnerId,
+    userId: UserId,
     threadId: string,
   ): Promise<WorkspaceUIMessage[]>;
   /**
@@ -65,13 +65,13 @@ export type ThreadRepository = {
    * thread the owner does not have.
    */
   saveMessages(
-    ownerId: OwnerId,
+    userId: UserId,
     threadId: string,
     messages: readonly WorkspaceUIMessage[],
   ): Promise<void>;
 };
 
-/** The requester's projects, as the projects module answers for them. */
+/** The user's projects, as the projects module answers for them. */
 export type ProjectDirectory = {
   exists(projectId: string): Promise<boolean>;
 };

@@ -1,6 +1,6 @@
 "use server";
 // The module's writes. `action` signs the caller in and validates the input; each handler then
-// writes straight on Drizzle, naming the requester's owner id in every query (ARCHITECTURE.md,
+// writes straight on Drizzle, naming the user's id in every query (ARCHITECTURE.md,
 // "Data ownership"). Only the actions are exported: every export of this file can be called
 // from the browser.
 import { and, eq } from "drizzle-orm";
@@ -24,18 +24,18 @@ export const createProjectAction = action(
   createProjectInputSchema,
   async (
     input,
-    { requester },
+    { user },
   ): Promise<Result<Project, ProjectNameMissing | Conflict>> => {
     const name = nameProject(input.name);
     if (!name.ok) return name;
-    const { ownerId } = requester;
+    const userId = user.id;
 
     const [existing] = await db()
       .select(columns)
       .from(projectsTable)
       .where(
         and(
-          eq(projectsTable.ownerId, ownerId),
+          eq(projectsTable.userId, userId),
           eq(projectsTable.name, name.value),
         ),
       );
@@ -44,7 +44,7 @@ export const createProjectAction = action(
     try {
       const [created] = await db()
         .insert(projectsTable)
-        .values({ ownerId, name: name.value })
+        .values({ userId, name: name.value })
         .returning(columns);
       return ok(created!);
     } catch (error) {

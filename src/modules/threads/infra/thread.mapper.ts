@@ -1,4 +1,4 @@
-import type { OwnerId } from "@conventions/nextjs/core";
+import type { UserId } from "@/lib/auth/user";
 import type { threadMessagesTable, threadsTable } from "@/lib/db/schema";
 import type { WorkspaceUIMessage } from "../contracts";
 import type { ModelProvider, Thread, ThreadPlacement } from "../domain/thread";
@@ -52,10 +52,10 @@ export function toThreadChanges(thread: Thread) {
   } satisfies Partial<NewThreadRow>;
 }
 
-export function toThreadRow(ownerId: OwnerId, thread: Thread): NewThreadRow {
+export function toThreadRow(userId: UserId, thread: Thread): NewThreadRow {
   return {
     id: thread.id,
-    ownerId,
+    userId,
     projectId: thread.projectId,
     title: thread.title,
     sourceId: thread.scope?.sourceId ?? null,
@@ -81,13 +81,13 @@ export function toMessage(row: MessageRow): WorkspaceUIMessage {
 }
 
 export function toMessageRows(
-  ownerId: OwnerId,
+  userId: UserId,
   threadId: string,
   messages: readonly WorkspaceUIMessage[],
 ): NewMessageRow[] {
   return messages.map((message, position) => ({
     threadId,
-    ownerId,
+    userId,
     id: message.id,
     position,
     role: message.role,

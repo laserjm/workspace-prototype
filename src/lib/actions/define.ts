@@ -1,5 +1,5 @@
 // How a server action runs: sign the caller in, validate the input, run the handler, and turn
-// anything thrown into `Unexpected`. Plain TypeScript with the requester passed in, so the
+// anything thrown into `Unexpected`. Plain TypeScript with the user passed in, so the
 // tests run it without a request; `server.ts` binds it to the session (ARCHITECTURE.md,
 // "Server actions").
 import { unstable_rethrow } from "next/navigation";
@@ -33,12 +33,12 @@ type Log = (traceId: string, error: unknown) => void;
 const logToConsole: Log = (traceId, error) =>
   console.error(`[action] ${traceId}`, error);
 
-export function createActions<Requester>({
-  getRequester,
+export function createActions<User>({
+  getUser,
   log = logToConsole,
 }: {
   /** The signed-in caller, or null for a visitor. */
-  getRequester: () => Promise<Requester | null>;
+  getUser: () => Promise<User | null>;
   log?: Log;
 }) {
   /** Logs what was thrown and answers `Unexpected`; Next.js's redirect and notFound pass. */
@@ -52,30 +52,30 @@ export function createActions<Requester>({
   /**
    * A server action for signed-in users. A visitor gets `SignedOut` before the input is read;
    * input that does not match `schema` gets `ValidationFailed`; the handler gets the parsed
-   * input and the requester and answers with a `Result`, which reaches the caller as is.
+   * input and the user and answers with a `Result`, which reaches the caller as is.
    *
-   *   export const createProjectAction = action(createProjectInputSchema, (input, { requester }) =>
-   *     createProject(requester, input),
+   *   export const createProjectAction = action(createProjectInputSchema, (input, { user }) =>
+   *     createProject(user, input),
    *   );
    */
   function action<Schema extends z.ZodType, R extends AnyResult>(
     schema: Schema,
     handler: (
       input: z.output<Schema>,
-      context: { requester: Requester },
+      context: { user: User },
     ) => Promise<R>,
   ): (input: z.input<Schema>) => Promise<ActionResult<ValueOf<R>, ErrorOf<R>>>;
   function action(
     schema: z.ZodType,
-    handler: (input: unknown, context: { requester: Requester }) => Promise<AnyResult>,
+    handler: (input: unknown, context: { user: User }) => Promise<AnyResult>,
   ): (input: unknown) => Promise<AnyResult> {
     return async (input) => {
       try {
-        const requester = await getRequester();
-        if (!requester) return err({ _tag: "SignedOut" });
+        const user = await getUser();
+        if (!user) return err({ _tag: "SignedOut" });
         const parsed = validate(schema, input);
         if (!parsed.ok) return parsed;
-        return await handler(parsed.value, { requester });
+        return await handler(parsed.value, { user });
       } catch (error) {
         return unexpected(error);
       }

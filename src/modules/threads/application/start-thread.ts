@@ -5,8 +5,8 @@ import {
   notFound,
   ok,
   type NotFound,
-  type OwnerRequester,
 } from "@conventions/nextjs/core";
+import type { User } from "@/lib/auth/user";
 import type { StartThreadInput } from "../contracts";
 import type { ScopeHasNoRecords } from "../domain/errors";
 import {
@@ -17,7 +17,7 @@ import {
 import type { Clock, ProjectDirectory, ThreadRepository } from "./ports";
 
 export type StartThreadDeps = {
-  requester: OwnerRequester;
+  user: User;
   threads: ThreadRepository;
   projects: ProjectDirectory;
   clock: Clock;
@@ -28,7 +28,7 @@ export const startThread = defineUseCase<
   Thread,
   NotFound | ScopeHasNoRecords,
   StartThreadDeps
->(async (input, { requester, threads, projects, clock }) => {
+>(async (input, { user, threads, projects, clock }) => {
   // Another user's project is answered like a missing one: its id reveals nothing.
   if (input.projectId && !(await projects.exists(input.projectId)))
     return err(notFound("Project", input.projectId));
@@ -37,6 +37,6 @@ export const startThread = defineUseCase<
     : undefined;
   if (scope && !scope.ok) return scope;
   const thread = start({ ...input, scope: scope?.value }, clock.now());
-  await threads.save(requester.ownerId, thread);
+  await threads.save(user.id, thread);
   return ok(thread);
 });

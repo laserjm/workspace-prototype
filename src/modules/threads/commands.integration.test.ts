@@ -1,15 +1,14 @@
 import { randomUUID } from "node:crypto";
 import { expect, it, vi } from "vitest";
-import { OwnerId } from "@conventions/nextjs/core";
 import {
   assertIsolation,
   describeIntegration,
 } from "@conventions/nextjs/testing";
 import { createProjectAction } from "@/modules/projects/server";
 import { composeStack } from "@/tests/support/compose-stack";
-import { withOwners } from "@/tests/support/owners";
+import { withUsers } from "@/tests/support/users";
 import { callAs } from "@/tests/support/session";
-import { aRequester } from "@/tests/factories/requester";
+import { aUser } from "@/tests/factories/user";
 import { answerThread, forkThread, placeThread, startThread } from "./commands";
 import type {
   StartThreadInput,
@@ -20,7 +19,7 @@ import { threadRepository } from "./infra/thread.repository";
 import { listThreadMessages, listThreads } from "./queries";
 
 // The projects module creates projects only through its action, which reads the session.
-vi.mock("@/lib/auth/requester", () => import("@/tests/support/session"));
+vi.mock("@/lib/auth/session", () => import("@/tests/support/session"));
 
 function aNewThread(
   overrides: Partial<StartThreadInput> = {},
@@ -64,11 +63,11 @@ const conversation: WorkspaceUIMessage[] = [
  * A stored thread with a conversation. Replies are stored when the model's stream ends, which
  * these tests do not call; the repository stands in for that write.
  */
-async function aConversationOf(requester: ReturnType<typeof aRequester>) {
-  const thread = await startThread(requester, aNewThread());
+async function aConversationOf(user: ReturnType<typeof aUser>) {
+  const thread = await startThread(user, aNewThread());
   if (!thread.ok) throw new Error("the thread was not started");
   await threadRepository.saveMessages(
-    requester.ownerId,
+    user.id,
     thread.value.id,
     conversation,
   );
@@ -87,23 +86,23 @@ function aChatTurn(threadId: string) {
   };
 }
 
-async function aProjectOf(requester: ReturnType<typeof aRequester>) {
-  const project = await callAs(requester, createProjectAction, {
+async function aProjectOf(user: ReturnType<typeof aUser>) {
+  const project = await callAs(user, createProjectAction, {
     name: "workspace",
   });
   if (!project.ok) throw new Error("the project was not created");
   return project.value.id;
 }
 
-// Command-level: the commands and queries against the compose Postgres, with a requester built
+// Command-level: the commands and queries against the compose Postgres, with a user built
 // here instead of a session. Stands in for the use case's unit test and the repository's
 // integration test (NX-TEST-01, NX-TEST-02; ARCHITECTURE.md "Command tests").
 describeIntegration(
   "threads commands",
   () => {
-    const ana = aRequester("test-threads-ana");
-    const ben = aRequester("test-threads-ben");
-    withOwners(ana.userId, ben.userId);
+    const ana = aUser("test-threads-ana");
+    const ben = aUser("test-threads-ben");
+    withUsers(ana.id, ben.id);
 
     it("starts a thread without a project, titled by its first message", async () => {
       const input = aNewThread();
@@ -149,7 +148,7 @@ describeIntegration(
         ...conversation.slice(0, 3),
         { ...conversation[3]!, id: "a2b" },
       ];
-      await threadRepository.saveMessages(ana.ownerId, thread.id, regenerated);
+      await threadRepository.saveMessages(ana.id, thread.id, regenerated);
       expect(await listThreadMessages(ana, thread.id)).toEqual(regenerated);
     });
 
@@ -222,17 +221,17 @@ describeIntegration(
       expect(await listThreadMessages(ana, id)).toEqual([]);
     });
 
-    async function aStartedThreadOf(requester: ReturnType<typeof aRequester>) {
-      const thread = await startThread(requester, aNewThread());
+    async function aStartedThreadOf(user: ReturnType<typeof aUser>) {
+      const thread = await startThread(user, aNewThread());
       if (!thread.ok) throw new Error("the thread was not started");
       return thread.value;
     }
 
     async function listed(
-      requester: ReturnType<typeof aRequester>,
+      user: ReturnType<typeof aUser>,
       id: string,
     ) {
-      return (await listThreads(requester)).find((thread) => thread.id === id);
+      return (await listThreads(user)).find((thread) => thread.id === id);
     }
 
     const inAnHour = () => new Date(Date.now() + 3_600_000).toISOString();
@@ -315,14 +314,14 @@ describeIntegration(
     let placedThreadId = "";
     assertIsolation({
       name: "placeThread, listThreads",
-      ownerA: OwnerId(ana.userId),
-      ownerB: OwnerId(ben.userId),
+      ownerA: ana.id,
+      ownerB: ben.id,
       arrange: async (owner) => {
-        placedThreadId = (await aStartedThreadOf(aRequester(owner))).id;
+        placedThreadId = (await aStartedThreadOf(aUser(owner))).id;
       },
-      read: (owner) => listed(aRequester(owner), placedThreadId),
+      read: (owner) => listed(aUser(owner), placedThreadId),
       change: async (owner) => {
-        const ben = aRequester(owner);
+        const ben = aUser(owner);
         await placeThread(ben, {
           threadId: placedThreadId,
           change: { kind: "settle" },
@@ -338,15 +337,15 @@ describeIntegration(
     const isolated = aNewThread();
     assertIsolation({
       name: "startThread, listThreads",
-      ownerA: OwnerId(ana.userId),
-      ownerB: OwnerId(ben.userId),
-      arrange: (owner) => startThread(aRequester(owner), isolated),
+      ownerA: ana.id,
+      ownerB: ben.id,
+      arrange: (owner) => startThread(aUser(owner), isolated),
       read: async (owner) =>
-        (await listThreads(aRequester(owner))).filter(
+        (await listThreads(aUser(owner))).filter(
           (thread) => thread.id === isolated.id,
         ),
       change: (owner) =>
-        startThread(aRequester(owner), { ...isolated, prompt: "Taken over" }),
+        startThread(aUser(owner), { ...isolated, prompt: "Taken over" }),
     });
 
     // Ben cannot read Ana's conversation, and a chat turn on her thread is a 404 that stores
@@ -354,16 +353,16 @@ describeIntegration(
     let conversationThreadId = "";
     assertIsolation({
       name: "answerThread, forkThread, listThreadMessages",
-      ownerA: OwnerId(ana.userId),
-      ownerB: OwnerId(ben.userId),
+      ownerA: ana.id,
+      ownerB: ben.id,
       arrange: async (owner) => {
-        conversationThreadId = (await aConversationOf(aRequester(owner))).id;
+        conversationThreadId = (await aConversationOf(aUser(owner))).id;
       },
       read: (owner) =>
-        listThreadMessages(aRequester(owner), conversationThreadId),
+        listThreadMessages(aUser(owner), conversationThreadId),
       change: async (owner) => {
-        await answerThread(aRequester(owner), aChatTurn(conversationThreadId));
-        await forkThread(aRequester(owner), {
+        await answerThread(aUser(owner), aChatTurn(conversationThreadId));
+        await forkThread(aUser(owner), {
           fromThreadId: conversationThreadId,
           id: randomUUID(),
           throughMessageId: "a1",

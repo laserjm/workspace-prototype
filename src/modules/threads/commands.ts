@@ -1,12 +1,12 @@
 import "server-only";
-// The module's use cases wired to what they run on (NX-LAYER-11), each taking the Requester its
-// caller signed in as first.
+// The module's use cases wired to what they run on (NX-LAYER-11), each taking the signed-in
+// user first.
 import {
   conflict,
   ConstraintViolation,
   err,
-  type OwnerRequester,
 } from "@conventions/nextjs/core";
+import type { User } from "@/lib/auth/user";
 import { findProject } from "@/modules/projects/server";
 import { listSkills } from "@/modules/skills/server";
 import { listSources } from "@/modules/sources/server";
@@ -26,16 +26,16 @@ import { threadRepository } from "./infra/thread.repository";
 
 /** Stores the new thread the user's first message starts. */
 export async function startThread(
-  requester: OwnerRequester,
+  user: User,
   input: StartThreadInput,
 ) {
   try {
     return await start(input, {
-      requester,
+      user,
       threads: threadRepository,
       projects: {
         exists: async (projectId) =>
-          (await findProject(requester, projectId)) !== null,
+          (await findProject(user, projectId)) !== null,
       },
       clock,
     });
@@ -51,12 +51,12 @@ const clock = { now: () => new Date() };
 
 /** Stores a fork of one of the user's threads through one of its responses. */
 export async function forkThread(
-  requester: OwnerRequester,
+  user: User,
   input: ForkThreadInput,
 ) {
   try {
     return await fork(input, {
-      requester,
+      user,
       threads: threadRepository,
       clock,
     });
@@ -70,10 +70,10 @@ export async function forkThread(
 
 /** Settles, snoozes, restores or wakes one of the user's threads, or undoes that. */
 export async function placeThread(
-  requester: OwnerRequester,
+  user: User,
   input: PlaceThreadInput,
 ) {
-  return place(input, { requester, threads: threadRepository, clock });
+  return place(input, { user, threads: threadRepository, clock });
 }
 
 function badRequest(error: string) {
@@ -82,11 +82,11 @@ function badRequest(error: string) {
 
 /**
  * POST /api/chat: validates the body at the edge, then streams the next response of one of the
- * requester's threads and stores the conversation when it ends. Another user's thread is a 404,
+ * user's threads and stores the conversation when it ends. Another user's thread is a 404,
  * like a missing one.
  */
 export async function answerThread(
-  requester: OwnerRequester,
+  user: User,
   body: unknown,
   signal?: AbortSignal,
 ) {
@@ -96,7 +96,7 @@ export async function answerThread(
   const result = await answer(
     { ...request.data, signal },
     {
-      requester,
+      user,
       threads: threadRepository,
       models: aiGatewayModelCatalog,
       skills,

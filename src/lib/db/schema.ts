@@ -21,12 +21,12 @@ import {
 
 // ---- Sign-in (Better Auth, ARCHITECTURE.md "Sign-in: Better Auth against Keycloak") ------------
 // Better Auth reads and writes these four tables through its Drizzle adapter
-// (lib/auth/auth.ts); the app reads them only through `getRequester()`. Property names are the
+// (lib/auth/auth.ts); the app reads them only through `getUser()`. Property names are the
 // fields Better Auth expects; columns are snake_case. Users are created in Keycloak and land here
 // on their first sign-in.
 
 /**
- * One row per person who has signed in. `id` is their Keycloak `sub`, which is the `OwnerId`.
+ * One row per person who has signed in. `id` is their Keycloak `sub`, which is the `UserId`.
  * `keycloakSub` is how the `sub` reaches Better Auth's create hook (lib/auth/auth.ts); the check
  * keeps the two equal.
  */
@@ -131,14 +131,14 @@ export const verificationsTable = pgTable(
 
 // ---- Owned data (ARCHITECTURE.md "Data ownership") ---------------------------------------------
 // Every row names its owner, the signed-in user's `users.id` (their Keycloak `sub`). Repositories
-// name `owner_id` in every query (NX-AUTH-03); deleting a user deletes what they own.
+// name `user_id` in every query (NX-AUTH-03); deleting a user deletes what they own.
 
 /** A user's project. Names are unique per owner. */
 export const projectsTable = pgTable(
   "projects",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    ownerId: text("owner_id")
+    userId: text("user_id")
       .notNull()
       .references(() => usersTable.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
@@ -147,15 +147,15 @@ export const projectsTable = pgTable(
       .defaultNow(),
   },
   (table) => [
-    uniqueIndex("projects_owner_id_name_key").on(table.ownerId, table.name),
-    // The target of threads' (project_id, owner_id) reference.
-    unique("projects_id_owner_id_key").on(table.id, table.ownerId),
+    uniqueIndex("projects_user_id_name_key").on(table.userId, table.name),
+    // The target of threads' (project_id, user_id) reference.
+    unique("projects_id_user_id_key").on(table.id, table.userId),
   ],
 );
 
 /**
  * A user's thread. `project_id` is null for a thread without a project. The reference includes
- * `owner_id`, so a thread can only belong to a project of the same owner. The browser picks `id`
+ * `user_id`, so a thread can only belong to a project of the same owner. The browser picks `id`
  * (its chat needs it before the server answers). A fork names the thread and response it was
  * forked from: a snapshot, not a reference, so the fork reads the same if its origin changes.
  * Placement: at most one of `settled_at`, `snoozed_until` and `woke_at` is set; none is active.
@@ -166,7 +166,7 @@ export const threadsTable = pgTable(
   "threads",
   {
     id: uuid("id").primaryKey(),
-    ownerId: text("owner_id")
+    userId: text("user_id")
       .notNull()
       .references(() => usersTable.id, { onDelete: "cascade" }),
     projectId: uuid("project_id"),
@@ -190,27 +190,27 @@ export const threadsTable = pgTable(
       sql`num_nonnulls(${table.settledAt}, ${table.snoozedUntil}, ${table.wokeAt}) <= 1`,
     ),
     foreignKey({
-      name: "threads_project_id_owner_id_fkey",
-      columns: [table.projectId, table.ownerId],
-      foreignColumns: [projectsTable.id, projectsTable.ownerId],
+      name: "threads_project_id_user_id_fkey",
+      columns: [table.projectId, table.userId],
+      foreignColumns: [projectsTable.id, projectsTable.userId],
     }),
-    index("threads_owner_id_created_at_idx").on(table.ownerId, table.createdAt),
-    // The target of thread_messages' (thread_id, owner_id) reference.
-    unique("threads_id_owner_id_key").on(table.id, table.ownerId),
+    index("threads_user_id_created_at_idx").on(table.userId, table.createdAt),
+    // The target of thread_messages' (thread_id, user_id) reference.
+    unique("threads_id_user_id_key").on(table.id, table.userId),
   ],
 );
 
 /**
  * One message of a thread's conversation, as the AI SDK's `UIMessage`: `parts` and `metadata`
  * are stored as the chat streamed them. `id` is the AI SDK's message id, unique within its
- * thread, so a fork copies messages without renaming them. The reference includes `owner_id`,
+ * thread, so a fork copies messages without renaming them. The reference includes `user_id`,
  * so a message can only belong to a thread of the same owner; deleting the thread deletes it.
  */
 export const threadMessagesTable = pgTable(
   "thread_messages",
   {
     threadId: uuid("thread_id").notNull(),
-    ownerId: text("owner_id").notNull(),
+    userId: text("user_id").notNull(),
     id: text("id").notNull(),
     position: integer("position").notNull(),
     role: text("role").notNull(),
@@ -230,9 +230,9 @@ export const threadMessagesTable = pgTable(
       table.position,
     ),
     foreignKey({
-      name: "thread_messages_thread_id_owner_id_fkey",
-      columns: [table.threadId, table.ownerId],
-      foreignColumns: [threadsTable.id, threadsTable.ownerId],
+      name: "thread_messages_thread_id_user_id_fkey",
+      columns: [table.threadId, table.userId],
+      foreignColumns: [threadsTable.id, threadsTable.userId],
     }).onDelete("cascade"),
   ],
 );

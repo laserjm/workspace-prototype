@@ -11,15 +11,15 @@ import {
 
 export const startThreadAction = action(
   startThreadInputSchema,
-  (input, { requester }) => startThread(requester, input),
+  (input, { user }) => startThread(user, input),
 );
 
 export const forkThreadAction = action(
   forkThreadInputSchema,
-  (input, { requester }) => forkThread(requester, input),
+  (input, { user }) => forkThread(user, input),
 );
 
 export const placeThreadAction = action(
   placeThreadInputSchema,
-  (input, { requester }) => placeThread(requester, input),
+  (input, { user }) => placeThread(user, input),
 );

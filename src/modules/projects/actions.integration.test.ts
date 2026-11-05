@@ -1,27 +1,26 @@
 import { expect, it, vi } from "vitest";
-import { OwnerId } from "@conventions/nextjs/core";
 import {
   assertIsolation,
   describeIntegration,
 } from "@conventions/nextjs/testing";
 import { composeStack } from "@/tests/support/compose-stack";
-import { withOwners } from "@/tests/support/owners";
+import { withUsers } from "@/tests/support/users";
 import { callAs } from "@/tests/support/session";
-import { aRequester } from "@/tests/factories/requester";
+import { aUser } from "@/tests/factories/user";
 import { createProjectAction } from "./actions";
 import { PROJECT_NAME_MAX_LENGTH } from "./contracts";
 import { listProjects } from "./queries";
 
-vi.mock("@/lib/auth/requester", () => import("@/tests/support/session"));
+vi.mock("@/lib/auth/session", () => import("@/tests/support/session"));
 
 // The actions as the browser calls them (sign-in, validation, the write) and the queries,
 // against the compose Postgres with requesters built here (ARCHITECTURE.md "Command tests").
 describeIntegration(
   "projects actions",
   () => {
-    const ana = aRequester("test-projects-ana");
-    const ben = aRequester("test-projects-ben");
-    withOwners(ana.userId, ben.userId);
+    const ana = aUser("test-projects-ana");
+    const ben = aUser("test-projects-ben");
+    withUsers(ana.id, ben.id);
 
     it("adds a project under its trimmed name and lists it", async () => {
       const result = await callAs(ana, createProjectAction, {
@@ -82,16 +81,16 @@ describeIntegration(
     // Ben adding a project under Ana's name gets his own; Ana's stays hers alone.
     assertIsolation({
       name: "createProjectAction, listProjects",
-      ownerA: OwnerId(ana.userId),
-      ownerB: OwnerId(ben.userId),
+      ownerA: ana.id,
+      ownerB: ben.id,
       arrange: (owner) =>
-        callAs(aRequester(owner), createProjectAction, { name: "isolated" }),
+        callAs(aUser(owner), createProjectAction, { name: "isolated" }),
       read: async (owner) =>
-        (await listProjects(aRequester(owner))).filter(
+        (await listProjects(aUser(owner))).filter(
           (project) => project.name === "isolated",
         ),
       change: (owner) =>
-        callAs(aRequester(owner), createProjectAction, { name: "isolated" }),
+        callAs(aUser(owner), createProjectAction, { name: "isolated" }),
     });
   },
   { when: composeStack },

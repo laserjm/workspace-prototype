@@ -5,7 +5,7 @@
 //   ACTION-02  every export of an actions.ts is `export const <name>Action = action(…)` or
 //              `publicAction(…)` imported from @/lib/actions/server; a publicAction has a comment
 //              above it that says why visitors may call it
-//   ACTION-03  only src/lib/actions/server.ts, src/lib/auth/ and src/app/ import the requester
+//   ACTION-03  only src/lib/actions/server.ts, src/lib/auth/ and src/app/ import the session (getUser)
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
@@ -17,8 +17,8 @@ const USE_SERVER = /^\s*["']use server["'];?\s*$/;
 const ACTION_EXPORT = /^export const ([a-z][A-Za-z0-9]*Action) = (action|publicAction)\(/;
 const IMPORTS_ACTION =
   /import\s*\{[^}]*\b(?:action|publicAction)\b[^}]*\}\s*from\s*["']@\/lib\/actions\/server["']/;
-const IMPORTS_REQUESTER = /from\s*["'](?:@\/lib\/auth\/requester|(?:\.\.?\/)+(?:lib\/)?auth\/requester)["']/;
-const MAY_IMPORT_REQUESTER = [/^src\/lib\/actions\/server\.ts$/, /^src\/lib\/auth\//, /^src\/app\//];
+const IMPORTS_SESSION = /from\s*["'](?:@\/lib\/auth\/session|(?:\.\.?\/)+(?:lib\/)?auth\/session)["']/;
+const MAY_IMPORT_SESSION = [/^src\/lib\/actions\/server\.ts$/, /^src\/lib\/auth\//, /^src\/app\//];
 
 function walk(dir) {
   return readdirSync(dir).flatMap((name) => {
@@ -27,7 +27,7 @@ function walk(dir) {
   });
 }
 
-// Comments may mention "use server" or the requester without breaking a rule.
+// Comments may mention "use server" or the session without breaking a rule.
 function withoutComments(source) {
   return source
     .replace(/\/\*[\s\S]*?\*\//g, (comment) => comment.replace(/[^\n]/g, " "))
@@ -52,8 +52,8 @@ for (const file of walk(join(root, "src"))) {
   lines.forEach((line, index) => {
     if (!isActions && USE_SERVER.test(line))
       report(path, index + 1, "ACTION-01", `"use server" outside a module's actions.ts; export the action from modules/<x>/actions.ts`);
-    if (IMPORTS_REQUESTER.test(line) && !MAY_IMPORT_REQUESTER.some((allowed) => allowed.test(path)))
-      report(path, index + 1, "ACTION-03", "imports the requester; an action gets it from `action(…)`, a command or query takes it as its first argument");
+    if (IMPORTS_SESSION.test(line) && !MAY_IMPORT_SESSION.some((allowed) => allowed.test(path)))
+      report(path, index + 1, "ACTION-03", "imports the session; an action gets the user from `action(…)`, a command or query takes the user as its first argument");
   });
 
   if (!isActions) continue;
