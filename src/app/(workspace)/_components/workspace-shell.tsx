@@ -592,11 +592,8 @@ export function WorkspaceShell({
             if (!open) setDialog(null);
           }}
         >
-          {/* workspace-dialog stays as a hook while workspace.css still
-              styles the source choices inside it. */}
           <DialogContent
             className={cn(
-              "workspace-dialog",
               dialog === "settings"
                 ? "max-h-[calc(100dvh-3rem)] w-190 max-w-[calc(100vw-2rem)] overflow-y-auto sm:max-w-190 max-md:p-5"
                 : "sm:max-w-md",

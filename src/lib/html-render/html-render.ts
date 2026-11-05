@@ -97,7 +97,7 @@ export const HTML_RENDER_DEFAULT_FONTS = {
   mono: '"SF Mono", "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace',
 } as const;
 
-/** The workspace's light palette (see workspace.css), as html_render tokens. */
+/** The workspace's light palette (see src/app/globals.css), as html_render tokens. */
 export const WORKSPACE_HTML_RENDER_THEME: HtmlRenderTheme = {
   appearance: "light",
   variables: {
