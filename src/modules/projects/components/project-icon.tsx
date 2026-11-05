@@ -2,11 +2,9 @@ import { ChartNoAxesCombined, Infinity, Rocket } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ProjectKind } from "../domain/project";
 
-// `project-icon` and `project-letter` stay as hooks while workspace.css still
-// resizes the icon in the mobile breadcrumb.
-const icon = "project-icon size-4 shrink-0";
+const icon = "size-4 shrink-0";
 const letter =
-  "project-letter inline-flex size-4 shrink-0 items-center justify-center rounded-sm font-mono text-3xs leading-none font-bold";
+  "inline-flex size-4 shrink-0 items-center justify-center rounded-sm font-mono text-3xs leading-none font-bold";
 
 export function ProjectIcon({
   kind = "workspace",

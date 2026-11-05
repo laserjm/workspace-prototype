@@ -2,6 +2,7 @@
 
 import { useAction } from "next-safe-action/hooks";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { createProjectAction } from "../actions";
 import { PROJECT_NAME_MAX_LENGTH, type Project } from "../domain/project";
 
@@ -27,15 +28,17 @@ export function ProjectForm({
     result.serverError || result.validationErrors || result.data?.ok === false;
   return (
     <form
-      className="workspace-dialog-form"
+      className="flex flex-col gap-2"
       onSubmit={(event) => {
         event.preventDefault();
         if (!name.trim()) return;
         execute({ name });
       }}
     >
-      <label htmlFor="project-name">Project name</label>
-      <input
+      <label htmlFor="project-name" className="text-xs font-medium">
+        Project name
+      </label>
+      <Input
         id="project-name"
         autoFocus
         placeholder="my-workspace"
@@ -49,13 +52,17 @@ export function ProjectForm({
       {refused && (
         <p
           id="project-name-error"
-          className="workspace-dialog-error"
+          className="text-xs text-destructive-foreground"
           role="alert"
         >
           The project could not be created. Try again.
         </p>
       )}
-      <Button type="submit" disabled={!name.trim() || isPending}>
+      <Button
+        type="submit"
+        disabled={!name.trim() || isPending}
+        className="mt-3 self-end"
+      >
         {isPending ? "Creating…" : "Create project"}
       </Button>
     </form>

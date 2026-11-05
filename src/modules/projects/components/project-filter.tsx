@@ -105,7 +105,7 @@ export function ProjectFilter({
         className={cn(
           buttonVariants({ variant: "ghost", size: "icon-sm" }),
           iconButtonClassName,
-          selected.length > 0 && "is-active",
+          selected.length > 0 && "bg-accent text-accent-foreground",
           "data-popup-open:bg-accent data-popup-open:text-accent-foreground",
         )}
       >

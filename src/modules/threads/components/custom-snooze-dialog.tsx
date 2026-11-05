@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -45,7 +46,7 @@ export function CustomSnoozeDialog({
           </DialogDescription>
         </DialogHeader>
         <form
-          className="workspace-dialog-form custom-snooze-form"
+          className="flex flex-col gap-2"
           onSubmit={(event) => {
             event.preventDefault();
             const until = customSnoozeTime(
@@ -97,8 +98,10 @@ export function CustomSnoozeDialog({
           </div>
           {mode === "date" ? (
             <>
-              <label htmlFor="snooze-date">Return at (local time)</label>
-              <input
+              <label htmlFor="snooze-date" className="text-xs font-medium">
+                Return at (local time)
+              </label>
+              <Input
                 id="snooze-date"
                 type="datetime-local"
                 value={date}
@@ -111,8 +114,10 @@ export function CustomSnoozeDialog({
             </>
           ) : (
             <>
-              <label htmlFor="snooze-minutes">Snooze for (minutes)</label>
-              <input
+              <label htmlFor="snooze-minutes" className="text-xs font-medium">
+                Snooze for (minutes)
+              </label>
+              <Input
                 id="snooze-minutes"
                 type="number"
                 min="1"
