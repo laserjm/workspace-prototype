@@ -12,6 +12,8 @@ const STORAGE_KEY = "workspace:source-panel-width";
 const DEFAULT_WIDTH = 400;
 const MIN_WIDTH = 320;
 const MIN_CONVERSATION_WIDTH = 440;
+// While dragging, <html data-resizing="source-panel"> keeps the col-resize
+// cursor everywhere (a base rule in globals.css) and lights the handle.
 
 function readWidth() {
   try {
@@ -65,14 +67,14 @@ export function ResizableSourcePanel({ children }: { children: ReactNode }) {
       saveWidth(active.width);
       if (active.target.hasPointerCapture(active.pointerId))
         active.target.releasePointerCapture(active.pointerId);
-      document.documentElement.classList.remove("source-panel-resizing");
+      delete document.documentElement.dataset.resizing;
     };
     window.addEventListener("blur", onBlur);
     return () => {
       observer.disconnect();
       window.removeEventListener("blur", onBlur);
       drag.current = null;
-      document.documentElement.classList.remove("source-panel-resizing");
+      delete document.documentElement.dataset.resizing;
     };
   }, []);
 
@@ -94,12 +96,12 @@ export function ResizableSourcePanel({ children }: { children: ReactNode }) {
     else commit(active.width);
     if (event.currentTarget.hasPointerCapture(event.pointerId))
       event.currentTarget.releasePointerCapture(event.pointerId);
-    document.documentElement.classList.remove("source-panel-resizing");
+    delete document.documentElement.dataset.resizing;
   }
 
   return (
     <div
-      className="source-panel"
+      className="relative h-full max-w-[calc(100%-27.5rem)] min-w-80 shrink-0"
       ref={panelRef}
       style={{ width: displayedWidth }}
     >
@@ -113,7 +115,7 @@ export function ResizableSourcePanel({ children }: { children: ReactNode }) {
         aria-valuenow={Math.round(displayedWidth)}
         aria-valuetext={`${Math.round(displayedWidth)} pixels wide`}
         tabIndex={0}
-        className="source-panel-resize-handle"
+        className="absolute inset-y-0 -left-1 z-20 w-2 cursor-col-resize touch-none outline-none select-none after:absolute after:inset-y-0 after:left-1 after:w-0.5 after:bg-transparent after:transition-colors after:duration-150 hover:after:bg-ring focus-visible:after:bg-muted-foreground active:after:bg-ring in-data-[resizing=source-panel]:after:bg-ring"
         title="Drag to resize · Double-click to reset"
         onPointerDown={(event) => {
           if (event.button !== 0 || drag.current) return;
@@ -127,7 +129,7 @@ export function ResizableSourcePanel({ children }: { children: ReactNode }) {
             startWidth: displayedWidth,
             width: displayedWidth,
           };
-          document.documentElement.classList.add("source-panel-resizing");
+          document.documentElement.dataset.resizing = "source-panel";
         }}
         onPointerMove={(event) => {
           const active = drag.current;
@@ -154,7 +156,7 @@ export function ResizableSourcePanel({ children }: { children: ReactNode }) {
             drag.current = null;
             setWidth(active.startWidth);
             active.target.releasePointerCapture(active.pointerId);
-            document.documentElement.classList.remove("source-panel-resizing");
+            delete document.documentElement.dataset.resizing;
             event.preventDefault();
           } else if (next !== undefined) {
             event.preventDefault();

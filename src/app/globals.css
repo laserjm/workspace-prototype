@@ -276,6 +276,13 @@
     outline: 2px solid var(--ring);
     outline-offset: 3px;
   }
+  /* While a panel is dragged wider or narrower, the resize cursor and the
+     no-select state follow the pointer everywhere, not only over the handle. */
+  html[data-resizing],
+  html[data-resizing] * {
+    cursor: col-resize !important;
+    user-select: none !important;
+  }
   @media (prefers-reduced-motion: reduce) {
     *,
     ::before,

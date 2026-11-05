@@ -9,12 +9,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "./tooltip";
  * The workspace's quiet 28px toolbar button. Exported for triggers that render
  * their own button (a combobox or menu trigger). A toggle passes aria-pressed
  * and reads as active while it is pressed.
- *
- * `workspace-icon-button` stays as a hook while workspace.css still sizes the
- * button in the composer toolbar and the source explorer.
  */
 export const iconButtonClassName =
-  "workspace-icon-button size-7 rounded-md text-icon-muted hover:bg-accent hover:text-accent-foreground disabled:opacity-40 [&_svg]:stroke-[1.65] aria-pressed:bg-accent aria-pressed:text-accent-foreground";
+  "size-7 rounded-md text-icon-muted hover:bg-accent hover:text-accent-foreground disabled:opacity-40 [&_svg]:stroke-[1.65] aria-pressed:bg-accent aria-pressed:text-accent-foreground";
 
 export function IconButton({
   label,
