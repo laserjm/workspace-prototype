@@ -1,6 +1,6 @@
 // Fictional enterprise records bundled with the prototype. A live connector (for example
 // `jira.record-reader.ts`) replaces this adapter; nothing here calls an external system.
-import type { Source } from "../domain/source";
+import type { Source } from "./contracts";
 
 export const sampleSourceCatalog: Source[] = [
   {

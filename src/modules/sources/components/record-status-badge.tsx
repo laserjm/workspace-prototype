@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import type { RecordStatus } from "../domain/source";
+import type { RecordStatus } from "../contracts";
 
 const TONES: Record<RecordStatus, string> = {
   "To do":

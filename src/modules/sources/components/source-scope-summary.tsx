@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronDown } from "lucide-react";
-import { recordCountLabel } from "../domain/source";
+import { recordCountLabel } from "../contracts";
 import { SourceIcon } from "./source-icon";
 import { useSources } from "./use-sources";
 

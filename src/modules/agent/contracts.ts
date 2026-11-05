@@ -6,6 +6,7 @@ import {
   HTML_RENDER_MAX_TITLE_LENGTH,
   HTML_RENDER_MIN_HEIGHT,
 } from "@/lib/html-render/html-render";
+import type { SearchRecordsInput, SearchRecordsOutput } from "@/modules/sources";
 
 export const MODEL_PROVIDERS = ["claude", "openai"] as const;
 export type ModelProvider = (typeof MODEL_PROVIDERS)[number];
@@ -73,10 +74,11 @@ export type WorkspaceMessageMetadata = {
 
 /**
  * The tools as the browser sees them; keys are the names the model sees. Stored conversations
- * hold these names, so a tool is never renamed (see `tools.ts`).
+ * hold these names, so a tool is never renamed (see `tools.ts`, whose set this must match).
  */
 export type WorkspaceUITools = {
   html_render: { input: HtmlRenderInput; output: HtmlRenderOutput };
+  search_records: { input: SearchRecordsInput; output: SearchRecordsOutput };
 };
 
 export type WorkspaceUIMessage = UIMessage<

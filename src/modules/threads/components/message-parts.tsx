@@ -3,17 +3,20 @@
 import { HtmlRenderFrame } from "@/components/ui/html-render-frame";
 import { Markdown } from "@/components/ui/markdown";
 import type { WorkspaceUIMessage } from "@/modules/agent";
+import { RecordSearchCall } from "@/modules/sources";
 import { preparingDotClassName } from "./response-turn";
 
 type MessagePart = WorkspaceUIMessage["parts"][number];
 type HtmlRenderPart = Extract<MessagePart, { type: "tool-html_render" }>;
+type SearchRecordsPart = Extract<MessagePart, { type: "tool-search_records" }>;
 
 /** Whether a message has anything `MessageParts` would show yet. */
 export function hasVisibleParts(message: WorkspaceUIMessage | undefined) {
   return !!message?.parts.some(
     (part) =>
       (part.type === "text" && part.text.trim().length > 0) ||
-      part.type === "tool-html_render",
+      part.type === "tool-html_render" ||
+      part.type === "tool-search_records",
   );
 }
 
@@ -49,6 +52,8 @@ export function MessageParts({
         ) : null;
       case "tool-html_render":
         return <HtmlRenderToolPart key={part.toolCallId} part={part} />;
+      case "tool-search_records":
+        return <SearchRecordsToolPart key={part.toolCallId} part={part} />;
       default:
         return null;
     }
@@ -83,6 +88,29 @@ function HtmlRenderToolPart({ part }: { part: HtmlRenderPart }) {
           {part.input?.title ? `“${part.input.title}”` : "the page"}.{" "}
           {part.errorText}
         </p>
+      );
+    default:
+      return null;
+  }
+}
+
+/** A module's tool card lives in its module; this only maps the part's state onto it. */
+function SearchRecordsToolPart({ part }: { part: SearchRecordsPart }) {
+  switch (part.state) {
+    case "input-streaming":
+    case "input-available":
+      return <RecordSearchCall state="searching" input={part.input} />;
+    case "output-available":
+      return (
+        <RecordSearchCall state="done" input={part.input} output={part.output} />
+      );
+    case "output-error":
+      return (
+        <RecordSearchCall
+          state="failed"
+          input={part.input}
+          errorText={part.errorText}
+        />
       );
     default:
       return null;

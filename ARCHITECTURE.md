@@ -181,7 +181,7 @@ at its deadline (`wakeIfDue`, in `listThreads` and before each change), and the 
 an open page's threads live (`useSnoozeWake`). Asking again returns a parked thread to active
 and stores the provider it now talks to (`answerThread`). Whether a response is in flight only
 the browser knows, so it refuses a snooze while one is. The source catalogue is read-only
-sample data in `sources/infra/sample.source-catalog.ts`; the skill catalogue is one
+sample data in `sources/catalog.ts`; the skill catalogue is one
 `skills/catalog/<id>/SKILL.md` per skill (see "Skills are SKILL.md files"). Both are read through
 `queries.ts` and `server.ts`, and reach the browser through `SourcesProvider` and `SkillsProvider`. Skill activation and the source panel
 width persist in `localStorage`; the stored skill ids are parsed with `storedSkillIdsSchema`. There are no cache tags: every read is per request, and an action returns what it
@@ -250,10 +250,12 @@ The `agent` module is the runtime AI, flat by file:
   the `markdownAsText` plugin does the same in Vitest, and `src/markdown.d.ts` types it.
 - `instructions.ts`: the two files, then the skill, then the attached records. The records stay
   TypeScript, because they are built from data.
-- `tools.ts`: every tool the model can call. Stored conversations hold the tool names and every
-  send validates the whole conversation against this set, so a tool is never renamed and a
-  removed one keeps a stub under its name.
-- `html-render.tool.ts`: the agent's own tool; a module's tool lives in that module.
+- `tools.ts`: the registry. `tools` is every tool the agent knows, its own and the modules'
+  (see "Agent tools live in their module"); `toolsFor(context)` picks the ones one answer may
+  call and what each knows of the thread. Stored conversations hold the tool names and every
+  send validates the whole conversation against all of `tools`, so a tool is never renamed and a
+  removed one keeps a stub under its name; `tools.test.ts` lists the names.
+- `html-render.tool.ts`: the agent's own tool, because it presents and acts on no module's data.
 - `contracts.ts`: the browser-safe types (`WorkspaceUIMessage`, the tool schemas, `ModelChoice`,
   `ChatOptions`), so the chat UI never imports the server side.
 
@@ -271,6 +273,33 @@ to GitHub pull requests and issues, GitLab merge requests and files show as chip
 instructions point diagrams at Mermaid, math at `$$`, tables at Markdown, and charts from
 data and long or sortable tables at `html_render`.
 **Enforced by.** `agent/context.test.ts`, `answer-thread.test.ts` and the command tests.
+**Recorded in.** This entry.
+
+### Agent tools live in their module
+
+**Decision.** A tool is another way into a module, beside its pages and actions, so it lives in
+the module it acts on and is a thin wrapper over that module's `queries.ts` (or, for a write,
+its actions). `sources/tools.ts` is the pattern: `search_records` searches the records the
+thread attached.
+- **Files.** The tool's input and output schemas, and the rule it applies (`searchRecords`), are
+  in the module's `contracts.ts`, so the browser can type the tool's parts. The tool is in
+  `<module>/tools.ts` (`server-only`), exported as `<module>Tools` from `server.ts`. Its chat
+  card is in `<module>/components/` (`RecordSearchCall`), exported from `index.ts`; the chat's
+  `message-parts.tsx` maps the part's state onto it.
+- **Context, not trust.** What a tool may see comes from the server, never from the model: the
+  tool declares it with `contextSchema` (`{ scope?: RecordScope }`, ids as everywhere between
+  modules), and `toolsFor` in `agent/tools.ts` fills it from the resolved `AgentContext`.
+  `search_records` reads through `listScopedRecords(scope)`, so a record outside the thread's
+  scope is never read, whatever the model asks. A tool whose context the thread lacks is not
+  offered (`activeTools`), and its `execute` refuses anyway.
+- **Registration.** `agent/tools.ts` spreads the module's tools into `tools`, adds the tool's
+  context to `toolsFor`, and `WorkspaceUITools` in `agent/contracts.ts` gets its types.
+- **Behaviour.** The tools only read. The attached records are still in the prompt as well;
+  `search_records` lets the model filter them by status, priority, owner or words.
+**Enforced by.** `sources/tools.test.ts` (only scoped records, refused without a scope);
+`agent/tools.test.ts` (the tool names, what `toolsFor` offers); `agent/run.test.ts` (on a mock
+model, the call offers the tools and `execute` sees the thread's scope); `tsc`
+(`WorkspaceUITools`, `toolsContext`).
 **Recorded in.** This entry.
 
 ### Skills are SKILL.md files
@@ -359,8 +388,7 @@ calls `assertIsolation()`. A handler reads a refused constraint with `violatedCo
 real need, named after what it holds (`tools.ts`, `run.ts`), not after a layer.
 
 `threads` still has the older layered shape (`domain/`, `application/`, `infra/`,
-`commands.ts`), and `sources` keeps `domain/` and its sample data in `infra/sample.*.ts`; they
-become flat as they change. `skills` is flat. A use case there is a typed `async function` (`defineUseCase` only
+`commands.ts`); it becomes flat as it changes. `skills` and `sources` are flat. A use case there is a typed `async function` (`defineUseCase` only
 returns its argument), a repository an object that `satisfies` its port, and a module catches
 the `ConstraintViolation` its own repository throws.
 **Enforced by.** Review.

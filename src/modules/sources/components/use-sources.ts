@@ -2,7 +2,7 @@
 
 import { createContext, useContext } from "react";
 import { bug } from "@conventions/nextjs/core";
-import { findSource, type Source } from "../domain/source";
+import { findSource, type Source } from "../contracts";
 
 export const SourcesContext = createContext<readonly Source[] | null>(null);
 

@@ -10,7 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { allRecordIds, recordCountLabel } from "../domain/source";
+import { allRecordIds, recordCountLabel } from "../contracts";
 import { RecordStatusBadge } from "./record-status-badge";
 import { noResultsClassName } from "./source-explorer";
 import { SourceIcon } from "./source-icon";

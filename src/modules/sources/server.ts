@@ -1,3 +1,4 @@
 import "server-only";
 
-export { listSources } from "./queries";
+export { listScopedRecords, listSources } from "./queries";
+export { sourceTools } from "./tools";

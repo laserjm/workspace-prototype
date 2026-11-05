@@ -12,7 +12,7 @@ import type { NotFound, ValidationFailed } from "@/lib/errors";
 import { err, ok, type Result } from "@/lib/result";
 import { listSkills } from "@/modules/skills/server";
 import { listSources } from "@/modules/sources/server";
-import { resolveContext } from "./context";
+import { resolveContext, type AgentContext } from "./context";
 import type {
   ChatOptions,
   WorkspaceMessageMetadata,
@@ -20,7 +20,7 @@ import type {
 } from "./contracts";
 import { baseInstructions, instructionsFor } from "./instructions";
 import { models, type AgentModel } from "./models";
-import { tools } from "./tools";
+import { tools, toolsFor } from "./tools";
 
 export type AgentRequest = {
   /** The model, skill and records, as the ids the browser sent. */
@@ -39,8 +39,9 @@ export type AgentRequest = {
 export type AgentRun = { model: AgentModel; response: Response };
 
 /**
- * The workspace agent on the Vercel AI Gateway. Each call passes the gateway model id and the
- * full instructions as call options; `prepareCall` turns them into the model and prompt.
+ * The workspace agent on the Vercel AI Gateway. Each call passes the answer's context as its
+ * call option; `prepareCall` turns it into the model, the prompt, the tools the answer may call
+ * and what those tools know of the thread.
  */
 const workspaceAgent = new ToolLoopAgent({
   id: "workspace",
@@ -48,16 +49,17 @@ const workspaceAgent = new ToolLoopAgent({
   model: models[0]!.gateway,
   instructions: baseInstructions,
   tools,
-  // Lets the model call html_render and then write its reply.
+  // Replaced on every call by toolsFor; no thread, no attached records.
+  toolsContext: { search_records: {} },
+  // Lets the model call a tool or two and then write its reply.
   stopWhen: stepCountIs(5),
-  callOptionsSchema: z.object({
-    gateway: z.string(),
-    instructions: z.string(),
-  }),
-  prepareCall: ({ options, ...settings }) => ({
+  // Built on the server by resolveContext, never from the request, so it is not parsed again.
+  callOptionsSchema: z.object({ context: z.custom<AgentContext>() }),
+  prepareCall: ({ options: { context }, ...settings }) => ({
     ...settings,
-    model: options.gateway,
-    instructions: options.instructions,
+    model: context.model.gateway,
+    instructions: instructionsFor(context),
+    ...toolsFor(context),
   }),
 });
 
@@ -120,10 +122,7 @@ export async function runAgent({
         console.error("[runAgent] the conversation was not stored", error);
       }
     },
-    options: {
-      gateway: model.gateway,
-      instructions: instructionsFor(context.value),
-    },
+    options: { context: context.value },
     abortSignal: signal,
     messageMetadata: ({ part }) => {
       if (part.type === "start") {

@@ -25,7 +25,7 @@ import {
   recordsIn,
   type RecordPriority,
   type SourceRecord,
-} from "../domain/source";
+} from "../contracts";
 import { RecordStatusBadge } from "./record-status-badge";
 import { ResizableSourcePanel } from "./resizable-source-panel";
 import { SourceIcon } from "./source-icon";
