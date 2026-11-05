@@ -180,9 +180,10 @@ action fails (`useThreads`). Nothing runs at a snooze's deadline: a due snooze r
 at its deadline (`wakeIfDue`, in `listThreads` and before each change), and the browser wakes
 an open page's threads live (`useSnoozeWake`). Asking again returns a parked thread to active
 and stores the provider it now talks to (`answerThread`). Whether a response is in flight only
-the browser knows, so it refuses a snooze while one is. Read-only sample data (sources and their records, skills) lives in each module's
-`infra/sample.*.ts` adapter, read through `queries.ts` and `server.ts`; the catalogues reach the
-browser through `SourcesProvider` and `SkillsProvider`. Skill activation and the source panel
+the browser knows, so it refuses a snooze while one is. The source catalogue is read-only
+sample data in `sources/infra/sample.source-catalog.ts`; the skill catalogue is one
+`skills/catalog/<id>/SKILL.md` per skill (see "Skills are SKILL.md files"). Both are read through
+`queries.ts` and `server.ts`, and reach the browser through `SourcesProvider` and `SkillsProvider`. Skill activation and the source panel
 width persist in `localStorage`; the stored skill ids are parsed with `storedSkillIdsSchema`. There are no cache tags: every read is per request, and an action returns what it
 stored, which the browser adds to its state.
 **Enforced by.** The `server-only` import in every `queries.ts`, `commands.ts` and `server.ts`
@@ -272,6 +273,21 @@ data and long or sortable tables at `html_render`.
 **Enforced by.** `agent/context.test.ts`, `answer-thread.test.ts` and the command tests.
 **Recorded in.** This entry.
 
+### Skills are SKILL.md files
+
+**Decision.** Each skill is a folder, `modules/skills/catalog/<id>/SKILL.md`: the folder name is
+its id, the frontmatter holds `name`, `description`, `output`, `prompt`, `enabledByDefault` and
+`order` (one `key: value` per line), and the body is the instructions the agent gets. A folder
+may hold more files for the skill (examples, references). `catalog.ts` picks the files up with
+Turbopack's `import.meta.glob`, bundled with the server code like the agent's instructions,
+parses each with a strict schema and sorts by `order` (a glob sorts by path). A malformed file
+throws with its path when the catalogue loads, which `next build` does. The browser gets the
+whole skill, instructions included: the settings panel shows them. Adding a skill is adding a
+folder.
+**Enforced by.** `skills/catalog.test.ts` (every file parses, in order; malformed files are
+refused); `next build`.
+**Recorded in.** This entry.
+
 ### Styling: design tokens and Tailwind classes
 
 **Decision.** `src/app/globals.css` is the only stylesheet. It holds the design tokens in three
@@ -343,8 +359,8 @@ calls `assertIsolation()`. A handler reads a refused constraint with `violatedCo
 real need, named after what it holds (`tools.ts`, `run.ts`), not after a layer.
 
 `threads` still has the older layered shape (`domain/`, `application/`, `infra/`,
-`commands.ts`), and `skills` and `sources` keep their sample data in `infra/sample.*.ts`; they
-become flat as they change. A use case there is a typed `async function` (`defineUseCase` only
+`commands.ts`), and `sources` keeps `domain/` and its sample data in `infra/sample.*.ts`; they
+become flat as they change. `skills` is flat. A use case there is a typed `async function` (`defineUseCase` only
 returns its argument), a repository an object that `satisfies` its port, and a module catches
 the `ConstraintViolation` its own repository throws.
 **Enforced by.** Review.

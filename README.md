@@ -138,7 +138,7 @@ modules/
   agent/                        the runtime AI: models, instructions, tools, the agent loop
   threads/                      conversations: settle, snooze, wake, fork, the chat UI
   sources/                      Jira, Confluence and Codebeamer sample records, picker, explorer
-  skills/                       skill catalogue, picker, settings panel, browser-stored activation
+  skills/                       skill catalogue (catalog/<id>/SKILL.md), picker, settings, activation
   projects/                     project list, add-project form, sidebar filter
 components/ui/                  shadcn primitives, the html_render frame, other feature-agnostic UI
 lib/                            `cn`, the html_render helpers shared by server and browser

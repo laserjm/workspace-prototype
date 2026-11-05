@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import type { Skill } from "../domain/skill";
+import type { Skill } from "../contracts";
 import { SkillsContext } from "./use-skills";
 
 export function SkillsProvider({
