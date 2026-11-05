@@ -8,6 +8,13 @@
       "when": 1793818942846,
       "tag": "0000_create-auth-tables",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1793867809000,
+      "tag": "0001_create-projects-and-threads",
+      "breakpoints": true
     }
   ]
 }

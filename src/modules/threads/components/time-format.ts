@@ -57,3 +57,13 @@ export function toLocalDateTime(date: Date) {
   const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
   return local.toISOString().slice(0, 16);
 }
+
+/** How long ago a thread started, for the sidebar: "now", "5m", "2h", "3d". */
+export function formatAge(timestamp: string, now: Date) {
+  const minutes = Math.floor((now.getTime() - Date.parse(timestamp)) / 60_000);
+  if (!Number.isFinite(minutes) || minutes < 1) return "now";
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  return `${Math.floor(hours / 24)}d`;
+}

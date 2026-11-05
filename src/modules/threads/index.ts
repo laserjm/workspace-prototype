@@ -3,7 +3,6 @@ export type {
   ModelProvider,
   NewThread,
   ResponseTiming,
-  SampleTurn,
   Thread,
   ThreadPlacement,
   ThreadScope,
@@ -24,6 +23,7 @@ export {
   chatTurnDtoSchema,
   type ChatOptions,
   type ChatTurnDto,
+  type StartThreadInput,
   type WorkspaceMessageMetadata,
   type WorkspaceUIMessage,
 } from "./contracts";

@@ -15,8 +15,8 @@ importers:
         specifier: ^1.9.0
         version: 1.9.0(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@conventions/nextjs':
-        specifier: https://github.com/laserjm/conventions/releases/download/v0.3.0/conventions-nextjs-0.3.0.tgz
-        version: https://github.com/laserjm/conventions/releases/download/v0.3.0/conventions-nextjs-0.3.0.tgz(@typescript-eslint/utils@8.72.1(eslint@9.39.5(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0)(typescript@5.9.3))(drizzle-orm@0.45.4(kysely@0.29.8)(postgres@3.4.9))(eslint-import-resolver-node@0.3.9(supports-color@7.2.0))(eslint-plugin-import@2.32.0)(eslint@9.39.5(jiti@2.7.0)(supports-color@7.2.0))(next-safe-action@8.7.3(next@16.4.4(@babel/core@7.29.7(supports-color@7.2.0))(@types/node@22.20.5)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(supports-color@7.2.0)(typescript@5.9.3)(vitest@5.1.0(@types/node@22.20.5)(vite@8.3.5(@types/node@22.20.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)))
+        specifier: https://github.com/laserjm/conventions/releases/download/v0.3.2/conventions-nextjs-0.3.2.tgz
+        version: https://github.com/laserjm/conventions/releases/download/v0.3.2/conventions-nextjs-0.3.2.tgz(@typescript-eslint/utils@8.72.1(eslint@9.39.5(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0)(typescript@5.9.3))(drizzle-orm@0.45.4(kysely@0.29.8)(postgres@3.4.9))(eslint-import-resolver-node@0.3.9(supports-color@7.2.0))(eslint-plugin-import@2.32.0)(eslint@9.39.5(jiti@2.7.0)(supports-color@7.2.0))(next-safe-action@8.7.3(next@16.4.4(@babel/core@7.29.7(supports-color@7.2.0))(@types/node@22.20.5)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(supports-color@7.2.0)(typescript@5.9.3)(vitest@5.1.0(@types/node@22.20.5)(vite@8.3.5(@types/node@22.20.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)))
       ai:
         specifier: ^7.0.162
         version: 7.0.162(zod@4.6.7)
@@ -64,8 +64,8 @@ importers:
         version: 4.6.7
     devDependencies:
       '@conventions/cli':
-        specifier: https://github.com/laserjm/conventions/releases/download/v0.3.0/conventions-cli-0.3.0.tgz
-        version: https://github.com/laserjm/conventions/releases/download/v0.3.0/conventions-cli-0.3.0.tgz(eslint@9.39.5(jiti@2.7.0)(supports-color@7.2.0))
+        specifier: https://github.com/laserjm/conventions/releases/download/v0.3.2/conventions-cli-0.3.2.tgz
+        version: https://github.com/laserjm/conventions/releases/download/v0.3.2/conventions-cli-0.3.2.tgz(eslint@9.39.5(jiti@2.7.0)(supports-color@7.2.0))
       '@tailwindcss/turbopack':
         specifier: ^4
         version: 4.3.3
@@ -419,9 +419,9 @@ packages:
     resolution: {integrity: sha512-W65Gum02liMd3hmNrLmDBX1u5BmRMcunouFjLXyhxHnNY4YlK1kTxsgfflZ5XBGSnPnO0MkiUzAcoGzYrlx0RQ==}
     engines: {node: '>=18.18'}
 
-  '@conventions/cli@https://github.com/laserjm/conventions/releases/download/v0.3.0/conventions-cli-0.3.0.tgz':
-    resolution: {integrity: sha512-Hw+qWWsiZpQ7MP9c3wTHoM7rBahpPDZqueS4/O8A7I6TLBcN/LMNzJhk+KY8Ql2SqO4yMTWIeQP6ZALLMiAfzQ==, tarball: https://github.com/laserjm/conventions/releases/download/v0.3.0/conventions-cli-0.3.0.tgz}
-    version: 0.3.0
+  '@conventions/cli@https://github.com/laserjm/conventions/releases/download/v0.3.2/conventions-cli-0.3.2.tgz':
+    resolution: {integrity: sha512-+elrxUPmM54W5nCo3b44GhJMYT6ODpW37nkPSbWGs7UvDY/XL/nMH8DWCqd3yjHXsicWil0IdPTwbzetbz6eZw==, tarball: https://github.com/laserjm/conventions/releases/download/v0.3.2/conventions-cli-0.3.2.tgz}
+    version: 0.3.2
     engines: {node: '>=20'}
     hasBin: true
     peerDependencies:
@@ -430,9 +430,9 @@ packages:
       eslint:
         optional: true
 
-  '@conventions/nextjs@https://github.com/laserjm/conventions/releases/download/v0.3.0/conventions-nextjs-0.3.0.tgz':
-    resolution: {integrity: sha512-VTVCAoDd2bh7vJpcp11AU6XQkTolWUOnaMRKk2rrWiRb+C8jzB/VtVUXVWA2C02sOUm7+4Ilo8LCqY7JaNGznQ==, tarball: https://github.com/laserjm/conventions/releases/download/v0.3.0/conventions-nextjs-0.3.0.tgz}
-    version: 0.3.0
+  '@conventions/nextjs@https://github.com/laserjm/conventions/releases/download/v0.3.2/conventions-nextjs-0.3.2.tgz':
+    resolution: {integrity: sha512-iKniKTc9Y1lQ5kSOPHea2n7X4UhlwyyjyKIOcXPlMb1qCj+n0rhByjpjc9xGgKpkXHPuDsjNbRY441ZQi1ZqgA==, tarball: https://github.com/laserjm/conventions/releases/download/v0.3.2/conventions-nextjs-0.3.2.tgz}
+    version: 0.3.2
     peerDependencies:
       drizzle-orm: '>=0.40.0 || >=1.0.0-rc.0'
       eslint: '>=9.0.0'
@@ -4416,7 +4416,7 @@ snapshots:
       - eslint-import-resolver-webpack
       - supports-color
 
-  '@conventions/cli@https://github.com/laserjm/conventions/releases/download/v0.3.0/conventions-cli-0.3.0.tgz(eslint@9.39.5(jiti@2.7.0)(supports-color@7.2.0))':
+  '@conventions/cli@https://github.com/laserjm/conventions/releases/download/v0.3.2/conventions-cli-0.3.2.tgz(eslint@9.39.5(jiti@2.7.0)(supports-color@7.2.0))':
     dependencies:
       '@ast-grep/cli': 0.51.1
       '@ls-lint/ls-lint': 2.3.2
@@ -4425,9 +4425,9 @@ snapshots:
     optionalDependencies:
       eslint: 9.39.5(jiti@2.7.0)(supports-color@7.2.0)
 
-  '@conventions/nextjs@https://github.com/laserjm/conventions/releases/download/v0.3.0/conventions-nextjs-0.3.0.tgz(@typescript-eslint/utils@8.72.1(eslint@9.39.5(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0)(typescript@5.9.3))(drizzle-orm@0.45.4(kysely@0.29.8)(postgres@3.4.9))(eslint-import-resolver-node@0.3.9(supports-color@7.2.0))(eslint-plugin-import@2.32.0)(eslint@9.39.5(jiti@2.7.0)(supports-color@7.2.0))(next-safe-action@8.7.3(next@16.4.4(@babel/core@7.29.7(supports-color@7.2.0))(@types/node@22.20.5)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(supports-color@7.2.0)(typescript@5.9.3)(vitest@5.1.0(@types/node@22.20.5)(vite@8.3.5(@types/node@22.20.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)))':
+  '@conventions/nextjs@https://github.com/laserjm/conventions/releases/download/v0.3.2/conventions-nextjs-0.3.2.tgz(@typescript-eslint/utils@8.72.1(eslint@9.39.5(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0)(typescript@5.9.3))(drizzle-orm@0.45.4(kysely@0.29.8)(postgres@3.4.9))(eslint-import-resolver-node@0.3.9(supports-color@7.2.0))(eslint-plugin-import@2.32.0)(eslint@9.39.5(jiti@2.7.0)(supports-color@7.2.0))(next-safe-action@8.7.3(next@16.4.4(@babel/core@7.29.7(supports-color@7.2.0))(@types/node@22.20.5)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(supports-color@7.2.0)(typescript@5.9.3)(vitest@5.1.0(@types/node@22.20.5)(vite@8.3.5(@types/node@22.20.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)))':
     dependencies:
-      '@conventions/cli': https://github.com/laserjm/conventions/releases/download/v0.3.0/conventions-cli-0.3.0.tgz(eslint@9.39.5(jiti@2.7.0)(supports-color@7.2.0))
+      '@conventions/cli': https://github.com/laserjm/conventions/releases/download/v0.3.2/conventions-cli-0.3.2.tgz(eslint@9.39.5(jiti@2.7.0)(supports-color@7.2.0))
       '@typescript-eslint/eslint-plugin': 8.72.1(@typescript-eslint/parser@8.72.1(eslint@9.39.5(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0)(typescript@5.9.3))(eslint@9.39.5(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0)(typescript@5.9.3)
       '@typescript-eslint/parser': 8.72.1(eslint@9.39.5(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0)(typescript@5.9.3)
       eslint: 9.39.5(jiti@2.7.0)(supports-color@7.2.0)

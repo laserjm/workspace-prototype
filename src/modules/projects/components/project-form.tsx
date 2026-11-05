@@ -1,23 +1,37 @@
 "use client";
 
+import { useAction } from "next-safe-action/hooks";
 import { Button } from "@/components/ui/button";
+import { createProjectAction } from "../actions";
+import { PROJECT_NAME_MAX_LENGTH, type Project } from "../domain/project";
 
+/** Adds a project; a name the user already uses selects that project. */
 export function ProjectForm({
   name,
   onNameChange,
-  onCreate,
+  onCreated,
 }: {
+  /** Held by the caller, so the name survives closing the dialog. */
   name: string;
   onNameChange: (name: string) => void;
-  onCreate: (name: string) => void;
+  onCreated: (project: Project) => void;
 }) {
+  const { execute, result, isPending } = useAction(createProjectAction, {
+    onSuccess: ({ data }) => {
+      if (!data?.ok) return;
+      onNameChange("");
+      onCreated(data.value);
+    },
+  });
+  const refused =
+    result.serverError || result.validationErrors || result.data?.ok === false;
   return (
     <form
       className="workspace-dialog-form"
       onSubmit={(event) => {
         event.preventDefault();
         if (!name.trim()) return;
-        onCreate(name);
+        execute({ name });
       }}
     >
       <label htmlFor="project-name">Project name</label>
@@ -27,11 +41,22 @@ export function ProjectForm({
         placeholder="my-workspace"
         value={name}
         onChange={(event) => onNameChange(event.target.value)}
-        maxLength={80}
+        maxLength={PROJECT_NAME_MAX_LENGTH}
         required
+        aria-invalid={refused ? true : undefined}
+        aria-describedby={refused ? "project-name-error" : undefined}
       />
-      <Button type="submit" disabled={!name.trim()}>
-        Create project
+      {refused && (
+        <p
+          id="project-name-error"
+          className="workspace-dialog-error"
+          role="alert"
+        >
+          The project could not be created. Try again.
+        </p>
+      )}
+      <Button type="submit" disabled={!name.trim() || isPending}>
+        {isPending ? "Creating…" : "Create project"}
       </Button>
     </form>
   );

@@ -23,6 +23,16 @@ export const chatOptionsSchema = z.object({
 });
 export type ChatOptions = z.infer<typeof chatOptionsSchema>;
 
+/** The first message of a new thread. `id` is the chat's, picked by the browser. */
+export const startThreadInputSchema = z.object({
+  id: z.uuid(),
+  projectId: z.uuid().nullable(),
+  prompt: z.string().trim().min(1).max(10_000),
+  provider: z.enum(["claude", "openai"]),
+  scope: chatOptionsSchema.shape.scope,
+});
+export type StartThreadInput = z.infer<typeof startThreadInputSchema>;
+
 /**
  * The POST body of /api/chat. `id` and `messages` come from the AI SDK chat transport; the
  * messages are validated separately against the agent's tools.

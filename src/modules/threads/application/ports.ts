@@ -1,7 +1,12 @@
-import type { Result, ValidationFailed } from "@conventions/nextjs/core";
+import type {
+  OwnerId,
+  Result,
+  ValidationFailed,
+} from "@conventions/nextjs/core";
 import type { Skill } from "@/modules/skills";
 import type { Source, SourceRecord } from "@/modules/sources";
 import type { ModelChoice } from "../domain/model-choice";
+import type { Thread } from "../domain/thread";
 
 /** A model the workspace offers, with the id the gateway knows it by. Server-side only. */
 export type GatewayModel = ModelChoice & { gateway: string };
@@ -27,3 +32,18 @@ export type ResponseRequest = {
 export type ResponseAgent = {
   answer(request: ResponseRequest): Promise<Result<Response, ValidationFailed>>;
 };
+
+/** The signed-in user's threads. Owned methods take the OwnerId first (NX-AUTH-03). */
+export type ThreadRepository = {
+  /** Newest first. */
+  listByOwner(ownerId: OwnerId): Promise<Thread[]>;
+  /** Adds a thread. Throws a `ConstraintViolation` when its id is taken. */
+  save(ownerId: OwnerId, thread: Thread): Promise<void>;
+};
+
+/** The requester's projects, as the projects module answers for them. */
+export type ProjectDirectory = {
+  exists(projectId: string): Promise<boolean>;
+};
+
+export type Clock = { now(): Date };

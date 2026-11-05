@@ -1,13 +1,44 @@
 import "server-only";
 // The module's use cases wired to what they run on (NX-LAYER-11), each taking the Requester its
 // caller signed in as first.
-import type { OwnerRequester } from "@conventions/nextjs/core";
+import {
+  conflict,
+  ConstraintViolation,
+  err,
+  type OwnerRequester,
+} from "@conventions/nextjs/core";
+import { findProject } from "@/modules/projects/server";
 import { listSkills } from "@/modules/skills/server";
 import { listSources } from "@/modules/sources/server";
 import { answerThread as answer } from "./application/answer-thread";
-import { chatTurnDtoSchema } from "./contracts";
+import { startThread as start } from "./application/start-thread";
+import { chatTurnDtoSchema, type StartThreadInput } from "./contracts";
 import { aiGatewayModelCatalog } from "./infra/ai-gateway.model-catalog";
 import { aiGatewayResponseAgent } from "./infra/ai-gateway.response-agent";
+import { threadRepository } from "./infra/thread.repository";
+
+/** Stores the new thread the user's first message starts. */
+export async function startThread(
+  requester: OwnerRequester,
+  input: StartThreadInput,
+) {
+  try {
+    return await start(input, {
+      requester,
+      threads: threadRepository,
+      projects: {
+        exists: async (projectId) =>
+          (await findProject(requester, projectId)) !== null,
+      },
+      clock: { now: () => new Date() },
+    });
+  } catch (error) {
+    // The id is taken: a resent first message, or another user's thread.
+    if (error instanceof ConstraintViolation)
+      return err(conflict(error.constraint));
+    throw error;
+  }
+}
 
 function badRequest(error: string) {
   return Response.json({ error }, { status: 400 });
@@ -15,8 +46,8 @@ function badRequest(error: string) {
 
 /**
  * POST /api/chat: validates the body at the edge, then streams the thread's next response.
- * Threads are not stored yet, so nothing here is owned and the requester decides nothing; it
- * reaches the use case with the first owned thread.
+ * The conversation is not stored yet and the thread's owner is not checked here, so the
+ * requester decides nothing yet.
  */
 export async function answerThread(
   requester: OwnerRequester,

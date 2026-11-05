@@ -8,20 +8,21 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ProjectIcon } from "@/modules/projects";
+import { ProjectIcon, type Project } from "@/modules/projects";
 
 /** "What would you like to know in <project>?", with the project as a picker. */
 export function NewThreadHeading({
-  project,
+  projectId,
   projects,
   onProject,
   onAddProject,
 }: {
-  project: string | null;
-  projects: string[];
-  onProject: (project: string | null) => void;
+  projectId: string | null;
+  projects: Project[];
+  onProject: (projectId: string | null) => void;
   onAddProject: () => void;
 }) {
+  const project = projects.find((item) => item.id === projectId)?.name;
   return (
     <div className="draft-heading">
       <h1
@@ -47,11 +48,11 @@ export function NewThreadHeading({
                 <span>{project}</span>
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-72" align="center">
-                {projects.map((name) => (
-                  <DropdownMenuItem key={name} onClick={() => onProject(name)}>
+                {projects.map(({ id, name }) => (
+                  <DropdownMenuItem key={id} onClick={() => onProject(id)}>
                     <ProjectIcon />
                     <span className="truncate">{name}</span>
-                    {name === project && <Check className="ml-auto" />}
+                    {id === projectId && <Check className="ml-auto" />}
                   </DropdownMenuItem>
                 ))}
                 <DropdownMenuSeparator />
@@ -70,7 +71,14 @@ export function NewThreadHeading({
       <button
         type="button"
         className="start-without-project"
-        onClick={() => onProject(project ? null : "workspace-prototype")}
+        // A user without projects adds their first one.
+        onClick={() =>
+          project
+            ? onProject(null)
+            : projects[0]
+              ? onProject(projects[0].id)
+              : onAddProject()
+        }
       >
         {project ? "or start without a project" : "or choose a project"}
       </button>

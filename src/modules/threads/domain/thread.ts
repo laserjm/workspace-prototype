@@ -13,17 +13,6 @@ export type ResponseTiming = { startedAt: string; completedAt: string | null };
 /** The source records a thread may use, by id. The sources module owns what they are. */
 export type ThreadScope = { sourceId: string; recordIds: string[] };
 
-/**
- * A seeded demo turn, answered locally from the selected sample records. Live turns are not
- * stored on the thread: they live in its chat (see `components/chat-store.ts`).
- */
-export type SampleTurn = {
-  prompt: string;
-  attachments?: string[];
-  skillId?: string;
-  responseTiming: ResponseTiming;
-};
-
 /** Where a thread sits in the sidebar. No field set: active. */
 export type ThreadPlacement = {
   settledAt?: string;
@@ -33,15 +22,18 @@ export type ThreadPlacement = {
 
 export type ThreadShelf = "active" | "snoozed" | "settled";
 
-/** Sidebar and session metadata. Conversation content lives in the thread's chat. */
+/**
+ * Sidebar and session metadata. Conversation content lives in the thread's chat. `projectId`
+ * refers to a project of the projects module; null: the thread has no project.
+ */
 export type Thread = ThreadPlacement & {
   id: string;
-  project: string;
+  projectId: string | null;
   title: string;
   branch: string;
-  age: string;
-  provider?: ModelProvider;
-  sample?: SampleTurn;
+  /** ISO timestamp. */
+  createdAt: string;
+  provider: ModelProvider;
   forkedFrom?: { threadId: string; title: string; responseIndex: number };
   scope?: ThreadScope;
 };
@@ -121,20 +113,20 @@ export function acknowledgeWake(thread: Thread): Thread {
 
 export type NewThread = {
   id: string;
-  project: string;
+  projectId: string | null;
   /** The first message; it titles the thread. */
   prompt: string;
   provider: ModelProvider;
   scope?: ThreadScope;
 };
 
-export function startThread(input: NewThread): Thread {
+export function startThread(input: NewThread, now: Date): Thread {
   return {
     id: input.id,
-    project: input.project,
+    projectId: input.projectId,
     title: input.prompt,
     branch: "main",
-    age: "now",
+    createdAt: now.toISOString(),
     provider: input.provider,
     scope: input.scope
       ? { ...input.scope, recordIds: [...input.scope.recordIds] }
@@ -156,20 +148,21 @@ export function continueThread(
 }
 
 /**
- * An independent copy of the thread through response `responseIndex`, with the same scope and
- * sample turn. The chat copies its messages separately.
+ * An independent copy of the thread through response `responseIndex`, with the same project and
+ * scope. The chat copies its messages separately.
  */
 export function forkThread(
   thread: Thread,
   responseIndex: number,
   id: string,
+  now: Date,
 ): Thread {
   return {
     ...thread,
     ...ACTIVE,
     id,
     title: `Fork: ${thread.title.replace(/^Fork: /, "")}`,
-    age: "now",
+    createdAt: now.toISOString(),
     scope: thread.scope
       ? { ...thread.scope, recordIds: [...thread.scope.recordIds] }
       : undefined,

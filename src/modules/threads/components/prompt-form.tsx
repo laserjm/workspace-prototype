@@ -50,12 +50,13 @@ export function PromptForm({
   onStop,
 }: {
   models: ModelChoice[];
+  /** Resolves false when the message was not taken; the form then keeps it. */
   onSend: (
     prompt: string,
     attachments: string[],
     modelId: string,
     skillId?: string,
-  ) => void;
+  ) => Promise<boolean>;
   onSources: () => void;
   compact?: boolean;
   scope?: ThreadScope;
@@ -90,16 +91,20 @@ export function PromptForm({
   const fileInput = useRef<HTMLInputElement>(null);
   const canSend = prompt.trim().length > 0 && !busy;
 
-  function submit() {
+  async function submit() {
     if (!canSend) return;
-    onSend(
-      prompt.trim(),
-      attachments.map((file) => file.name),
+    const draft = { prompt, attachments };
+    setPrompt("");
+    setAttachments([]);
+    const sent = await onSend(
+      draft.prompt.trim(),
+      draft.attachments.map((file) => file.name),
       model.id,
       selectedSkill,
     );
-    setPrompt("");
-    setAttachments([]);
+    if (sent) return;
+    setPrompt(draft.prompt);
+    setAttachments(draft.attachments);
   }
 
   return (
@@ -146,7 +151,7 @@ export function PromptForm({
         aria-busy={busy}
         onSubmit={(event) => {
           event.preventDefault();
-          submit();
+          void submit();
         }}
       >
         {attachments.length > 0 && (
@@ -187,7 +192,7 @@ export function PromptForm({
               !event.nativeEvent.isComposing
             ) {
               event.preventDefault();
-              submit();
+              void submit();
             }
           }}
         />

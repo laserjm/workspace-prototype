@@ -21,7 +21,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { IconButton } from "@/components/ui/icon-button";
-import { ProjectFilter } from "@/modules/projects";
+import { ProjectFilter, type Project } from "@/modules/projects";
 import { useSources } from "@/modules/sources";
 import {
   CustomSnoozeDialog,
@@ -34,7 +34,9 @@ import {
 type SidebarProps = {
   user: { name: string; email: string };
   threads: Thread[];
-  projects: string[];
+  projects: Project[];
+  /** The name the sidebar shows for a thread's project. */
+  projectName: (projectId: string | null) => string;
   activeId?: string;
   onSelect: (thread: Thread) => void;
   onNewThread: () => void;
@@ -49,6 +51,9 @@ type SidebarProps = {
   notice?: { message: string; onUndo?: () => void };
 };
 
+/** The filter's key for threads without a project; never a project id (those are UUIDs). */
+const NO_PROJECT = "none";
+
 export function WorkspaceSidebar(props: SidebarProps) {
   const { sourceById } = useSources();
   const [query, setQuery] = useState("");
@@ -57,19 +62,17 @@ export function WorkspaceSidebar(props: SidebarProps) {
   const [expandedShelves, setExpandedShelves] = useState<string[]>([]);
   const [customSnoozeId, setCustomSnoozeId] = useState<string | null>(null);
   const [contextId, setContextId] = useState<string | null>(null);
-  const projects = [
-    ...new Set([
-      ...props.projects,
-      ...props.threads.map((thread) => thread.project),
-    ]),
-  ];
+  // Threads without a project can be filtered too, under "No project".
+  const projects = props.threads.some((thread) => !thread.projectId)
+    ? [...props.projects, { id: NO_PROJECT, name: props.projectName(null) }]
+    : props.projects;
   const filteredThreads = props.threads.filter(
     (thread) =>
-      `${thread.title} ${thread.project} ${thread.branch} ${thread.scope ? sourceById(thread.scope.sourceId).name : ""}`
+      `${thread.title} ${props.projectName(thread.projectId)} ${thread.branch} ${thread.scope ? sourceById(thread.scope.sourceId).name : ""}`
         .toLowerCase()
         .includes(query.toLowerCase()) &&
       (selectedProjects.length === 0 ||
-        selectedProjects.includes(thread.project)),
+        selectedProjects.includes(thread.projectId ?? NO_PROJECT)),
   );
   const activeThreads = filteredThreads.filter(
     (thread) => shelfOf(thread) === "active",
@@ -100,6 +103,7 @@ export function WorkspaceSidebar(props: SidebarProps) {
       <ThreadRow
         key={thread.id}
         thread={thread}
+        projectName={props.projectName(thread.projectId)}
         active={props.activeId === thread.id}
         onSelect={() => props.onSelect(thread)}
         onSettle={() => props.onSettle(thread.id, nextThread(thread.id))}
@@ -288,7 +292,12 @@ export function WorkspaceSidebar(props: SidebarProps) {
               Source records included in this conversation.
             </DialogDescription>
           </DialogHeader>
-          {contextThread && <ThreadContextCard thread={contextThread} />}
+          {contextThread && (
+            <ThreadContextCard
+              thread={contextThread}
+              projectName={props.projectName(contextThread.projectId)}
+            />
+          )}
         </DialogContent>
       </Dialog>
     </aside>
