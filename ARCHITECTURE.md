@@ -259,7 +259,8 @@ Shiki, formulas (`components/ui/math.tsx`) are typeset by KaTeX as MathML, and a
 block has finished streaming. Each library loads with the first message that needs it, and
 all three take their colours from the tokens, so `globals.css` stays the only stylesheet. Links
 to GitHub pull requests and issues, GitLab merge requests and files show as chips. The
-instructions point diagrams at Mermaid, math at `$$` and charts from data at `html_render`.
+instructions point diagrams at Mermaid, math at `$$`, tables at Markdown, and charts from
+data and long or sortable tables at `html_render`.
 **Enforced by.** `conventions check` (`use-case-test`, `rich-shape`), `boundaries/element-types`,
 `boundaries/external` (the ORM-free, framework-free `application/`).
 **Recorded in.** This entry.

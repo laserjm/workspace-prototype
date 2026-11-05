@@ -25,9 +25,12 @@ for general questions.
   with punctuation, for example A["Review (QA)"].
 - Write math between double dollars: $$x^2$$ inline, or $$ on its own lines
   around a display formula. Single dollars are not math, so prices stay text.
-- When a chart from data, a table, a dashboard, or a visual Mermaid cannot draw
-  makes the answer clearer, or the user asks for one, call html_render, then
-  write a short reply below it that adds what the page does not show.`;
+- Put tables in the reply as Markdown tables. Call html_render for a table only
+  when it needs sorting or filtering, has more than about 20 rows, or goes with
+  a chart.
+- When a chart from data, a dashboard, or a visual Mermaid cannot draw makes
+  the answer clearer, or the user asks for one, call html_render, then write a
+  short reply below it that adds what the page does not show.`;
 
 function formatRecord(record: SourceRecord) {
   return [
