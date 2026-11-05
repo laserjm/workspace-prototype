@@ -250,6 +250,17 @@ the model allowlist in `infra/ai-gateway.model-catalog.ts` and the `html_render`
 requester and answers 401 without one. The command takes it as its first argument
 (NX-LAYER-11), and the use case answers and stores only the requester's threads. The frame that shows an `html_render` page is feature-agnostic and lives in
 `components/ui/html-render-*.tsx`; the helpers both sides share are in `lib/html-render/`.
+Message text renders as Markdown through `components/ui/markdown.tsx`: GitHub-flavoured, `$$`
+math, raw HTML shown as text, a user's single newlines kept. `lib/markdown/` holds the plugins,
+the block splitting that lets a streamed reply re-render only its last block, and the pure
+readers for code blocks and links. Code blocks (`components/ui/code-block.tsx`) are coloured by
+Shiki, formulas (`components/ui/math.tsx`) are typeset by KaTeX as MathML, and a
+```` ```mermaid ```` fence is drawn by `components/ui/mermaid-diagram.tsx` with Pele once its
+block has finished streaming. Each library loads with the first message that needs it, and
+all three take their colours from the tokens, so `globals.css` stays the only stylesheet. Links
+to GitHub pull requests and issues, GitLab merge requests and files show as chips. The
+instructions point diagrams at Mermaid, math at `$$`, tables at Markdown, and charts from
+data and long or sortable tables at `html_render`.
 **Enforced by.** `conventions check` (`use-case-test`, `rich-shape`), `boundaries/element-types`,
 `boundaries/external` (the ORM-free, framework-free `application/`).
 **Recorded in.** This entry.

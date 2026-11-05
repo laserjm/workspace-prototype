@@ -38,6 +38,7 @@ export function ResponseTurn({
   note,
   preparingLabel,
   streaming = false,
+  copyText,
 }: {
   timing: ResponseTiming;
   continuation: boolean;
@@ -50,6 +51,8 @@ export function ResponseTurn({
   preparingLabel: string;
   /** While working, show the partial response instead of the placeholder. */
   streaming?: boolean;
+  /** What Copy copies; without it, the response's visible text. */
+  copyText?: string;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [now, setNow] = useState(() => Date.parse(timing.startedAt));
@@ -87,7 +90,9 @@ export function ResponseTurn({
 
   async function copyMessage() {
     try {
-      await navigator.clipboard.writeText(bodyRef.current?.innerText ?? "");
+      await navigator.clipboard.writeText(
+        copyText ?? bodyRef.current?.innerText ?? "",
+      );
       setCopyState("copied");
     } catch {
       setCopyState("error");

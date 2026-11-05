@@ -8,6 +8,13 @@ import type { GatewayModel } from "../application/ports";
  */
 export const aiGatewayModelCatalog = [
   {
+    id: "haiku",
+    label: "Haiku 5.5",
+    effort: "High",
+    provider: "claude",
+    gateway: "anthropic/claude-haiku-5.5",
+  },
+  {
     id: "opus",
     label: "Opus 5.5",
     effort: "High",
