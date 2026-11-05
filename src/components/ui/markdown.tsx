@@ -98,15 +98,15 @@ const components: Components = {
   ),
   hr: styled("hr", "my-5 border-border"),
   strong: styled("strong", "font-semibold"),
-  // As in T3 Code: a cell wraps at words and is capped at 24rem, so a long path or URL wraps
-  // past the cap; a formula keeps its width and the table scrolls.
+  // As in T3 Code, a cell is capped at 24rem and wraps at words past that; a formula keeps its
+  // width and the table scrolls. Headers sit on a muted row with rounded ends.
   th: styled(
     "th",
-    "max-w-96 border-b border-border px-2 py-1.5 text-start align-top font-medium text-pretty text-foreground wrap-break-word first:ps-0 last:pe-0 has-data-[slot=math]:max-w-none",
+    "max-w-96 bg-muted px-2.5 py-1.5 text-start align-top font-medium text-pretty text-foreground wrap-break-word first:rounded-s-md last:rounded-e-md has-data-[slot=math]:max-w-none",
   ),
   td: styled(
     "td",
-    "max-w-96 border-b border-border/60 px-2 py-1.5 text-start align-top text-pretty wrap-break-word first:ps-0 last:pe-0 has-data-[slot=math]:max-w-none",
+    "max-w-96 border-b border-border/60 px-2.5 py-1.5 text-start align-top text-pretty wrap-break-word has-data-[slot=math]:max-w-none",
   ),
   a: function MarkdownLink({ node, className, href, children, ...rest }) {
     const file = filePathOf(href);
@@ -187,14 +187,16 @@ const components: Components = {
   table: function MarkdownTable({ node, className, ...rest }) {
     const source = use(BlockSource);
     return (
-      <div data-slot="table" className="my-3">
+      // As wide as the table, up to the message, so the copy button sits under its right edge.
+      <div data-slot="table" className="my-3 w-fit max-w-full">
         <div className="max-w-full overflow-x-auto [scrollbar-width:thin]">
           <table
             {...rest}
             className={cn(
-              // The message's wrap-anywhere would let columns shrink to a letter wide; a
-              // column is at least its longest word, and only wider tables scroll.
-              "w-full border-collapse text-start text-xs wrap-normal break-normal [&_tbody_tr:last-child>td]:border-b-0",
+              // Sized to its content, as on GitHub: short columns never wrap, a small table
+              // stays small, and one wider than the message scrolls. The message's
+              // wrap-anywhere would let columns shrink to a letter wide, so cells wrap at words.
+              "w-max border-collapse text-start text-xs wrap-normal break-normal [&_tbody_tr:last-child>td]:border-b-0",
               className,
             )}
           />
