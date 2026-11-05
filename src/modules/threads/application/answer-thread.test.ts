@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { aRequester } from "@/tests/factories/requester";
+import { aUser } from "@/tests/factories/user";
 import { aSkill } from "@/tests/factories/skill";
 import { aSource, aSourceRecord } from "@/tests/factories/source";
 import { aThread } from "@/tests/factories/thread";
@@ -27,7 +27,7 @@ const jira = aSource({
   ],
 });
 
-const ana = aRequester("ana");
+const ana = aUser("ana");
 const threadId = "6f1c1c1e-2d6b-4f43-9a51-2a0d9a3c1e01";
 
 const ask = (id: string, text = "Summarize") => ({
@@ -48,12 +48,12 @@ async function setup(
   const { agent, requests } = inMemoryResponseAgent();
   const { repository, conversations, threadOf } = inMemoryThreadRepository();
   await repository.save(
-    ana.ownerId,
+    ana.id,
     aThread({ id: threadId, ...thread }),
     stored,
   );
   const deps = {
-    requester: ana,
+    user: ana,
     threads: repository,
     models: [opus],
     skills: [riskReview],
@@ -142,7 +142,7 @@ describe("answerThread", () => {
   it("refuses another user's thread as if it did not exist", async () => {
     const { deps, requests } = await setup();
     expect(
-      await answerThread(request, { ...deps, requester: aRequester("ben") }),
+      await answerThread(request, { ...deps, user: aUser("ben") }),
     ).toEqual({
       ok: false,
       error: { _tag: "NotFound", entity: "Thread", id: threadId },

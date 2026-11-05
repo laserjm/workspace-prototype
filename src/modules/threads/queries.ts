@@ -1,5 +1,5 @@
 import "server-only";
-import type { OwnerRequester } from "@conventions/nextjs/core";
+import type { User } from "@/lib/auth/user";
 import { z } from "zod";
 import type { WorkspaceUIMessage } from "./contracts";
 import type { ModelChoice } from "./domain/model-choice";
@@ -9,10 +9,10 @@ import { threadRepository } from "./infra/thread.repository";
 
 /** The signed-in user's threads, newest first, as they read now: a due snooze has woken. */
 export async function listThreads(
-  requester: OwnerRequester,
+  user: User,
 ): Promise<Thread[]> {
   const now = new Date();
-  return (await threadRepository.listByOwner(requester.ownerId)).map((thread) =>
+  return (await threadRepository.listByUser(user.id)).map((thread) =>
     wakeIfDue(thread, now),
   );
 }
@@ -22,11 +22,11 @@ export async function listThreads(
  * not have, as for one without messages, and for an id that is not a thread's.
  */
 export async function listThreadMessages(
-  requester: OwnerRequester,
+  user: User,
   threadId: string,
 ): Promise<WorkspaceUIMessage[]> {
   if (!z.uuid().safeParse(threadId).success) return [];
-  return threadRepository.listMessages(requester.ownerId, threadId);
+  return threadRepository.listMessages(user.id, threadId);
 }
 
 /** The models the composer offers, without their gateway ids. */

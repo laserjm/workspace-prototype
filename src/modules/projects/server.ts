@@ -1,4 +1,4 @@
 import "server-only";
 
-export { createProject } from "./commands";
+export { createProjectAction } from "./actions";
 export { findProject, listProjects } from "./queries";

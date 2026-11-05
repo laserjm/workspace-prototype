@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { Result } from "@conventions/nextjs/core";
+import { callAction } from "@/lib/actions/client";
 import type { SnoozeTimeInPast, ThreadStillWorking } from "../domain/errors";
 import {
   forkThreadAction,
@@ -45,16 +46,15 @@ export function useThreads(
 
   /** Stores a change already shown; `before` is the thread as it was. */
   function store(before: Thread, change: ThreadChange) {
-    void placeThreadAction({ threadId: before.id, change })
-      .then((result) => result?.data?.ok === true)
-      .catch(() => false)
-      .then((stored) => {
-        if (stored) return;
+    void callAction(placeThreadAction, { threadId: before.id, change }).then(
+      (result) => {
+        if (result.ok) return;
         update(before.id, (latest) =>
           withPlacement(latest, placementOf(before)),
         );
         onPlacementNotStored?.();
-      });
+      },
+    );
   }
 
   function find(id: string) {
@@ -110,9 +110,8 @@ export function useThreads(
 
     /** Stores the thread, then lists it. Null when the server refused or could not be reached. */
     async startThread(input: StartThreadInput): Promise<Thread | null> {
-      const result = await startThreadAction(input).catch(() => undefined);
-      const started = result?.data;
-      if (!started?.ok) return null;
+      const started = await callAction(startThreadAction, input);
+      if (!started.ok) return null;
       setThreads((previous) => [started.value, ...previous]);
       return started.value;
     },
@@ -139,13 +138,12 @@ export function useThreads(
       thread: Thread,
       throughMessageId: string,
     ): Promise<Thread | null> {
-      const result = await forkThreadAction({
+      const forked = await callAction(forkThreadAction, {
         fromThreadId: thread.id,
         id: crypto.randomUUID(),
         throughMessageId,
-      }).catch(() => undefined);
-      const forked = result?.data;
-      if (!forked?.ok) return null;
+      });
+      if (!forked.ok) return null;
       setThreads((previous) => [forked.value, ...previous]);
       return forked.value;
     },

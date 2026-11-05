@@ -5,9 +5,9 @@ import {
   err,
   notFound,
   type NotFound,
-  type OwnerRequester,
   type ValidationFailed,
 } from "@conventions/nextjs/core";
+import type { User } from "@/lib/auth/user";
 import type { Skill } from "@/modules/skills";
 import type { Source } from "@/modules/sources";
 import type { ChatTurnDto } from "../contracts";
@@ -26,7 +26,7 @@ import type {
 export type AnswerThreadInput = ChatTurnDto & { signal?: AbortSignal };
 
 export type AnswerThreadDeps = {
-  requester: OwnerRequester;
+  user: User;
   threads: ThreadRepository;
   models: readonly GatewayModel[];
   skills: readonly Skill[];
@@ -35,7 +35,7 @@ export type AnswerThreadDeps = {
 };
 
 /**
- * Answers the latest message of one of the requester's threads and stores the conversation once
+ * Answers the latest message of one of the user's threads and stores the conversation once
  * the reply ends. Asking returns a parked thread to active and records the provider it now talks
  * to. The request names the model, skill and records by id; they are resolved here,
  * so the prompt only ever holds what the server offers. The conversation before the message is
@@ -46,7 +46,7 @@ export const answerThread = defineUseCase<
   Response,
   NotFound | ValidationFailed,
   AnswerThreadDeps
->(async (input, { requester, threads, models, skills, sources, agent }) => {
+>(async (input, { user, threads, models, skills, sources, agent }) => {
   const model = models.find((item) => item.id === input.modelId);
   if (!model) return err(notFound("Model", input.modelId));
 
@@ -69,14 +69,14 @@ export const answerThread = defineUseCase<
   }
 
   // Another user's thread is answered like a missing one: its id reveals nothing.
-  const { ownerId } = requester;
-  const thread = await threads.findById(ownerId, input.id);
+  const userId = user.id;
+  const thread = await threads.findById(userId, input.id);
   if (!thread) return err(notFound("Thread", input.id));
   // The browser refuses a send while a response is in flight; here nothing is in flight.
   const continued = continueThread(thread, model.provider, false);
   if (!continued.ok) bug("a thread with no response in flight was refused");
-  await threads.update(ownerId, continued.value);
-  const stored = await threads.listMessages(ownerId, thread.id);
+  await threads.update(userId, continued.value);
+  const stored = await threads.listMessages(userId, thread.id);
 
   return agent.answer({
     model,
@@ -84,6 +84,6 @@ export const answerThread = defineUseCase<
     attached,
     messages: withLatestMessage<ConversationMessage>(stored, input.message),
     signal: input.signal,
-    onEnd: (messages) => threads.saveMessages(ownerId, thread.id, messages),
+    onEnd: (messages) => threads.saveMessages(userId, thread.id, messages),
   });
 });

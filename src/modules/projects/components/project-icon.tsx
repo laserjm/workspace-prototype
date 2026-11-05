@@ -1,6 +1,6 @@
 import { ChartNoAxesCombined, Infinity, Rocket } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { ProjectKind } from "../domain/project";
+import type { ProjectKind } from "../contracts";
 
 const icon = "size-4 shrink-0";
 const letter =

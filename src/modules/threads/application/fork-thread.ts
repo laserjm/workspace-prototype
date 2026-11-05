@@ -5,15 +5,15 @@ import {
   notFound,
   ok,
   type NotFound,
-  type OwnerRequester,
 } from "@conventions/nextjs/core";
+import type { User } from "@/lib/auth/user";
 import type { ForkThreadInput } from "../contracts";
 import { forkPoint } from "../domain/conversation";
 import { forkThread as fork, type Thread } from "../domain/thread";
 import type { Clock, ThreadRepository } from "./ports";
 
 export type ForkThreadDeps = {
-  requester: OwnerRequester;
+  user: User;
   threads: ThreadRepository;
   clock: Clock;
 };
@@ -24,17 +24,17 @@ export const forkThread = defineUseCase<
   Thread,
   NotFound,
   ForkThreadDeps
->(async (input, { requester, threads, clock }) => {
-  const { ownerId } = requester;
+>(async (input, { user, threads, clock }) => {
+  const userId = user.id;
   // Another user's thread is answered like a missing one: its id reveals nothing.
-  const thread = await threads.findById(ownerId, input.fromThreadId);
+  const thread = await threads.findById(userId, input.fromThreadId);
   if (!thread) return err(notFound("Thread", input.fromThreadId));
   const point = forkPoint(
-    await threads.listMessages(ownerId, thread.id),
+    await threads.listMessages(userId, thread.id),
     input.throughMessageId,
   );
   if (!point.ok) return point;
   const forked = fork(thread, point.value.responseIndex, input.id, clock.now());
-  await threads.save(ownerId, forked, point.value.messages);
+  await threads.save(userId, forked, point.value.messages);
   return ok(forked);
 });

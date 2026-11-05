@@ -14,6 +14,8 @@ jobs:
         run: pnpm exec conventions lint
       - name: styling on the design tokens (STYLE-01…03, scripts/check-styles.mjs)
         run: pnpm lint:styles
+      - name: every server action signs its caller in (ACTION-01…03, scripts/check-actions.mjs)
+        run: pnpm lint:actions
       - name: structural checks (modules, tests, header, deviations, inventory)
         run: pnpm exec conventions check
       - name: schema drift (NX-DB-01) — a schema.ts change needs its generated migration

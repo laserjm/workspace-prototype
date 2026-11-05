@@ -6,9 +6,9 @@ import {
   notFound,
   ok,
   type NotFound,
-  type OwnerRequester,
   type Result,
 } from "@conventions/nextjs/core";
+import type { User } from "@/lib/auth/user";
 import type { PlaceThreadInput, ThreadChange } from "../contracts";
 import type { SnoozeTimeInPast } from "../domain/errors";
 import {
@@ -23,7 +23,7 @@ import {
 import type { Clock, ThreadRepository } from "./ports";
 
 export type PlaceThreadDeps = {
-  requester: OwnerRequester;
+  user: User;
   threads: ThreadRepository;
   clock: Clock;
 };
@@ -58,14 +58,14 @@ export const placeThread = defineUseCase<
   Thread,
   NotFound | SnoozeTimeInPast,
   PlaceThreadDeps
->(async (input, { requester, threads, clock }) => {
-  const { ownerId } = requester;
+>(async (input, { user, threads, clock }) => {
+  const userId = user.id;
   const now = clock.now();
   // Another user's thread is answered like a missing one: its id reveals nothing.
-  const thread = await threads.findById(ownerId, input.threadId);
+  const thread = await threads.findById(userId, input.threadId);
   if (!thread) return err(notFound("Thread", input.threadId));
   const placed = apply(wakeIfDue(thread, now), input.change, now);
   if (!placed.ok) return placed;
-  await threads.update(ownerId, placed.value);
+  await threads.update(userId, placed.value);
   return ok(placed.value);
 });

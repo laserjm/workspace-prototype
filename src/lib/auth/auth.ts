@@ -50,7 +50,7 @@ function createAuth() {
     databaseHooks: {
       user: {
         create: {
-          // The user's id is their Keycloak `sub`, so `ownerId` is the same in Keycloak, the
+          // The user's id is their Keycloak `sub`, so `userId` is the same in Keycloak, the
           // tokens and every owned row, and survives a `pnpm stack:reset` (fixed realm ids).
           before: async (user) => {
             const { keycloakSub } = user;

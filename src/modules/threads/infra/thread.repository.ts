@@ -1,11 +1,11 @@
-// Repository: defineRepository against the port; owner id first and in every query (NX-AUTH-03);
+// Repository: defineRepository against the port; the user id first and in every query (NX-AUTH-03);
 // a violated constraint becomes a ConstraintViolation (NX-DB-05).
 import { and, asc, desc, eq } from "drizzle-orm";
 import {
   ConstraintViolation,
   defineRepository,
-  type OwnerId,
 } from "@conventions/nextjs/core";
+import type { UserId } from "@/lib/auth/user";
 import { violatedConstraint } from "@conventions/nextjs/drizzle";
 import { db, withTransaction } from "@/lib/db/client";
 import { threadMessagesTable, threadsTable } from "@/lib/db/schema";
@@ -31,56 +31,56 @@ async function writing<T>(write: () => Promise<T>): Promise<T> {
 }
 
 export const threadRepository = defineRepository<ThreadRepository>({
-  async listByOwner(ownerId: OwnerId): Promise<Thread[]> {
+  async listByUser(userId: UserId): Promise<Thread[]> {
     const rows = await db()
       .select()
       .from(threadsTable)
-      .where(eq(threadsTable.ownerId, ownerId))
+      .where(eq(threadsTable.userId, userId))
       .orderBy(desc(threadsTable.createdAt));
     return rows.map(toThread);
   },
 
-  async findById(ownerId: OwnerId, id: string): Promise<Thread | null> {
+  async findById(userId: UserId, id: string): Promise<Thread | null> {
     const [row] = await db()
       .select()
       .from(threadsTable)
-      .where(and(eq(threadsTable.ownerId, ownerId), eq(threadsTable.id, id)));
+      .where(and(eq(threadsTable.userId, userId), eq(threadsTable.id, id)));
     return row ? toThread(row) : null;
   },
 
-  async save(ownerId: OwnerId, thread: Thread, messages = []): Promise<void> {
+  async save(userId: UserId, thread: Thread, messages = []): Promise<void> {
     await writing(() =>
       withTransaction("interactive", async (tx) => {
-        await tx.insert(threadsTable).values(toThreadRow(ownerId, thread));
+        await tx.insert(threadsTable).values(toThreadRow(userId, thread));
         if (messages.length > 0)
           await tx
             .insert(threadMessagesTable)
-            .values(toMessageRows(ownerId, thread.id, messages));
+            .values(toMessageRows(userId, thread.id, messages));
       }),
     );
   },
 
-  async update(ownerId: OwnerId, thread: Thread): Promise<void> {
+  async update(userId: UserId, thread: Thread): Promise<void> {
     await writing(() =>
       db()
         .update(threadsTable)
         .set(toThreadChanges(thread))
         .where(
           and(
-            eq(threadsTable.ownerId, ownerId),
+            eq(threadsTable.userId, userId),
             eq(threadsTable.id, thread.id),
           ),
         ),
     );
   },
 
-  async listMessages(ownerId: OwnerId, threadId: string) {
+  async listMessages(userId: UserId, threadId: string) {
     const rows = await db()
       .select()
       .from(threadMessagesTable)
       .where(
         and(
-          eq(threadMessagesTable.ownerId, ownerId),
+          eq(threadMessagesTable.userId, userId),
           eq(threadMessagesTable.threadId, threadId),
         ),
       )
@@ -88,21 +88,21 @@ export const threadRepository = defineRepository<ThreadRepository>({
     return rows.map(toMessage);
   },
 
-  async saveMessages(ownerId: OwnerId, threadId: string, messages) {
+  async saveMessages(userId: UserId, threadId: string, messages) {
     await writing(() =>
       withTransaction("interactive", async (tx) => {
         await tx
           .delete(threadMessagesTable)
           .where(
             and(
-              eq(threadMessagesTable.ownerId, ownerId),
+              eq(threadMessagesTable.userId, userId),
               eq(threadMessagesTable.threadId, threadId),
             ),
           );
         if (messages.length > 0)
           await tx
             .insert(threadMessagesTable)
-            .values(toMessageRows(ownerId, threadId, messages));
+            .values(toMessageRows(userId, threadId, messages));
       }),
     );
   },
