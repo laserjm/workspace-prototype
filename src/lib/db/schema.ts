@@ -8,7 +8,10 @@ import {
   check,
   foreignKey,
   index,
+  integer,
+  jsonb,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   unique,
@@ -153,7 +156,9 @@ export const projectsTable = pgTable(
 /**
  * A user's thread. `project_id` is null for a thread without a project. The reference includes
  * `owner_id`, so a thread can only belong to a project of the same owner. The browser picks `id`
- * (its chat needs it before the server answers). The conversation is not stored yet.
+ * (its chat needs it before the server answers). A fork names the thread and response it was
+ * forked from: a snapshot, not a reference, so the fork reads the same if its origin changes.
+ * The conversation is in `thread_messages`.
  */
 export const threadsTable = pgTable(
   "threads",
@@ -167,6 +172,9 @@ export const threadsTable = pgTable(
     provider: text("provider").notNull(),
     sourceId: text("source_id"),
     recordIds: text("record_ids").array(),
+    forkedFromThreadId: uuid("forked_from_thread_id"),
+    forkedFromTitle: text("forked_from_title"),
+    forkedFromResponseIndex: integer("forked_from_response_index"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -178,5 +186,44 @@ export const threadsTable = pgTable(
       foreignColumns: [projectsTable.id, projectsTable.ownerId],
     }),
     index("threads_owner_id_created_at_idx").on(table.ownerId, table.createdAt),
+    // The target of thread_messages' (thread_id, owner_id) reference.
+    unique("threads_id_owner_id_key").on(table.id, table.ownerId),
+  ],
+);
+
+/**
+ * One message of a thread's conversation, as the AI SDK's `UIMessage`: `parts` and `metadata`
+ * are stored as the chat streamed them. `id` is the AI SDK's message id, unique within its
+ * thread, so a fork copies messages without renaming them. The reference includes `owner_id`,
+ * so a message can only belong to a thread of the same owner; deleting the thread deletes it.
+ */
+export const threadMessagesTable = pgTable(
+  "thread_messages",
+  {
+    threadId: uuid("thread_id").notNull(),
+    ownerId: text("owner_id").notNull(),
+    id: text("id").notNull(),
+    position: integer("position").notNull(),
+    role: text("role").notNull(),
+    parts: jsonb("parts").$type<unknown[]>().notNull(),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    primaryKey({
+      name: "thread_messages_pkey",
+      columns: [table.threadId, table.id],
+    }),
+    unique("thread_messages_thread_id_position_key").on(
+      table.threadId,
+      table.position,
+    ),
+    foreignKey({
+      name: "thread_messages_thread_id_owner_id_fkey",
+      columns: [table.threadId, table.ownerId],
+      foreignColumns: [threadsTable.id, threadsTable.ownerId],
+    }).onDelete("cascade"),
   ],
 );

@@ -3212,6 +3212,10 @@
 .response-error button:hover {
   background: #fbeaea;
 }
+.conversation-loading {
+  color: #92929c;
+  font-size: 12px;
+}
 
 /* html_render pages (adapted from T3 Code's HtmlRenderFrame) */
 .html-render-frame {

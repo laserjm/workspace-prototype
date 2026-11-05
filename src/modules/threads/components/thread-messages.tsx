@@ -7,7 +7,7 @@ import type { WorkspaceUIMessage } from "../contracts";
 import type { ModelChoice } from "../domain/model-choice";
 import type { Thread } from "../domain/thread";
 import { LiveResponse } from "./live-response";
-import { useChatStore } from "./use-chat-store";
+import { useChatStore, useConversationLoad } from "./use-chat-store";
 
 export type ForkTarget = { messageId: string; responseIndex: number };
 
@@ -25,6 +25,7 @@ export function ThreadMessages({
   onFork: (target: ForkTarget) => void;
 }) {
   const store = useChatStore();
+  const load = useConversationLoad(thread.id);
   const { messages, status, error } = useChat({
     chat: store.getChat(thread.id),
   });
@@ -108,6 +109,19 @@ export function ThreadMessages({
           />
         );
       })}
+      {load === "loading" && messages.length === 0 && (
+        <p className="conversation-loading" role="status">
+          Loading the conversation…
+        </p>
+      )}
+      {load === "failed" && messages.length === 0 && (
+        <div className="response-error" role="alert">
+          <span>The conversation could not be loaded.</span>
+          <button type="button" onClick={() => void store.load(thread.id)}>
+            Try again
+          </button>
+        </div>
+      )}
       {error && !inFlight && (
         <div className="response-error" role="alert">
           <span>The response did not finish. {error.message}</span>

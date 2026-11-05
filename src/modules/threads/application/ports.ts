@@ -5,6 +5,7 @@ import type {
 } from "@conventions/nextjs/core";
 import type { Skill } from "@/modules/skills";
 import type { Source, SourceRecord } from "@/modules/sources";
+import type { WorkspaceUIMessage } from "../contracts";
 import type { ModelChoice } from "../domain/model-choice";
 import type { Thread } from "../domain/thread";
 
@@ -23,9 +24,14 @@ export type ResponseRequest = {
   model: GatewayModel;
   skill?: Skill;
   attached?: AttachedRecords;
-  /** The conversation as the chat transport sent it; the agent validates it. */
+  /** The stored conversation with the message just sent; the agent validates it. */
   messages: unknown[];
   signal?: AbortSignal;
+  /**
+   * Called once the reply ends, finished, stopped or failed, with the conversation including
+   * it. The reply is complete even if the browser went away.
+   */
+  onEnd(messages: WorkspaceUIMessage[]): Promise<void>;
 };
 
 /** Streams the assistant's reply to a thread's conversation. */
@@ -37,8 +43,30 @@ export type ResponseAgent = {
 export type ThreadRepository = {
   /** Newest first. */
   listByOwner(ownerId: OwnerId): Promise<Thread[]>;
-  /** Adds a thread. Throws a `ConstraintViolation` when its id is taken. */
-  save(ownerId: OwnerId, thread: Thread): Promise<void>;
+  findById(ownerId: OwnerId, id: string): Promise<Thread | null>;
+  /**
+   * Adds a thread with the conversation it starts with (a fork's copy), in one transaction.
+   * Throws a `ConstraintViolation` when its id is taken.
+   */
+  save(
+    ownerId: OwnerId,
+    thread: Thread,
+    messages?: readonly WorkspaceUIMessage[],
+  ): Promise<void>;
+  /** The thread's conversation in order; empty for a thread the owner does not have. */
+  listMessages(
+    ownerId: OwnerId,
+    threadId: string,
+  ): Promise<WorkspaceUIMessage[]>;
+  /**
+   * Replaces the thread's conversation, in one transaction. Throws a `ConstraintViolation` for a
+   * thread the owner does not have.
+   */
+  saveMessages(
+    ownerId: OwnerId,
+    threadId: string,
+    messages: readonly WorkspaceUIMessage[],
+  ): Promise<void>;
 };
 
 /** The requester's projects, as the projects module answers for them. */

@@ -1,8 +1,13 @@
 "use client";
 
-import { createContext, useContext, useSyncExternalStore } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useSyncExternalStore,
+} from "react";
 import { bug } from "@conventions/nextjs/core";
-import type { ChatStore } from "./chat-store";
+import type { ChatStore, ConversationLoad } from "./chat-store";
 
 export const ChatStoreContext = createContext<ChatStore | null>(null);
 
@@ -24,5 +29,18 @@ export function useThreadWorking(
     resolved.subscribe,
     () => (threadId ? resolved.isWorking(threadId) : false),
     () => false,
+  );
+}
+
+/** Loads the thread's stored conversation the first time it opens, and says how that went. */
+export function useConversationLoad(threadId: string): ConversationLoad {
+  const store = useChatStore();
+  useEffect(() => {
+    void store.load(threadId);
+  }, [store, threadId]);
+  return useSyncExternalStore(
+    store.subscribe,
+    () => store.loadState(threadId),
+    () => "loading",
   );
 }

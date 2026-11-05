@@ -243,9 +243,15 @@ export function WorkspaceShell({
     setSourceOpen(true);
   }
 
-  function handleFork(target: ForkTarget) {
+  async function handleFork(target: ForkTarget) {
     if (!activeThread) return;
-    const fork = forkThread(activeThread, target.responseIndex);
+    const fork = await forkThread(activeThread, target.messageId);
+    if (!fork) {
+      setThreadNotice({
+        message: "The thread could not be forked. Try again.",
+      });
+      return;
+    }
     chatStore.fork(activeThread.id, fork.id, target.messageId);
     setProjectId(fork.projectId);
     navigate(fork.id);
@@ -477,7 +483,7 @@ export function WorkspaceShell({
                   onRestore={() => handleRestore(activeThread.id)}
                   onOpenThread={navigate}
                   onViewSource={showSource}
-                  onFork={handleFork}
+                  onFork={(target) => void handleFork(target)}
                   composer={
                     <PromptForm
                       key={activeThread.id}

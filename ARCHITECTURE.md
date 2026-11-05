@@ -62,7 +62,10 @@ Integration tests (NX-TEST-03) pass `describeIntegration` the probe `composeStac
 migrations are never edited by hand. `lib/db/client.ts` is the profile's starter on postgres.js,
 with prepared statements on because the app connects to Postgres directly, not through a
 transaction pooler. `withTransaction` keeps the default statement timeouts (NX-DRZ-05: 8 s
-interactive, 5 min system). The first tables are the sign-in's four.
+interactive, 5 min system). The first tables are the sign-in's four. `drizzle-kit generate` adds
+a new table's foreign keys before the unique constraints added to existing tables in the same
+migration, so a reference to a constraint that does not exist yet is generated as two
+migrations (`0002_add-thread-forks`, then `0003_create-thread-messages`).
 **Enforced by.** CI (`drizzle-kit check`, and `drizzle-kit generate` must leave `drizzle/`
 unchanged); `conventions check` (`inventory`, reading `drizzle/*.sql` per the `migrations` key);
 `boundaries/external` (NX-DRZ-01).
@@ -77,9 +80,10 @@ threads or source connections configured once per organisation, would make this 
 app, recorded here as a migration.
 The owner is the signed-in Keycloak user: `ownerId` is their `sub`, which is also `users.id`
 (see the sign-in). The four sign-in tables are Better Auth's, not owned data the app reads. The
-owned tables are `projects` and `threads`: each row has an `owner_id` referencing `users.id`
-(deleting a user deletes what they own), and every repository method takes the `OwnerId` first
-and names it in its query.
+owned tables are `projects`, `threads` and `thread_messages`: each row has an `owner_id`
+referencing `users.id` (deleting a user deletes what they own); a message's reference
+`(thread_id, owner_id)` → `threads(id, owner_id)` lets it belong only to a thread of its own
+owner. Every repository method takes the `OwnerId` first and names it in its query.
 **Enforced by.** `OwnerId` from `lib/auth/requester.ts` and `tsc` through the brand;
 `conventions check` (`owner-id-type`); `assertIsolation()` in each module's command test (see
 "Command tests").
@@ -149,11 +153,12 @@ the requester); `boundaries/external`. The check constraint `users_id_is_keycloa
 Auth's startup schema check, which refuses to run when `schema.ts` and its fields disagree.
 **Recorded in.** This entry; `docs/adr/0001-auth-library-for-keycloak-sign-in.md`.
 
-### Stored projects and threads; session-only thread state
+### Stored projects, threads and conversations; session-only placement
 
-**Decision.** Projects and threads are stored per owner (see "Data ownership"); creating
-either is a use case (`projects/application/create-project.ts`,
-`threads/application/start-thread.ts`) wired in the module's `commands.ts` and called from its
+**Decision.** Projects, threads and their conversations are stored per owner (see "Data
+ownership"); creating a project or thread and forking a thread are use cases
+(`projects/application/create-project.ts`, `threads/application/start-thread.ts`,
+`threads/application/fork-thread.ts`) wired in the module's `commands.ts` and called from its
 `actions.ts`, which the module's components call (`ProjectForm`, `useThreads`).
 `app/(workspace)/page.tsx` reads the requester once and passes it to `listProjects` and
 `listThreads`. A name the user already uses answers with that project instead of adding it
@@ -162,19 +167,32 @@ browser picks a new thread's id (its chat needs it before the server answers) an
 thread before it sends the first message; a taken id is a `Conflict`, a project that is not
 the user's a `NotFound`.
 
-Not stored yet: the conversation (it lives in the `ChatStore`, one AI SDK `Chat` per thread,
-for the session, so a reloaded thread shows its title and no messages), and settle, snooze,
-wake and fork, which change the thread in the browser through the pure functions in
-`modules/threads/domain/` and are lost on reload. A stored thread reads as active. Read-only
-sample data (sources and their records, skills) lives in each module's `infra/sample.*.ts`
-adapter, read through `queries.ts` and `server.ts`; the catalogues reach the browser through
-`SourcesProvider` and `SkillsProvider`. Skill activation and the source panel width persist in
-`localStorage`; the stored skill ids are parsed with `storedSkillIdsSchema` (NX-TYPE-03). There
-are no cache tags: every read is per request, and an action returns what it stored, which the
-browser adds to its state.
+The conversation follows the AI SDK's message persistence: one `thread_messages` row per
+`UIMessage`, with `parts` and `metadata` in `jsonb` as streamed, ordered by `position`, keyed
+`(thread_id, id)` so a fork copies messages under their ids. The chat sends only its latest
+message (`prepareSendMessagesRequest` in `ChatStore`); the server puts it after the stored
+conversation, or in its old place when it is sent again, dropping what came after it, which is
+how a regenerate replaces a reply (`withLatestMessage`, `domain/conversation.ts`). When the
+reply ends, finished, stopped or failed, the response agent hands the conversation with the
+reply to `saveMessages`, which replaces the stored one in a transaction; the stream is read to
+its end on the server (`consumeSseStream`) so the reply is stored even if the browser went away.
+The server names the replies (`generateMessageId`). A thread's chat loads its conversation from
+`GET /api/threads/[id]/messages` the first time it opens; a chat this page started already has
+it. A fork is stored first, with the conversation through the chosen response, then opened
+(`forkPoint`; a question or a response not stored yet is a `NotFound`); its origin is a snapshot
+in `forked_from_*`, not a reference.
+
+Not stored yet: settle, snooze and wake, which change the thread in the browser through the
+pure functions in `modules/threads/domain/` and are lost on reload. A stored thread reads as
+active. Read-only sample data (sources and their records, skills) lives in each module's
+`infra/sample.*.ts` adapter, read through `queries.ts` and `server.ts`; the catalogues reach the
+browser through `SourcesProvider` and `SkillsProvider`. Skill activation and the source panel
+width persist in `localStorage`; the stored skill ids are parsed with `storedSkillIdsSchema`
+(NX-TYPE-03). There are no cache tags: every read is per request, and an action returns what it
+stored, which the browser adds to its state.
 **Enforced by.** `boundaries/element-types` (components never import `infra/` or `queries.ts`);
-the `server-only` import in every `queries.ts`, `commands.ts` and `server.ts`; the command
-tests.
+the `server-only` import in every `queries.ts`, `commands.ts` and `server.ts`; the
+`thread_messages_thread_id_owner_id_fkey` constraint; the command tests.
 **Recorded in.** This entry.
 
 ### Threads without a project
@@ -212,15 +230,16 @@ command tests skip loudly without the stack (NX-TEST-03).
 and the body to `answerThread` from `modules/threads/server.ts`. `modules/threads/commands.ts` validates it
 with `chatTurnDtoSchema` at the edge and runs the use case `application/answer-thread.ts`.
 The use case resolves the model, skill and records from their ids against the server's
-catalogues (unknown ids are `NotFound`, answered with a 400) and asks the `ResponseAgent`
-port to stream. `infra/ai-gateway.response-agent.ts` implements the port with an AI SDK
+catalogues (unknown ids are `NotFound`, answered with a 400), finds the thread among the
+requester's (another user's thread is a `NotFound` like a missing one, answered with a 404) and
+asks the `ResponseAgent` port to stream the stored conversation with the new message, then to
+store it when the reply ends (see "Stored projects, threads and conversations"). `infra/ai-gateway.response-agent.ts` implements the port with an AI SDK
 `ToolLoopAgent` on the gateway, with the instructions in `infra/ai-gateway.instructions.ts`,
 the model allowlist in `infra/ai-gateway.model-catalog.ts` and the `html_render` tool in
 `infra/ai-sdk.html-render-tool.ts`. The tool's input and output schemas are in
 `contracts.ts`, so the browser's message types never import `infra/`. The route reads the
 requester and answers 401 without one. The command takes it as its first argument
-(NX-LAYER-11). It decides nothing yet: threads are stored, but the conversation is not, and
-the route does not yet check that the thread is the requester's. The frame that shows an `html_render` page is feature-agnostic and lives in
+(NX-LAYER-11), and the use case answers and stores only the requester's threads. The frame that shows an `html_render` page is feature-agnostic and lives in
 `components/ui/html-render-*.tsx`; the helpers both sides share are in `lib/html-render/`.
 **Enforced by.** `conventions check` (`use-case-test`, `rich-shape`), `boundaries/element-types`,
 `boundaries/external` (the ORM-free, framework-free `application/`).
