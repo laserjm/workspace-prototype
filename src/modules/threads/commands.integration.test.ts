@@ -74,9 +74,8 @@ async function aConversationOf(user: ReturnType<typeof aUser>) {
   return thread.value;
 }
 
-function aChatTurn(threadId: string) {
+function aChatTurn() {
   return {
-    id: threadId,
     modelId: "opus",
     message: {
       id: "u3",
@@ -153,13 +152,13 @@ describeIntegration(
     });
 
     it("answers a missing thread with a 404 before asking the model", async () => {
-      const response = await answerThread(ana, aChatTurn(randomUUID()));
+      const response = await answerThread(ana, randomUUID(), aChatTurn());
       expect(response.status).toBe(404);
     });
 
-    it("refuses a chat turn whose thread id is not a uuid", async () => {
-      const response = await answerThread(ana, aChatTurn("thread-1"));
-      expect(response.status).toBe(400);
+    it("answers a thread id that is not a uuid like a missing thread", async () => {
+      const response = await answerThread(ana, "thread-1", aChatTurn());
+      expect(response.status).toBe(404);
     });
 
     it("forks through a response with a copy of the conversation up to it", async () => {
@@ -361,7 +360,11 @@ describeIntegration(
       read: (owner) =>
         listThreadMessages(aUser(owner), conversationThreadId),
       change: async (owner) => {
-        await answerThread(aUser(owner), aChatTurn(conversationThreadId));
+        await answerThread(
+          aUser(owner),
+          conversationThreadId,
+          aChatTurn(),
+        );
         await forkThread(aUser(owner), {
           fromThreadId: conversationThreadId,
           id: randomUUID(),

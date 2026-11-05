@@ -16,6 +16,7 @@ import { placeThread as place } from "./application/place-thread";
 import { startThread as start } from "./application/start-thread";
 import {
   chatTurnDtoSchema,
+  threadIdSchema,
   type ForkThreadInput,
   type PlaceThreadInput,
   type StartThreadInput,
@@ -80,21 +81,27 @@ function badRequest(error: string) {
   return Response.json({ error }, { status: 400 });
 }
 
+function threadNotFound() {
+  return Response.json({ error: "Thread not found." }, { status: 404 });
+}
+
 /**
- * POST /api/chat: validates the body at the edge, then streams the next response of one of the
- * user's threads and stores the conversation when it ends. Another user's thread is a 404,
- * like a missing one.
+ * POST /api/threads/[id]/messages: validates the id and body at the edge, then streams the next
+ * response of one of the user's threads and stores the conversation when it ends. Another user's
+ * thread is a 404, like a missing one or an id that is not a uuid.
  */
 export async function answerThread(
   user: User,
+  threadId: string,
   body: unknown,
   signal?: AbortSignal,
 ) {
+  if (!threadIdSchema.safeParse(threadId).success) return threadNotFound();
   const request = chatTurnDtoSchema.safeParse(body);
   if (!request.success) return badRequest("Invalid chat request.");
   const [skills, sources] = await Promise.all([listSkills(), listSources()]);
   const result = await answer(
-    { ...request.data, signal },
+    { ...request.data, threadId, signal },
     {
       user,
       threads: threadRepository,
@@ -108,7 +115,7 @@ export async function answerThread(
   switch (result.error._tag) {
     case "NotFound":
       return result.error.entity === "Thread"
-        ? Response.json({ error: "Thread not found." }, { status: 404 })
+        ? threadNotFound()
         : badRequest("Invalid chat request.");
     case "ValidationFailed":
       return badRequest("Invalid chat messages.");

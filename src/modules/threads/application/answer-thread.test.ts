@@ -64,7 +64,7 @@ async function setup(
 }
 
 const request: AnswerThreadInput = {
-  id: threadId,
+  threadId,
   message: ask("u1"),
   modelId: "opus",
 };

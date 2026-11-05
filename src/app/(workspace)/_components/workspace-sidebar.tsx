@@ -268,8 +268,8 @@ export function WorkspaceSidebar(props: SidebarProps) {
             <BarChart3 />
           </IconButton>
           <span className="flex-1" />
-          {/* A plain form post: /sign-out ends the session here and in Keycloak. */}
-          <form action="/sign-out" method="post">
+          {/* A plain form post: /api/sign-out ends the session here and in Keycloak. */}
+          <form action="/api/sign-out" method="post">
             <IconButton
               type="submit"
               label={`Sign out ${props.user.name || props.user.email}`}

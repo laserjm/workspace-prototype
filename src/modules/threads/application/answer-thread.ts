@@ -23,7 +23,10 @@ import type {
   ThreadRepository,
 } from "./ports";
 
-export type AnswerThreadInput = ChatTurnDto & { signal?: AbortSignal };
+export type AnswerThreadInput = ChatTurnDto & {
+  threadId: string;
+  signal?: AbortSignal;
+};
 
 export type AnswerThreadDeps = {
   user: User;
@@ -70,8 +73,8 @@ export const answerThread = defineUseCase<
 
   // Another user's thread is answered like a missing one: its id reveals nothing.
   const userId = user.id;
-  const thread = await threads.findById(userId, input.id);
-  if (!thread) return err(notFound("Thread", input.id));
+  const thread = await threads.findById(userId, input.threadId);
+  if (!thread) return err(notFound("Thread", input.threadId));
   // The browser refuses a send while a response is in flight; here nothing is in flight.
   const continued = continueThread(thread, model.provider, false);
   if (!continued.ok) bug("a thread with no response in flight was refused");

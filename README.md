@@ -132,7 +132,10 @@ app/
     page.tsx                    server component: reads every catalogue, renders the shell
     layout.tsx, workspace.css   the workspace styles
     _components/                shell, sidebar, settings and new-thread heading (this route only)
-  api/chat/route.ts             streams answers; hands the request to threads/server.ts
+  api/
+    threads/[id]/messages/      GET loads a thread's conversation, POST streams the next answer
+    sign-in/, sign-out/         start the Keycloak sign-in and end the session
+    auth/[...all]/              Better Auth's endpoints (the Keycloak callback)
 modules/
   threads/                      sessions: settle, snooze, wake, fork, the AI chat and its agent
   sources/                      Jira, Confluence and Codebeamer sample records, picker, explorer
@@ -146,7 +149,7 @@ tests/                          test factories and support
 Each module has the same shape: `domain/` holds plain types and pure functions with their
 tests, `infra/sample.*.ts` holds the bundled sample data, `queries.ts` and `server.ts` read it
 on the server, `components/` holds the browser UI, and `index.ts` is the public API. `threads`
-also has `application/answer-thread.ts`, the use case behind `/api/chat`, and its
+also has `application/answer-thread.ts`, the use case behind `POST /api/threads/[id]/messages`, and its
 `infra/ai-gateway.*.ts` adapters. A module
 reaches another one only through `index.ts` or `server.ts`.
 

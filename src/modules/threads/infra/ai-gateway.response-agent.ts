@@ -93,7 +93,7 @@ export const aiGatewayResponseAgent: ResponseAgent = {
         try {
           await onEnd(withCompletedReply(conversation));
         } catch (error) {
-          console.error("[api/chat] the conversation was not stored", error);
+          console.error("[answerThread] the conversation was not stored", error);
         }
       },
       options: {
@@ -117,7 +117,7 @@ export const aiGatewayResponseAgent: ResponseAgent = {
         return undefined;
       },
       onError: (error) => {
-        console.error("[api/chat]", error);
+        console.error("[answerThread]", error);
         return "The model request failed. Try again.";
       },
     });

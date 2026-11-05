@@ -24,7 +24,7 @@ function redirectWithCookies(location: string, from: Response, status = 302) {
   return response;
 }
 
-/** GET /sign-in?returnTo=/path: starts the code flow and sends the browser to Keycloak. */
+/** GET /api/sign-in?returnTo=/path: starts the code flow and sends the browser to Keycloak. */
 export async function startSignIn(request: Request) {
   const returnTo = sameOriginPath(
     new URL(request.url).searchParams.get("returnTo"),
@@ -48,7 +48,7 @@ export async function startSignIn(request: Request) {
 }
 
 /**
- * POST /sign-out: deletes the session, then ends the Keycloak session (RP-initiated logout),
+ * POST /api/sign-out: deletes the session, then ends the Keycloak session (RP-initiated logout),
  * which returns the browser to "/" and so to a fresh sign-in.
  */
 export async function signOut(request: Request) {

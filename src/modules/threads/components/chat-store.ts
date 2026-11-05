@@ -118,10 +118,10 @@ export class ChatStore {
       id: threadId,
       messages,
       transport: new DefaultChatTransport({
-        api: "/api/chat",
+        api: `/api/threads/${threadId}/messages`,
         // The server holds the conversation; it needs only the latest message.
-        prepareSendMessagesRequest: ({ id, messages, body }) => ({
-          body: { ...body, id, message: messages.at(-1) },
+        prepareSendMessagesRequest: ({ messages, body }) => ({
+          body: { ...body, message: messages.at(-1) },
         }),
       }),
       // The server stamps completedAt on a clean finish; stopped or failed

@@ -1,6 +1,6 @@
 /**
  * Where to send the browser after sign-in: `value` resolved against the app's origin, kept only
- * when it stays on that origin, so `/sign-in?returnTo=` cannot become an open redirect
+ * when it stays on that origin, so `/api/sign-in?returnTo=` cannot become an open redirect
  * (`//evil.example`, `/\evil.example` and absolute URLs all become "/").
  */
 export function sameOriginPath(value: string | null, appUrl: string): string {

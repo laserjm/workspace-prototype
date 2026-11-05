@@ -23,7 +23,7 @@ export default function WorkspacePage() {
 async function Workspace() {
   // proxy.ts only saw a cookie; an ended or revoked session lands here.
   const user = await getUser();
-  if (!user) redirect("/sign-in");
+  if (!user) redirect("/api/sign-in");
   const [sources, skills, threads, projects, models] = await Promise.all([
     listSources(),
     listSkills(),

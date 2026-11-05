@@ -33,14 +33,16 @@ export const startThreadInputSchema = z.object({
 });
 export type StartThreadInput = z.infer<typeof startThreadInputSchema>;
 
+/** A thread's id as a URL names it (`/api/threads/[id]/messages`). */
+export const threadIdSchema = z.uuid();
+
 /**
- * The POST body of /api/chat: the thread's id and its latest message, which the AI SDK chat
- * transport sends (`prepareSendMessagesRequest` in `ChatStore`). The server holds the rest of the
- * conversation, so a browser cannot rewrite it. The message is validated with the conversation
- * against the agent's tools.
+ * The POST body of /api/threads/[id]/messages: the thread's latest message, which the AI SDK chat
+ * transport sends (`prepareSendMessagesRequest` in `ChatStore`); the URL names the thread. The
+ * server holds the rest of the conversation, so a browser cannot rewrite it. The message is
+ * validated with the conversation against the agent's tools.
  */
 export const chatTurnDtoSchema = chatOptionsSchema.extend({
-  id: z.uuid(),
   message: z.looseObject({
     id: z.string().min(1).max(200),
     role: z.literal("user"),

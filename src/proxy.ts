@@ -11,7 +11,7 @@ export function proxy(request: NextRequest) {
       { error: "Sign in to continue." },
       { status: 401 },
     );
-  const signIn = new URL("/sign-in", request.url);
+  const signIn = new URL("/api/sign-in", request.url);
   signIn.searchParams.set("returnTo", pathname + search);
   return NextResponse.redirect(signIn);
 }
@@ -19,6 +19,6 @@ export function proxy(request: NextRequest) {
 export const config = {
   // Not the sign-in routes themselves, Better Auth's endpoints or static files.
   matcher: [
-    "/((?!api/auth|sign-in|sign-out|_next/static|_next/image|favicon.ico).*)",
+    "/((?!api/auth|api/sign-in|api/sign-out|_next/static|_next/image|favicon.ico).*)",
   ],
 };

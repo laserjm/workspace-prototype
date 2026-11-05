@@ -136,20 +136,20 @@ name and email from Keycloak.
   refreshes them when they expire. OAuth state, the PKCE verifier and the nonce live in
   `verifications`, not in a cookie.
 - **Routes.**
-  - `GET /sign-in?returnTo=` starts the code flow with PKCE. `returnTo` must stay on the app's
+  - `GET /api/sign-in?returnTo=` starts the code flow with PKCE. `returnTo` must stay on the app's
     origin (`sameOriginPath`).
   - `/api/auth/*` is Better Auth's handler; the Keycloak callback is
     `/api/auth/callback/keycloak`.
-  - `POST /sign-out` deletes the session and ends the Keycloak session (RP-initiated logout with
+  - `POST /api/sign-out` deletes the session and ends the Keycloak session (RP-initiated logout with
     `id_token_hint`), then returns to `/`.
   - `/update-user`, `/change-email` and `/delete-user` are disabled.
 - **Who checks what.** `proxy.ts` checks only that a session cookie exists, the optimistic check
-  Next.js recommends for Proxy. Without one, a page goes to `/sign-in` and `/api/*` gets 401. The
+  Next.js recommends for Proxy. Without one, a page goes to `/api/sign-in` and the rest of `/api/*` gets 401. The
   real check is `getUser()` next to the data: `app/(workspace)/page.tsx` redirects a visitor
-  whose session has ended (and hands the shell only name and email), and `/api/chat` and
+  whose session has ended (and hands the shell only name and email), and both methods of
   `/api/threads/[id]/messages` answer 401. Every server action is `action(…)` from
   `lib/actions/server.ts`, which calls the same `getUser()`: a visitor gets `SignedOut` and the
-  action does not run, and the browser goes to `/sign-in` and back (see "Server actions").
+  action does not run, and the browser goes to `/api/sign-in` and back (see "Server actions").
 
 **Enforced by.** The `auth` ruleset (NX-AUTH-01: only `app/`, `lib/` and `queries.ts` read the
 session), narrowed by ACTION-03 (`scripts/check-actions.mjs`: only `lib/actions/server.ts`,
@@ -244,9 +244,9 @@ command tests skip loudly without the stack (NX-TEST-03).
 
 ### Answers come from the Vercel AI Gateway
 
-**Decision.** `POST /api/chat` (`app/api/chat/route.ts`) only reads the user and hands them
-and the body to `answerThread` from `modules/threads/server.ts`. `modules/threads/commands.ts` validates it
-with `chatTurnDtoSchema` at the edge and runs the use case `application/answer-thread.ts`.
+**Decision.** `POST /api/threads/[id]/messages` (`app/api/threads/[id]/messages/route.ts`) only
+reads the user and hands them, the thread id and the body to `answerThread` from `modules/threads/server.ts`. `modules/threads/commands.ts` validates them
+with `threadIdSchema` (an id that is not a uuid is a 404) and `chatTurnDtoSchema` at the edge and runs the use case `application/answer-thread.ts`.
 The use case resolves the model, skill and records from their ids against the server's
 catalogues (unknown ids are `NotFound`, answered with a 400), finds the thread among the
 user's (another user's thread is a `NotFound` like a missing one, answered with a 404) and
@@ -320,7 +320,7 @@ type.
 
 In the browser, `callAction(action, input)` (`lib/actions/client.ts`) never throws: a call that
 does not reach the server answers `Unreachable`, and `SignedOut` sends the browser to
-`/sign-in?returnTo=<this page>` once, so no component handles an ended session.
+`/api/sign-in?returnTo=<this page>` once, so no component handles an ended session.
 `useAction(action, { onSuccess, onError })` wraps it for components with `run`, `pending` and
 `error`. `errorMessage(error, messages)` (`lib/actions/messages.ts`) has the copy for the standard
 errors; the compiler asks the caller for one for each of the module's own errors, and a caller

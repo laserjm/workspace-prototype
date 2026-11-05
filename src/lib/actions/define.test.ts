@@ -88,7 +88,7 @@ describe("action", () => {
   });
 
   it.each([
-    { name: "redirect", call: () => redirect("/sign-in") },
+    { name: "redirect", call: () => redirect("/api/sign-in") },
     { name: "notFound", call: () => notFound() },
   ])("lets Next.js's $name through", async ({ call }) => {
     const { action, log } = setUp();

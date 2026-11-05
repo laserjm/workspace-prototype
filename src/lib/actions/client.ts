@@ -34,7 +34,7 @@ function signInAgain() {
   signingIn = true;
   const { pathname, search, hash } = window.location;
   window.location.assign(
-    `/sign-in?returnTo=${encodeURIComponent(pathname + search + hash)}`,
+    `/api/sign-in?returnTo=${encodeURIComponent(pathname + search + hash)}`,
   );
 }
 
