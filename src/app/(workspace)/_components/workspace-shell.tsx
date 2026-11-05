@@ -40,13 +40,13 @@ import {
   useThreads,
   useThreadWorking,
   type ForkTarget,
-  type ModelChoice,
   type SnoozeTimeInPast,
   type Thread,
   type ThreadPlacement,
   type ThreadScope,
   type ThreadStillWorking,
 } from "@/modules/threads";
+import type { ModelChoice } from "@/modules/agent";
 import { NewThreadHeading } from "./new-thread-heading";
 import { WorkspaceSettings, type SettingsSection } from "./workspace-settings";
 import { WorkspaceSidebar } from "./workspace-sidebar";
@@ -311,6 +311,7 @@ export function WorkspaceShell({
       void chatStore.send(activeThread.id, message, {
         modelId,
         skillId,
+        skillIds: enabledSkills,
         scope: activeThread.scope,
       });
       return true;
@@ -331,6 +332,7 @@ export function WorkspaceShell({
     void chatStore.send(thread.id, message, {
       modelId,
       skillId,
+      skillIds: enabledSkills,
       scope: thread.scope,
     });
     navigate(thread.id);

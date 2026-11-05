@@ -1,12 +1,15 @@
 import "server-only";
 import type { GatewayModelId } from "ai";
-import type { GatewayModel } from "../application/ports";
+import type { ModelChoice } from "./contracts";
+
+/** A model the workspace offers, with the id the AI Gateway knows it by. Server-side only. */
+export type AgentModel = ModelChoice & { gateway: GatewayModelId };
 
 /**
  * The models the workspace offers. The browser only ever sends `id`; the server resolves
  * `gateway` from this allowlist, so a browser cannot pick any model.
  */
-export const aiGatewayModelCatalog = [
+export const models: readonly AgentModel[] = [
   {
     id: "haiku",
     label: "Haiku 5.5",
@@ -35,4 +38,14 @@ export const aiGatewayModelCatalog = [
     provider: "openai",
     gateway: "openai/gpt-6.1-sol",
   },
-] satisfies (GatewayModel & { gateway: GatewayModelId })[];
+];
+
+/** The models the composer offers, without their gateway ids. */
+export async function listModelChoices(): Promise<ModelChoice[]> {
+  return models.map(({ id, label, effort, provider }) => ({
+    id,
+    label,
+    effort,
+    provider,
+  }));
+}

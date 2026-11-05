@@ -10,11 +10,8 @@ import { withUsers } from "@/tests/support/users";
 import { callAs } from "@/tests/support/session";
 import { aUser } from "@/tests/factories/user";
 import { answerThread, forkThread, placeThread, startThread } from "./commands";
-import type {
-  StartThreadInput,
-  ThreadChange,
-  WorkspaceUIMessage,
-} from "./contracts";
+import type { WorkspaceUIMessage } from "@/modules/agent";
+import type { StartThreadInput, ThreadChange } from "./contracts";
 import { threadRepository } from "./infra/thread.repository";
 import { listThreadMessages, listThreads } from "./queries";
 
@@ -74,9 +71,8 @@ async function aConversationOf(user: ReturnType<typeof aUser>) {
   return thread.value;
 }
 
-function aChatTurn(threadId: string) {
+function aChatTurn() {
   return {
-    id: threadId,
     modelId: "opus",
     message: {
       id: "u3",
@@ -96,7 +92,7 @@ async function aProjectOf(user: ReturnType<typeof aUser>) {
 
 // Command-level: the commands and queries against the compose Postgres, with a user built
 // here instead of a session. Stands in for the use case's unit test and the repository's
-// integration test (NX-TEST-01, NX-TEST-02; ARCHITECTURE.md "Command tests").
+// integration test (ARCHITECTURE.md, "Command tests").
 describeIntegration(
   "threads commands",
   () => {
@@ -153,13 +149,13 @@ describeIntegration(
     });
 
     it("answers a missing thread with a 404 before asking the model", async () => {
-      const response = await answerThread(ana, aChatTurn(randomUUID()));
+      const response = await answerThread(ana, randomUUID(), aChatTurn());
       expect(response.status).toBe(404);
     });
 
-    it("refuses a chat turn whose thread id is not a uuid", async () => {
-      const response = await answerThread(ana, aChatTurn("thread-1"));
-      expect(response.status).toBe(400);
+    it("answers a thread id that is not a uuid like a missing thread", async () => {
+      const response = await answerThread(ana, "thread-1", aChatTurn());
+      expect(response.status).toBe(404);
     });
 
     it("forks through a response with a copy of the conversation up to it", async () => {
@@ -361,7 +357,11 @@ describeIntegration(
       read: (owner) =>
         listThreadMessages(aUser(owner), conversationThreadId),
       change: async (owner) => {
-        await answerThread(aUser(owner), aChatTurn(conversationThreadId));
+        await answerThread(
+          aUser(owner),
+          conversationThreadId,
+          aChatTurn(),
+        );
         await forkThread(aUser(owner), {
           fromThreadId: conversationThreadId,
           id: randomUUID(),

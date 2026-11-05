@@ -1,14 +1,20 @@
 // Browser-safe public API of the skills module.
-export type { Skill } from "./domain/skill";
 export {
   activeSkills,
   defaultSkillIds,
   findSkill,
   knownSkillIds,
+  loadSkillInputSchema,
+  loadSkillOutputSchema,
+  storedSkillIdsSchema,
   toggleSkill,
-} from "./domain/skill";
-export { storedSkillIdsSchema, type StoredSkillIds } from "./contracts";
+  type LoadSkillInput,
+  type LoadSkillOutput,
+  type Skill,
+  type StoredSkillIds,
+} from "./contracts";
 export { SkillIcon } from "./components/skill-icon";
+export { SkillLoadCall } from "./components/skill-load-call";
 export { SkillPicker } from "./components/skill-picker";
 export { SkillSettingsPanel } from "./components/skill-settings-panel";
 export { SkillsProvider } from "./components/skills-provider";

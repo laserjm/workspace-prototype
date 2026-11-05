@@ -1,8 +1,12 @@
 "use client";
 
 import { useMemo, useSyncExternalStore } from "react";
-import { storedSkillIdsSchema } from "../contracts";
-import { defaultSkillIds, knownSkillIds, toggleSkill } from "../domain/skill";
+import {
+  defaultSkillIds,
+  knownSkillIds,
+  storedSkillIdsSchema,
+  toggleSkill,
+} from "../contracts";
 import { useSkills } from "./use-skills";
 
 const storageKey = "workspace:enabled-skills";

@@ -1,11 +1,10 @@
 import { err, ok, type Result } from "@conventions/nextjs/core";
+import type { ModelProvider } from "@/modules/agent";
 import type {
   ScopeHasNoRecords,
   SnoozeTimeInPast,
   ThreadStillWorking,
 } from "./errors";
-
-export type ModelProvider = "claude" | "openai";
 
 /** When a response started and, once it has, when it finished. */
 export type ResponseTiming = { startedAt: string; completedAt: string | null };

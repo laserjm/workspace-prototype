@@ -9,6 +9,7 @@ import {
   placeThreadAction,
   startThreadAction,
 } from "../actions";
+import type { ModelProvider } from "@/modules/agent";
 import type { StartThreadInput, ThreadChange } from "../contracts";
 import {
   acknowledgeWake,
@@ -18,7 +19,6 @@ import {
   settle,
   snooze,
   withPlacement,
-  type ModelProvider,
   type Thread,
   type ThreadPlacement,
 } from "../domain/thread";

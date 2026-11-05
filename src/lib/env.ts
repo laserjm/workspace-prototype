@@ -1,4 +1,4 @@
-// Starter from @conventions/nextjs — NX-ZOD-05, NX-TYPE-06. The only reader of process.env besides
+// The only reader of process.env besides
 // lib/db/client.ts. Parsed on import, so a missing or malformed value fails `next build` and the
 // first request, not a sign-in halfway through.
 import "server-only";

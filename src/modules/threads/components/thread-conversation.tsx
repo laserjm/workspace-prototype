@@ -4,7 +4,7 @@ import { useLayoutEffect, useRef, type ReactNode } from "react";
 import { ChevronDown, GitFork } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { recordCountLabel, SourceIcon, useSources } from "@/modules/sources";
-import type { ModelChoice } from "../domain/model-choice";
+import type { ModelChoice } from "@/modules/agent";
 import { shelfOf, type Thread } from "../domain/thread";
 import { ThreadMessages, type ForkTarget } from "./thread-messages";
 import { formatWakeTime } from "./time-format";

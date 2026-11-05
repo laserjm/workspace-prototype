@@ -31,7 +31,7 @@ import {
   SourceScopeSummary,
   useSources,
 } from "@/modules/sources";
-import type { ModelChoice } from "../domain/model-choice";
+import type { ModelChoice } from "@/modules/agent";
 import type { ThreadScope } from "../domain/thread";
 import { attachmentChipClassName } from "./attachment-chip";
 import { ProviderIcon } from "./provider-icon";

@@ -2,7 +2,7 @@
 
 import { Chat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
-import type { ChatOptions, WorkspaceUIMessage } from "../contracts";
+import type { ChatOptions, WorkspaceUIMessage } from "@/modules/agent";
 
 export type ConversationLoad = "loading" | "failed" | "ready";
 
@@ -118,10 +118,10 @@ export class ChatStore {
       id: threadId,
       messages,
       transport: new DefaultChatTransport({
-        api: "/api/chat",
+        api: `/api/threads/${threadId}/messages`,
         // The server holds the conversation; it needs only the latest message.
-        prepareSendMessagesRequest: ({ id, messages, body }) => ({
-          body: { ...body, id, message: messages.at(-1) },
+        prepareSendMessagesRequest: ({ messages, body }) => ({
+          body: { ...body, message: messages.at(-1) },
         }),
       }),
       // The server stamps completedAt on a clean finish; stopped or failed

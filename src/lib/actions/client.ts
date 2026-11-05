@@ -33,8 +33,10 @@ function signInAgain() {
   if (signingIn) return;
   signingIn = true;
   const { pathname, search, hash } = window.location;
+  // A full load on purpose: /api/sign-in is a route handler that redirects to Keycloak, not a page.
+  // eslint-disable-next-line @next/next/no-location-assign-relative-destination
   window.location.assign(
-    `/sign-in?returnTo=${encodeURIComponent(pathname + search + hash)}`,
+    `/api/sign-in?returnTo=${encodeURIComponent(pathname + search + hash)}`,
   );
 }
 

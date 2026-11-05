@@ -1,7 +1,7 @@
-// The schema source of truth (code-first, NX-DB-01). Tables are `export const <nouns>Table =
-// pgTable("<nouns>", …)` and enums `<noun>StatusEnum = pgEnum("<noun>_status", …)` (NX-DRZ-04);
+// The schema source of truth (code-first). Tables are `export const <nouns>Table =
+// pgTable("<nouns>", …)` and enums `<noun>StatusEnum = pgEnum("<noun>_status", …)`;
 // after a change, `pnpm db:generate --name <verb>-<what>` writes the migration to drizzle/.
-// Only lib/db/ and modules/*/infra/ import drizzle-orm (NX-DRZ-01).
+// Only lib/db/ and modules/*/infra/ import drizzle-orm.
 import { sql } from "drizzle-orm";
 import {
   boolean,
@@ -131,7 +131,7 @@ export const verificationsTable = pgTable(
 
 // ---- Owned data (ARCHITECTURE.md "Data ownership") ---------------------------------------------
 // Every row names its owner, the signed-in user's `users.id` (their Keycloak `sub`). Repositories
-// name `user_id` in every query (NX-AUTH-03); deleting a user deletes what they own.
+// name `user_id` in every query; deleting a user deletes what they own.
 
 /** A user's project. Names are unique per owner. */
 export const projectsTable = pgTable(

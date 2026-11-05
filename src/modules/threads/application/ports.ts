@@ -1,45 +1,16 @@
-import type {
-  Result,
-  ValidationFailed,
-} from "@conventions/nextjs/core";
+import type { NotFound, ValidationFailed } from "@/lib/errors";
+import type { Result } from "@/lib/result";
 import type { UserId } from "@/lib/auth/user";
-import type { Skill } from "@/modules/skills";
-import type { Source, SourceRecord } from "@/modules/sources";
-import type { WorkspaceUIMessage } from "../contracts";
-import type { ModelChoice } from "../domain/model-choice";
+import type { WorkspaceUIMessage } from "@/modules/agent";
+import type { AgentRequest, AgentRun } from "@/modules/agent/server";
 import type { Thread } from "../domain/thread";
 
-/** A model the workspace offers, with the id the gateway knows it by. Server-side only. */
-export type GatewayModel = ModelChoice & { gateway: string };
+/** Answers a conversation: `runAgent` from the agent module, a fake in tests. */
+export type AnswerAgent = (
+  request: AgentRequest,
+) => Promise<Result<AgentRun, NotFound | ValidationFailed>>;
 
-/** The records a thread attached, resolved on the server from their ids. */
-export type AttachedRecords = {
-  source: Source;
-  records: SourceRecord[];
-  /** How many records the thread named; the label says "5 tickets" even if one is gone. */
-  recordCount: number;
-};
-
-export type ResponseRequest = {
-  model: GatewayModel;
-  skill?: Skill;
-  attached?: AttachedRecords;
-  /** The stored conversation with the message just sent; the agent validates it. */
-  messages: unknown[];
-  signal?: AbortSignal;
-  /**
-   * Called once the reply ends, finished, stopped or failed, with the conversation including
-   * it. The reply is complete even if the browser went away.
-   */
-  onEnd(messages: WorkspaceUIMessage[]): Promise<void>;
-};
-
-/** Streams the assistant's reply to a thread's conversation. */
-export type ResponseAgent = {
-  answer(request: ResponseRequest): Promise<Result<Response, ValidationFailed>>;
-};
-
-/** The signed-in user's threads. Owned methods take the UserId first (NX-AUTH-03). */
+/** The signed-in user's threads. Owned methods take the UserId first. */
 export type ThreadRepository = {
   /** Newest first. */
   listByUser(userId: UserId): Promise<Thread[]>;

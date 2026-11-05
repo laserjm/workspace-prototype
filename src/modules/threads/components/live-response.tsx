@@ -2,8 +2,7 @@
 
 import { findSkill, useSkills } from "@/modules/skills";
 import { findSource, recordCountLabel, useSources } from "@/modules/sources";
-import type { WorkspaceUIMessage } from "../contracts";
-import type { ModelChoice } from "../domain/model-choice";
+import type { ModelChoice, WorkspaceUIMessage } from "@/modules/agent";
 import type { ThreadScope } from "../domain/thread";
 import {
   hasVisibleParts,

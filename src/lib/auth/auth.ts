@@ -91,7 +91,7 @@ function createAuth() {
 
 let instance: ReturnType<typeof createAuth> | undefined;
 
-/** Built on first use, so importing a route needs neither the database nor the env (NX-TYPE-06). */
+/** Built on first use, so importing a route needs neither the database nor the env. */
 export function auth() {
   instance ??= createAuth();
   return instance;

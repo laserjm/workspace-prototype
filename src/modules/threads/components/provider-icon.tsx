@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import type { ModelProvider } from "../domain/thread";
+import type { ModelProvider } from "@/modules/agent";
 
 const icon = "size-4 shrink-0";
 import { claudePath, openAIPath } from "./provider-paths";

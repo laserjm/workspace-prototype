@@ -1,19 +1,28 @@
 // Browser-safe public API of the sources module.
 export type {
+  RecordMatch,
   RecordPriority,
+  RecordScope,
   RecordStatus,
+  SearchRecordsInput,
+  SearchRecordsOutput,
   Source,
   SourceRecord,
-} from "./domain/source";
+} from "./contracts";
 export {
+  RECORD_PRIORITIES,
   RECORD_STATUSES,
+  recordScopeSchema,
+  searchRecordsInputSchema,
+  searchRecordsOutputSchema,
   allRecordIds,
   countByStatus,
   findSource,
   hasRisk,
   recordCountLabel,
   recordsIn,
-} from "./domain/source";
+} from "./contracts";
+export { RecordSearchCall } from "./components/record-search-call";
 export { RecordStatusBadge } from "./components/record-status-badge";
 export { SourceChoiceList } from "./components/source-choice-list";
 export { SourceExplorer } from "./components/source-explorer";

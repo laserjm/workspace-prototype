@@ -1,5 +1,5 @@
 import "server-only";
-// The module's use cases wired to what they run on (NX-LAYER-11), each taking the signed-in
+// The module's use cases wired to what they run on, each taking the signed-in
 // user first.
 import {
   conflict,
@@ -7,21 +7,19 @@ import {
   err,
 } from "@conventions/nextjs/core";
 import type { User } from "@/lib/auth/user";
+import { runAgent } from "@/modules/agent/server";
 import { findProject } from "@/modules/projects/server";
-import { listSkills } from "@/modules/skills/server";
-import { listSources } from "@/modules/sources/server";
 import { answerThread as answer } from "./application/answer-thread";
 import { forkThread as fork } from "./application/fork-thread";
 import { placeThread as place } from "./application/place-thread";
 import { startThread as start } from "./application/start-thread";
 import {
   chatTurnDtoSchema,
+  threadIdSchema,
   type ForkThreadInput,
   type PlaceThreadInput,
   type StartThreadInput,
 } from "./contracts";
-import { aiGatewayModelCatalog } from "./infra/ai-gateway.model-catalog";
-import { aiGatewayResponseAgent } from "./infra/ai-gateway.response-agent";
 import { threadRepository } from "./infra/thread.repository";
 
 /** Stores the new thread the user's first message starts. */
@@ -80,35 +78,33 @@ function badRequest(error: string) {
   return Response.json({ error }, { status: 400 });
 }
 
+function threadNotFound() {
+  return Response.json({ error: "Thread not found." }, { status: 404 });
+}
+
 /**
- * POST /api/chat: validates the body at the edge, then streams the next response of one of the
- * user's threads and stores the conversation when it ends. Another user's thread is a 404,
- * like a missing one.
+ * POST /api/threads/[id]/messages: validates the id and body at the edge, then streams the next
+ * response of one of the user's threads and stores the conversation when it ends. Another user's
+ * thread is a 404, like a missing one or an id that is not a uuid.
  */
 export async function answerThread(
   user: User,
+  threadId: string,
   body: unknown,
   signal?: AbortSignal,
 ) {
+  if (!threadIdSchema.safeParse(threadId).success) return threadNotFound();
   const request = chatTurnDtoSchema.safeParse(body);
   if (!request.success) return badRequest("Invalid chat request.");
-  const [skills, sources] = await Promise.all([listSkills(), listSources()]);
   const result = await answer(
-    { ...request.data, signal },
-    {
-      user,
-      threads: threadRepository,
-      models: aiGatewayModelCatalog,
-      skills,
-      sources,
-      agent: aiGatewayResponseAgent,
-    },
+    { ...request.data, threadId, signal },
+    { user, threads: threadRepository, agent: runAgent },
   );
   if (result.ok) return result.value;
   switch (result.error._tag) {
     case "NotFound":
       return result.error.entity === "Thread"
-        ? Response.json({ error: "Thread not found." }, { status: 404 })
+        ? threadNotFound()
         : badRequest("Invalid chat request.");
     case "ValidationFailed":
       return badRequest("Invalid chat messages.");

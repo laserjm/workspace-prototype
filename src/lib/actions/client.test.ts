@@ -51,7 +51,7 @@ describe("callAction", () => {
     await callAction(ended, undefined);
     expect(assign).toHaveBeenCalledOnce();
     expect(assign).toHaveBeenCalledWith(
-      "/sign-in?returnTo=%2Fthreads%2Ft-1%3Fview%3Dboard%23r2",
+      "/api/sign-in?returnTo=%2Fthreads%2Ft-1%3Fview%3Dboard%23r2",
     );
   });
 });

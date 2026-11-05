@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { inlineTriggerClassName } from "@/components/ui/inline-trigger";
 import { cn } from "@/lib/utils";
-import { activeSkills } from "../domain/skill";
+import { activeSkills } from "../contracts";
 import { SkillIcon } from "./skill-icon";
 import { useSkills } from "./use-skills";
 

@@ -1,8 +1,8 @@
 import "server-only";
-import type { Skill } from "./domain/skill";
-import { sampleSkillCatalog } from "./infra/sample.skill-catalog";
+import { skillCatalog } from "./catalog";
+import type { Skill } from "./contracts";
 
-/** The skill catalogue. Shared data: no user (NX-AUTH-05). */
+/** The skill catalogue. Shared data: no user. */
 export async function listSkills(): Promise<Skill[]> {
-  return sampleSkillCatalog;
+  return skillCatalog;
 }
