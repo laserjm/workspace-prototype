@@ -344,8 +344,14 @@ export function WorkspaceShell({
   return (
     <ChatStoreProvider store={chatStore}>
       <TooltipProvider delay={450}>
+        {/* Layout state for descendants: utilities read it as
+            group-data-[sidebar=collapsed]/app:… and
+            group-data-[mobile-sidebar=open]/app:…. The classes stay until
+            workspace.css no longer reads them. */}
         <div
-          className={`workspace-app ${sidebarOpen ? "" : "sidebar-collapsed"} ${mobileSidebarOpen ? "mobile-sidebar-open" : ""}`}
+          className={`workspace-app group/app ${sidebarOpen ? "" : "sidebar-collapsed"} ${mobileSidebarOpen ? "mobile-sidebar-open" : ""}`}
+          data-sidebar={sidebarOpen ? "open" : "collapsed"}
+          data-mobile-sidebar={mobileSidebarOpen ? "open" : "closed"}
         >
           <a className="workspace-skip-link" href="#workspace-main">
             Skip to workspace
@@ -456,7 +462,11 @@ export function WorkspaceShell({
 
             <main
               id="workspace-main"
-              className={`workspace-main ${activeThread?.scope ? "source-session" : ""} ${activeThread?.scope && sourceOpen ? "source-session-open" : ""}`}
+              className={`workspace-main group/main ${activeThread?.scope ? "source-session" : ""} ${activeThread?.scope && sourceOpen ? "source-session-open" : ""}`}
+              data-session={activeThread?.scope ? "source" : "plain"}
+              data-source-panel={
+                activeThread?.scope && sourceOpen ? "open" : "closed"
+              }
               tabIndex={-1}
             >
               {!activeThread ? (

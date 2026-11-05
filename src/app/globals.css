@@ -6,6 +6,59 @@
 @custom-variant dark (&:is(.dark, .dark *));
 
 /*
+ * Responsive variants. Tailwind's own cover most of the workspace:
+ *   max-md:          phones (below 768px; workspace.css's `max-width: 767px`)
+ *   pointer-coarse:  touch screens
+ *   motion-reduce:   prefers-reduced-motion
+ * The breakpoints below keep the workspace's existing widths, so moving a
+ * rule into utilities does not move the layout.
+ */
+@theme {
+  --breakpoint-desktop: 75rem; /* 1200px: max-desktop: is the narrow-laptop layout */
+  --breakpoint-3xl: 100rem; /* 1600px */
+  --breakpoint-4xl: 112.5rem; /* 1800px */
+}
+
+/* Short windows: a laptop with the dock and browser chrome, or a phone in
+   landscape. short: is 720px tall or less, shorter: 650px or less. */
+@custom-variant short (@media (max-height: 720px));
+@custom-variant shorter (@media (max-height: 650px));
+
+/* Hover-revealed controls stay visible where there is no hover. Block form:
+   the one-line form splits the media query at its comma. */
+@custom-variant touch {
+  @media (hover: none), (pointer: coarse) {
+    @slot;
+  }
+}
+
+/*
+ * Moving colours out of workspace.css. Each hex value becomes the token of its
+ * role; the lightness bands are the default when the role is unclear.
+ *
+ *   Text and icons                         Surfaces and lines
+ *   #111 to #32323b     foreground         #fff               card
+ *   #393940 to #4f4f5b  secondary-foreground  #fcfcfd, #fdfdfd  background, popover
+ *   #52525b to #62626d  accent-foreground  #f9f9fa, #fafafa   sidebar
+ *   #71717a to #7b7b88  muted-foreground   #f4f4f5 to #f8f8fa muted, secondary
+ *   #7d7d88 to #9c9ca5  secondary-label    #ececf0 to #f1f1f3 accent (in the
+ *                       (text), icon-muted                    sidebar: sidebar-row-hover)
+ *                       (icons), placeholder #dddde2 to #e8e8ed border (as a
+ *                       (::placeholder)                       background: accent)
+ *   #a1a1aa             muted-foreground/70 #e4e4e799         border/60
+ *                       (text), ring (focus, #c5c5cc to #d8d8dd input (control
+ *                       outlines)                             borders on hover and focus)
+ *
+ * Reds are destructive (text: destructive-foreground, fills:
+ * bg-destructive/10, lines: border-destructive/30); greens are success; blues
+ * that mean "information" are info. Shadows (#000000xx) become shadow utilities
+ * or a named --shadow-* token. Accents that only identify something (project
+ * letters, providers, source marks, issue types, priority and status) use
+ * Tailwind's palette with a dark: variant, for example
+ * `bg-violet-100 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300`.
+ */
+
+/*
  * Design tokens. Three layers, as in T3 Code (apps/web/src/index.css):
  *   1. Tailwind's own scales (spacing, --text-*, --color-zinc-*), plus the
  *      dense sizes below text-xs registered here.
