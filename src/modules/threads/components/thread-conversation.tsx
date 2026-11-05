@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useLayoutEffect, useRef, type ReactNode } from "react";
 import { ChevronDown, GitFork } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { recordCountLabel, SourceIcon, useSources } from "@/modules/sources";
@@ -42,6 +42,26 @@ export function ThreadConversation({
   const { sourceById } = useSources();
   const source = thread.scope ? sourceById(thread.scope.sourceId) : undefined;
   const lane = conversationLane(!!thread.scope);
+  const conversationRef = useRef<HTMLDivElement>(null);
+  const composerLayerRef = useRef<HTMLDivElement>(null);
+
+  // The composer floats over the end of the message list. Its height (it grows
+  // with attachments or a skill hint) becomes --composer-height, which the
+  // list reserves at its end so the last message stops just above it.
+  useLayoutEffect(() => {
+    const conversation = conversationRef.current;
+    const layer = composerLayerRef.current;
+    if (!conversation || !layer) return;
+    const publish = () =>
+      conversation.style.setProperty(
+        "--composer-height",
+        `${Math.ceil(layer.getBoundingClientRect().height)}px`,
+      );
+    publish();
+    const observer = new ResizeObserver(publish);
+    observer.observe(layer);
+    return () => observer.disconnect();
+  }, []);
   // The rows above and below the message list reserve the same scrollbar
   // gutters as the list, so all three lanes resolve to one width even where
   // the browser draws classic (space-taking) scrollbars.
@@ -51,8 +71,9 @@ export function ThreadConversation({
   );
   return (
     <div
+      ref={conversationRef}
       className={cn(
-        "flex h-full min-w-0 flex-1 flex-col pb-12 max-md:pb-11",
+        "relative flex h-full min-w-0 flex-1 flex-col",
         !thread.scope && "pt-25 max-md:pt-42",
       )}
     >
@@ -118,8 +139,23 @@ export function ThreadConversation({
         onFork={onFork}
         laneClassName={lane}
       />
-      <div className={gutters}>
-        <div className={lane}>{composer}</div>
+      {/* Over the list's end: messages fade out in a short strip above the
+          composer, then pass behind a solid backdrop. Only the composer
+          itself takes clicks. */}
+      <div
+        ref={composerLayerRef}
+        className={cn(
+          gutters,
+          "pointer-events-none absolute inset-x-0 bottom-0 z-10",
+        )}
+      >
+        <div
+          aria-hidden
+          className="h-6 bg-linear-to-t from-background to-transparent"
+        />
+        <div className="bg-background pb-12 max-md:pb-11">
+          <div className={cn("pointer-events-auto", lane)}>{composer}</div>
+        </div>
       </div>
     </div>
   );

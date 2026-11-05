@@ -56,6 +56,20 @@ export function ThreadMessages({
     if (pinned.current) element.scrollTop = element.scrollHeight;
   }, [messages, lastUserId]);
 
+  // The composer floating over the end can grow (attachments, a skill hint),
+  // which grows the space reserved below the messages: stay at the end.
+  const laneRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const scroller = scrollRef.current;
+    const lane = laneRef.current;
+    if (!scroller || !lane) return;
+    const observer = new ResizeObserver(() => {
+      if (pinned.current) scroller.scrollTop = scroller.scrollHeight;
+    });
+    observer.observe(lane, { box: "border-box" });
+    return () => observer.disconnect();
+  }, []);
+
   const inFlight = status === "submitted" || status === "streaming";
   const last = messages.at(-1);
   let responseIndex = 0;
@@ -77,9 +91,12 @@ export function ThreadMessages({
       }}
     >
       <div
+        ref={laneRef}
+        // The end reserves the floating composer's height (--composer-height,
+        // set by ThreadConversation), so the last message stops above it.
         className={cn(
-          "flex flex-col gap-6 py-6",
-          thread.scope && "gap-5.5 py-6.5 max-md:pt-5.5",
+          "flex flex-col gap-6 pt-6 pb-(--composer-height)",
+          thread.scope && "gap-5.5 pt-6.5 max-md:pt-5.5",
           laneClassName,
         )}
       >
