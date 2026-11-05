@@ -39,7 +39,7 @@ export type ResponseAgent = {
   answer(request: ResponseRequest): Promise<Result<Response, ValidationFailed>>;
 };
 
-/** The signed-in user's threads. Owned methods take the UserId first (NX-AUTH-03). */
+/** The signed-in user's threads. Owned methods take the UserId first. */
 export type ThreadRepository = {
   /** Newest first. */
   listByUser(userId: UserId): Promise<Thread[]>;

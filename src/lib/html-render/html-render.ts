@@ -147,7 +147,7 @@ export const WORKSPACE_HTML_RENDER_THEME: HtmlRenderTheme = {
 const OPEN_LINK_METHOD = "ui/open-link";
 const SIZE_CHANGED_METHOD = "ui/notifications/size-changed";
 
-// Messages from the sandboxed frame are untrusted: parse them, never cast (NX-TYPE-03).
+// Messages from the sandboxed frame are untrusted: parse them, never cast.
 const sizeChangedMessageSchema = z.object({
   jsonrpc: z.literal("2.0"),
   method: z.literal(SIZE_CHANGED_METHOD),

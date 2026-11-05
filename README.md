@@ -63,7 +63,6 @@ Never edit a generated migration; CI fails when `schema.ts` and `drizzle/` disag
 
 ```sh
 pnpm lint
-pnpm check
 pnpm typecheck
 pnpm test
 pnpm build
@@ -121,9 +120,8 @@ On desktop, drag the source panel’s left edge to resize it. The width is remem
 
 ## Project structure
 
-The app follows the [`nextjs` conventions profile](https://github.com/laserjm/conventions) 0.3.2.
-[ARCHITECTURE.md](ARCHITECTURE.md) pins the version and records how this project applies the
-rules. Paths below are relative to `src/`, which `@/` points to.
+[ARCHITECTURE.md](ARCHITECTURE.md) records the structural decisions and what enforces each.
+Paths below are relative to `src/`, which `@/` points to.
 
 ```
 app/
@@ -146,18 +144,17 @@ lib/                            `cn`, the html_render helpers shared by server a
 tests/                          test factories and support
 ```
 
-Each module has the same shape: `domain/` holds plain types and pure functions with their
-tests, `infra/sample.*.ts` holds the bundled sample data, `queries.ts` and `server.ts` read it
-on the server, `components/` holds the browser UI, and `index.ts` is the public API. `threads`
-also has `application/answer-thread.ts`, the use case behind `POST /api/threads/[id]/messages`, and its
-`infra/ai-gateway.*.ts` adapters. A module
-reaches another one only through `index.ts` or `server.ts`.
+A module is reached from outside only through `index.ts` (browser-safe) or `server.ts`
+(server-only); ESLint refuses any deeper import. Inside, `contracts.ts` holds types and input
+schemas, `queries.ts` the reads, `actions.ts` the server actions and `components/` the browser
+UI. `threads` still has its older layers (`domain/`, `application/`, `infra/`); its
+`application/answer-thread.ts` is the use case behind `POST /api/threads/[id]/messages`, with
+the AI Gateway adapters in `infra/ai-gateway.*.ts`. See "Module shape" in ARCHITECTURE.md.
 
 ```sh
-pnpm lint          # conventions lint: ESLint, ast-grep and ls-lint; every finding carries a rule id
-pnpm check         # conventions check: module shape, tests, header, deviations
-pnpm test          # unit tests (Vitest)
-pnpm exec conventions explain NX-LAYER-05   # print a rule
+pnpm lint          # ESLint, design tokens (scripts/check-styles.mjs), server actions (scripts/check-actions.mjs)
+pnpm typecheck     # route types, then tsc
+pnpm test          # unit tests, plus integration tests when the stack runs (pnpm stack:up)
 ```
 
 Add shadcn components with:

@@ -1,5 +1,5 @@
-// Repository: defineRepository against the port; the user id first and in every query (NX-AUTH-03);
-// a violated constraint becomes a ConstraintViolation (NX-DB-05).
+// Repository: defineRepository against the port; the user id first and in every query;
+// a violated constraint becomes a ConstraintViolation.
 import { and, asc, desc, eq } from "drizzle-orm";
 import {
   ConstraintViolation,

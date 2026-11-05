@@ -1,6 +1,6 @@
-// Starter from @conventions/nextjs (binding: drizzle) — NX-TYPE-06. The project owns this file:
+// The project owns this file:
 // adapt the driver and pool to its hosting. Keep `db()` lazy, so importing a module needs no
-// DATABASE_URL, and keep `withTransaction` here so only infra/ reaches it (NX-DB-06).
+// DATABASE_URL, and keep `withTransaction` here so only infra/ reaches it.
 import "server-only";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";

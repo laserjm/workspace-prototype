@@ -8,9 +8,12 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 <!-- END:nextjs-agent-rules -->
 
-## Conventions
+## Project conventions
 
-Conventions profile `nextjs` 0.3.2, pinned in `ARCHITECTURE.md` (read it first).
-Lint what you change with `pnpm exec conventions lint <files>`, run `pnpm exec conventions check`
-before finishing, and read any rule with `pnpm exec conventions explain <RULE-ID>`. Never disable
-a rule; record a deviation in `ARCHITECTURE.md` instead.
+- Read `ARCHITECTURE.md` before changing structure. Each entry records a decision and what
+  enforces it; change the entry together with the decision.
+- Another module is reached only through its `index.ts` (browser-safe) or `server.ts`
+  (server-only). ESLint enforces it; inside a module, import relatively.
+- Before you finish, run `pnpm lint`, `pnpm typecheck` and `pnpm test`. The integration tests
+  need the local stack (`pnpm stack:up`) and skip loudly without it.
+- Fix a lint finding rather than disabling it. A disable needs a comment that says why.

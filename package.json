@@ -6,13 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "conventions lint && pnpm lint:styles && pnpm lint:actions",
+    "lint": "eslint && pnpm lint:styles && pnpm lint:actions",
     "lint:styles": "node scripts/check-styles.mjs",
     "lint:actions": "node scripts/check-actions.mjs",
-    "check": "conventions check",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
-    "conventions": "conventions lint && conventions check",
     "stack:up": "docker compose up -d --wait",
     "stack:down": "docker compose down",
     "stack:reset": "docker compose down --volumes",
@@ -49,7 +47,6 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@conventions/cli": "https://github.com/laserjm/conventions/releases/download/v0.3.2/conventions-cli-0.3.2.tgz",
     "@tailwindcss/turbopack": "^4",
     "@types/node": "^22.20.5",
     "@types/react": "^19",

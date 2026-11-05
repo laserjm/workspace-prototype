@@ -1,4 +1,4 @@
-// Use case: defineUseCase pins (input, deps) => Promise<Result> (NX-LAYER-07, NX-ERR-01).
+// Use case: defineUseCase pins (input, deps) => Promise<Result>.
 import {
   bug,
   defineUseCase,

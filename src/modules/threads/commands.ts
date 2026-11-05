@@ -1,5 +1,5 @@
 import "server-only";
-// The module's use cases wired to what they run on (NX-LAYER-11), each taking the signed-in
+// The module's use cases wired to what they run on, each taking the signed-in
 // user first.
 import {
   conflict,
