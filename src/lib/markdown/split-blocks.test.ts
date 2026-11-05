@@ -32,6 +32,10 @@ describe("splitMarkdownBlocks", () => {
     "- a\n\n  ```\n  x\n\n```\n\nb",
     "- a\n\n  ```\n  x\n\ny\n\n  ```\n\nb",
     "line one\nline two\n\nthird",
+    "Energy is $$E = mc^2$$.\n\n$$\na^2\n\n+ b^2\n$$\n\nafter",
+    "$$x$$ starts a paragraph\n\n$$$\n\\frac{1}{2}\n$$\n\n$$$\n\nend",
+    "text\n$$\nx\n\ny\n$$\n\n```ts\nconst price = \"$$\";\n```\n\ndone",
+    "```a`b\nnot a fence\n\nnext",
   ])(
     "renders each block as the whole text renders, at every streamed prefix: %j",
     (text) => {

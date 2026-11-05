@@ -1,12 +1,20 @@
 "use client";
 
-// Follows T3 Code's apps/web/src/components/chat/MermaidDiagram.tsx (MIT): Pele draws the
-// diagram, loaded on first use, and DOMPurify cleans its SVG.
+// Follows T3 Code's apps/web/src/components/chat/MermaidDiagram.tsx and
+// MarkdownMermaidCodeBlock.tsx (MIT): Pele draws the diagram, loaded on first use, and
+// DOMPurify cleans its SVG.
 
-import type { Mounted } from "pele/lazy";
-import { CodeIcon, WorkflowIcon } from "lucide-react";
+import type { MountOptions, Mounted } from "pele/lazy";
+import { CodeIcon, Maximize2Icon, WorkflowIcon } from "lucide-react";
 import { useCallback, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "./dialog";
+import { CopyButton } from "./copy-button";
 import { IconButton } from "./icon-button";
 
 type Renderer = {
@@ -50,22 +58,11 @@ const theme =
 
 type Status = "loading" | "drawn" | "failed";
 
-/**
- * A Mermaid diagram, with its code block (`children`) shown until it is drawn, when it
- * cannot be, and on request.
- */
-export function MermaidDiagram({
-  source,
-  children,
-}: {
-  source: string;
-  children: ReactNode;
-}) {
+/** Draws `source` into the element the returned ref is given, and reports how that went. */
+function useDiagram(source: string, zoom: MountOptions["zoom"]) {
   const [status, setStatus] = useState<Status>("loading");
   const [error, setError] = useState<string | null>(null);
-  const [showCode, setShowCode] = useState(false);
-
-  const mountDiagram = useCallback(
+  const ref = useCallback(
     (container: HTMLDivElement) => {
       let mounted: Mounted | undefined;
       let removed = false;
@@ -74,7 +71,9 @@ export function MermaidDiagram({
         setStatus("failed");
         // Pele's later lines point a caret at the source, which needs a monospace block.
         const summary =
-          reason instanceof Error ? reason.message.split("\n")[0].replace(/:$/, "") : "";
+          reason instanceof Error
+            ? reason.message.split("\n")[0].replace(/:$/, "")
+            : "";
         setError(summary || "it could not be drawn");
       };
       loadRenderer()
@@ -82,7 +81,7 @@ export function MermaidDiagram({
           pele.mountAsync(container, source.trim(), {
             links: false,
             images: false,
-            zoom: false,
+            zoom,
             // Keep the author's direction; a wide diagram scales down to fit instead.
             autoDirection: false,
             sanitize,
@@ -103,9 +102,28 @@ export function MermaidDiagram({
         mounted?.destroy();
       };
     },
-    [source],
+    [source, zoom],
   );
+  return { ref, status, error };
+}
 
+const ZOOM_IN_PLACE = false;
+const ZOOM_EXPANDED = { always: true, controls: true } as const;
+
+/**
+ * A Mermaid diagram. Its code block, from `renderCode`, shows until it is drawn, when it
+ * cannot be, and on request; `renderCode` is given the toggle back to the diagram.
+ */
+export function MermaidDiagram({
+  source,
+  renderCode,
+}: {
+  source: string;
+  renderCode: (actions: ReactNode) => ReactNode;
+}) {
+  const { ref, status, error } = useDiagram(source, ZOOM_IN_PLACE);
+  const [showCode, setShowCode] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const drawn = status === "drawn";
   return (
     <div data-slot="mermaid" className="relative my-3">
@@ -114,27 +132,88 @@ export function MermaidDiagram({
           Couldn&apos;t draw this diagram: {error}
         </p>
       ) : null}
-      {!drawn || showCode ? children : null}
+      {!drawn || showCode
+        ? renderCode(
+            drawn ? (
+              <IconButton
+                label="Show diagram"
+                className="size-6"
+                onClick={() => setShowCode(false)}
+              >
+                <WorkflowIcon />
+              </IconButton>
+            ) : null,
+          )
+        : null}
       {/* Laid out but invisible while it loads, so Pele can measure the width it has. */}
       <div
-        ref={mountDiagram}
         className={cn(
-          theme,
-          "flex justify-center overflow-x-auto rounded-lg border border-border bg-background px-3.5 py-3",
+          "overflow-hidden rounded-lg border border-border bg-background",
           status === "loading" && "invisible absolute inset-x-0 top-0",
           (status === "failed" || showCode) && "hidden",
         )}
-      />
-      {drawn ? (
-        <IconButton
-          label="Show code"
-          aria-pressed={showCode}
-          onClick={() => setShowCode((value) => !value)}
-          className="absolute end-1.5 top-1.5"
-        >
-          {showCode ? <WorkflowIcon /> : <CodeIcon />}
-        </IconButton>
+      >
+        <div className="flex min-h-8 items-center justify-between gap-2 ps-3.5 pe-1 pt-1 select-none">
+          <span className="font-mono text-2xs text-muted-foreground">mermaid</span>
+          <span className="flex shrink-0 items-center">
+            <IconButton
+              label="Expand diagram"
+              className="size-6"
+              onClick={() => setExpanded(true)}
+            >
+              <Maximize2Icon />
+            </IconButton>
+            <IconButton
+              label="Show code"
+              className="size-6"
+              onClick={() => setShowCode(true)}
+            >
+              <CodeIcon />
+            </IconButton>
+            <CopyButton text={source.trim()} label="Copy code" className="size-6" />
+          </span>
+        </div>
+        <div
+          ref={ref}
+          className={cn(theme, "flex justify-center overflow-x-auto px-3.5 pb-3")}
+        />
+      </div>
+      {expanded ? (
+        <ExpandedDiagram source={source} onClose={() => setExpanded(false)} />
       ) : null}
     </div>
+  );
+}
+
+/** The diagram at the size of the window, to pan and zoom. */
+function ExpandedDiagram({
+  source,
+  onClose,
+}: {
+  source: string;
+  onClose: () => void;
+}) {
+  const { ref } = useDiagram(source, ZOOM_EXPANDED);
+  return (
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
+      <DialogContent className="flex h-[calc(100svh-3rem)] w-[min(1400px,calc(100vw-3rem))] max-w-none flex-col gap-3 bg-background sm:max-w-none">
+        <DialogTitle className="pr-8 text-sm font-medium">Diagram</DialogTitle>
+        <DialogDescription className="sr-only">
+          The diagram at full size. Scroll or pinch to zoom, and drag to pan.
+        </DialogDescription>
+        <div
+          ref={ref}
+          className={cn(
+            theme,
+            "relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-lg border border-border",
+          )}
+        />
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -1,9 +1,11 @@
 "use client";
 
 // The rendering follows T3 Code's apps/web/src/components/ChatMarkdown.tsx (MIT), scaled down:
-// GFM through react-markdown, a component map instead of a stylesheet, and streamed text split
-// into blocks so only the last one re-renders.
+// GFM and $$ math through react-markdown, a component map instead of a stylesheet, streamed
+// text split into blocks so only the last one re-renders, highlighted code blocks, Mermaid
+// diagrams, and chips for links to pull requests, issues and files.
 
+import { CircleDotIcon, FileIcon, GitPullRequestIcon } from "lucide-react";
 import {
   createContext,
   createElement,
@@ -11,22 +13,28 @@ import {
   use,
   type ComponentProps,
   type JSX,
+  type ReactNode,
 } from "react";
 import ReactMarkdown, {
   type Components,
   type ExtraProps,
 } from "react-markdown";
-import { mermaidSource } from "@/lib/markdown/mermaid";
+import { codeBlockOf, isInlineMath, textOf } from "@/lib/markdown/code";
+import {
+  changeReferenceOf,
+  fileNameOf,
+  filePathOf,
+} from "@/lib/markdown/links";
 import {
   markdownPlugins,
   markdownPluginsWithBreaks,
+  markdownUrlTransform,
 } from "@/lib/markdown/plugins";
 import { splitMarkdownBlocks } from "@/lib/markdown/split-blocks";
 import { cn } from "@/lib/utils";
+import { CodeBlock } from "./code-block";
+import { MathFormula } from "./math";
 import { MermaidDiagram } from "./mermaid-diagram";
-
-/** Inside a fenced or indented code block, where `code` is not inline code. */
-const InCodeBlock = createContext(false);
 
 /** False for the block a reply is still streaming into, whose last fence may be unclosed. */
 const BlockSettled = createContext(true);
@@ -51,6 +59,10 @@ function styled<T extends keyof JSX.IntrinsicElements>(tag: T, classes: string) 
 // One level down: a message sits under the page's own h1. The size goes first: a text-* class
 // after leading-* would replace it.
 const heading = "mt-5 mb-2 font-semibold leading-snug text-foreground";
+
+// A link to a pull request, an issue or a file, set off from the text around it.
+const chip =
+  "inline-flex max-w-full items-center gap-1 rounded-md border border-border bg-muted/60 px-1.5 align-bottom text-xs leading-5 font-medium text-foreground no-underline [&>svg]:size-3 [&>svg]:shrink-0 [&>svg]:text-muted-foreground";
 
 const components: Components = {
   h1: styled("h2", `text-xl ${heading}`),
@@ -85,55 +97,80 @@ const components: Components = {
     "td",
     "border-b border-border/60 px-2 py-1.5 align-top first:ps-0 last:pe-0",
   ),
-  a: function MarkdownLink(props) {
-    const { className, href, ...rest } = withoutNode(props);
+  a: function MarkdownLink({ node, className, href, children, ...rest }) {
+    const file = filePathOf(href);
+    if (file || href?.startsWith("file:")) {
+      return (
+        <span title={file ?? undefined} className={chip}>
+          <FileIcon aria-hidden />
+          {/* A bare path reads as its file name; link text the author wrote stays. */}
+          {file && node && textOf(node) === href ? fileNameOf(file) : children}
+        </span>
+      );
+    }
+    const reference = changeReferenceOf(href);
     const sameDocument = href?.startsWith("#") ?? false;
+    const external = {
+      href,
+      target: sameDocument ? undefined : "_blank",
+      rel: sameDocument ? undefined : "noopener noreferrer",
+    };
+    if (reference) {
+      const Icon =
+        reference.kind === "pull-request" ? GitPullRequestIcon : CircleDotIcon;
+      return (
+        <a {...rest} {...external} className={cn(chip, "hover:bg-accent")}>
+          <Icon aria-hidden />
+          {node && textOf(node) === href ? reference.label : children}
+        </a>
+      );
+    }
     return (
       <a
         {...rest}
-        href={href}
-        target={sameDocument ? undefined : "_blank"}
-        rel={sameDocument ? undefined : "noopener noreferrer"}
+        {...external}
         className={cn(
           "underline decoration-muted-foreground/50 underline-offset-2 hover:decoration-foreground",
           className,
         )}
-      />
+      >
+        {children}
+      </a>
     );
   },
-  pre: function MarkdownCodeBlock({ node, className, ...rest }) {
+  pre: function MarkdownCodeBlock({ node, children, ...rest }) {
+    const block = codeBlockOf(node);
+    const settled = use(BlockSettled);
+    if (!block) return <pre {...rest}>{children}</pre>;
+    if (block.language === "math") {
+      return <MathFormula tex={block.code} display />;
+    }
+    const codeBlock = (actions?: ReactNode) => (
+      <CodeBlock code={block.code} language={block.language} actions={actions} />
+    );
     // A diagram is drawn once its block can no longer change.
-    const diagram = use(BlockSettled) ? mermaidSource(node) : null;
-    const block = (
-      <InCodeBlock value>
-        <pre
-          {...rest}
-          dir="ltr"
-          className={cn(
-            "my-3 max-w-full overflow-x-auto rounded-lg border border-border bg-muted px-3.5 py-3 font-mono text-xs leading-normal [scrollbar-width:thin]",
-            className,
-          )}
-        />
-      </InCodeBlock>
-    );
-    return diagram ? (
-      <MermaidDiagram source={diagram}>{block}</MermaidDiagram>
+    return block.language === "mermaid" && settled && block.code.trim() ? (
+      <MermaidDiagram source={block.code} renderCode={codeBlock} />
     ) : (
-      block
+      codeBlock()
     );
   },
+  // Only inline code reaches this: `pre` renders a block's code itself.
   code: function MarkdownCode(props) {
-    const { className, ...rest } = withoutNode(props);
-    const block = use(InCodeBlock);
+    const { className, children, ...rest } = withoutNode(props);
+    if (isInlineMath(className)) {
+      return <MathFormula tex={String(children)} display={false} />;
+    }
     return (
       <code
         {...rest}
         className={cn(
-          !block &&
-            "rounded-sm bg-foreground/8 px-1.25 py-0.5 font-mono box-decoration-clone",
+          "rounded-sm bg-foreground/8 px-1.25 py-0.5 font-mono box-decoration-clone",
           className,
         )}
-      />
+      >
+        {children}
+      </code>
     );
   },
   table: function MarkdownTable(props) {
@@ -166,6 +203,7 @@ const MarkdownBlock = memo(function MarkdownBlock({
     <BlockSettled value={settled}>
       <ReactMarkdown
         remarkPlugins={lineBreaks ? markdownPluginsWithBreaks : markdownPlugins}
+        urlTransform={markdownUrlTransform}
         components={components}
       >
         {text}

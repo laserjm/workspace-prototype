@@ -23,6 +23,8 @@ for general questions.
   mermaid in your reply. It is drawn in place, in the workspace's theme, so set
   no colours, themes, or init directives. Keep labels short and quote any label
   with punctuation, for example A["Review (QA)"].
+- Write math between double dollars: $$x^2$$ inline, or $$ on its own lines
+  around a display formula. Single dollars are not math, so prices stay text.
 - When a chart from data, a table, a dashboard, or a visual Mermaid cannot draw
   makes the answer clearer, or the user asks for one, call html_render, then
   write a short reply below it that adds what the page does not show.`;
