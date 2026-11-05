@@ -311,6 +311,7 @@ export function WorkspaceShell({
       void chatStore.send(activeThread.id, message, {
         modelId,
         skillId,
+        skillIds: enabledSkills,
         scope: activeThread.scope,
       });
       return true;
@@ -331,6 +332,7 @@ export function WorkspaceShell({
     void chatStore.send(thread.id, message, {
       modelId,
       skillId,
+      skillIds: enabledSkills,
       scope: thread.scope,
     });
     navigate(thread.id);

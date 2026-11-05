@@ -241,14 +241,17 @@ The `agent` module is the runtime AI, flat by file:
   then hands the conversation to `onEnd`. It returns the response and the model.
 - `context.ts`: `resolveContext` turns the browser's ids into the model, skill and records
   (unknown ids are `NotFound`, answered with a 400), so the prompt only ever holds what the
-  server offers.
+  server offers. It also turns `skillIds`, the skills switched on in this browser, into
+  `offeredSkills`: known ones only (a stale id is left out, not refused), without the picked
+  skill.
 - `models.ts`: the model allowlist with gateway ids, and `listModelChoices` for the composer.
 - `instructions/*.md`: the prompt as Markdown, so it reads and diffs as text: `workspace.md`
   (who the agent is, how it answers) and `formatting.md` (Mermaid, math, tables, when to call
   `html_render`). A `.md` file imports as its text: Turbopack's `text` module type
   (`next.config.ts`) bundles it into the server code, so nothing is read from disk at runtime;
   the `markdownAsText` plugin does the same in Vitest, and `src/markdown.d.ts` types it.
-- `instructions.ts`: the two files, then the skill, then the attached records. The records stay
+- `instructions.ts`: the two files, then the picked skill in full, then the offered skills by
+  id, name and description ("Skills you can load"), then the attached records. The records stay
   TypeScript, because they are built from data.
 - `tools.ts`: the registry. `tools` is every tool the agent knows, its own and the modules'
   (see "Agent tools live in their module"); `toolsFor(context)` picks the ones one answer may
@@ -280,7 +283,8 @@ data and long or sortable tables at `html_render`.
 **Decision.** A tool is another way into a module, beside its pages and actions, so it lives in
 the module it acts on and is a thin wrapper over that module's `queries.ts` (or, for a write,
 its actions). `sources/tools.ts` is the pattern: `search_records` searches the records the
-thread attached.
+thread attached, and `skills/tools.ts` (`load_skill`, see "Skills are SKILL.md files") follows
+it.
 - **Files.** The tool's input and output schemas, and the rule it applies (`searchRecords`), are
   in the module's `contracts.ts`, so the browser can type the tool's parts. The tool is in
   `<module>/tools.ts` (`server-only`), exported as `<module>Tools` from `server.ts`. Its chat
@@ -313,8 +317,17 @@ parses each with a strict schema and sorts by `order` (a glob sorts by path). A 
 throws with its path when the catalogue loads, which `next build` does. The browser gets the
 whole skill, instructions included: the settings panel shows them. Adding a skill is adding a
 folder.
+
+A skill reaches the agent two ways. The one the user picks for a message is in the prompt in
+full, as before. The others the user switched on (`skillIds` with each message, from
+`useSkillPreferences`) are listed by id, name and description only, and the model loads one's
+instructions with `load_skill` (`skills/tools.ts`) when a question fits it. The tool's context
+is the offered ids, filled by the server, so it never loads a skill the user switched off. Its
+chat card, `SkillLoadCall`, shows "Using the “Risk review” skill".
 **Enforced by.** `skills/catalog.test.ts` (every file parses, in order; malformed files are
-refused); `next build`.
+refused); `next build`; `skills/tools.test.ts` (only offered skills load);
+`agent/context.test.ts` (what is offered); `agent/run.test.ts` (on a mock model, the list is in
+the prompt and the tool answers).
 **Recorded in.** This entry.
 
 ### Styling: design tokens and Tailwind classes

@@ -49,3 +49,16 @@ export const storedSkillIdsSchema = z
   .array(z.unknown())
   .transform((ids) => ids.filter((id): id is string => typeof id === "string"));
 export type StoredSkillIds = z.infer<typeof storedSkillIdsSchema>;
+
+/** What the model asks `load_skill` for: one of the skills the prompt lists. */
+export const loadSkillInputSchema = z.object({
+  id: z.string().min(1).max(100).describe("The id of a skill from the list."),
+});
+export type LoadSkillInput = z.infer<typeof loadSkillInputSchema>;
+
+export const loadSkillOutputSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  instructions: z.string(),
+});
+export type LoadSkillOutput = z.infer<typeof loadSkillOutputSchema>;

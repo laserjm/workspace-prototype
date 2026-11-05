@@ -16,7 +16,10 @@ export type AttachedRecords = {
 /** What one answer runs with: the model, and the skill and records it is grounded in. */
 export type AgentContext = {
   model: AgentModel;
+  /** The skill the user picked for this message: its instructions are in the prompt. */
   skill?: Skill;
+  /** The other skills switched on in this browser: the agent may load one (`load_skill`). */
+  offeredSkills: Skill[];
   attached?: AttachedRecords;
 };
 
@@ -42,7 +45,13 @@ export function resolveContext(
     : undefined;
   if (options.skillId && !skill) return err(notFound("Skill", options.skillId));
 
-  if (!options.scope) return ok({ model, skill });
+  // A stale id from browser storage is no reason to refuse the message: it is left out.
+  const switchedOn = options.skillIds ?? [];
+  const offeredSkills = skills.filter(
+    (item) => switchedOn.includes(item.id) && item.id !== skill?.id,
+  );
+
+  if (!options.scope) return ok({ model, skill, offeredSkills });
   const { sourceId, recordIds } = options.scope;
   const source = sources.find((item) => item.id === sourceId);
   if (!source) return err(notFound("Source", sourceId));
@@ -50,10 +59,11 @@ export function resolveContext(
     recordIds.includes(record.id),
   );
   // A scope whose records are all gone adds no context, as if none was attached.
-  if (records.length === 0) return ok({ model, skill });
+  if (records.length === 0) return ok({ model, skill, offeredSkills });
   return ok({
     model,
     skill,
+    offeredSkills,
     attached: { source, records, recordCount: recordIds.length },
   });
 }

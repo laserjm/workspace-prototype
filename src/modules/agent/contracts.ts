@@ -6,6 +6,7 @@ import {
   HTML_RENDER_MAX_TITLE_LENGTH,
   HTML_RENDER_MIN_HEIGHT,
 } from "@/lib/html-render/html-render";
+import type { LoadSkillInput, LoadSkillOutput } from "@/modules/skills";
 import type { SearchRecordsInput, SearchRecordsOutput } from "@/modules/sources";
 
 export const MODEL_PROVIDERS = ["claude", "openai"] as const;
@@ -27,6 +28,8 @@ export type ModelChoice = {
 export const chatOptionsSchema = z.object({
   modelId: z.string().min(1).max(100),
   skillId: z.string().min(1).max(100).optional(),
+  /** The skills switched on in this browser: the agent may load one when a question fits it. */
+  skillIds: z.array(z.string().min(1).max(100)).max(50).optional(),
   scope: z
     .object({
       sourceId: z.string().min(1).max(100),
@@ -79,6 +82,7 @@ export type WorkspaceMessageMetadata = {
 export type WorkspaceUITools = {
   html_render: { input: HtmlRenderInput; output: HtmlRenderOutput };
   search_records: { input: SearchRecordsInput; output: SearchRecordsOutput };
+  load_skill: { input: LoadSkillInput; output: LoadSkillOutput };
 };
 
 export type WorkspaceUIMessage = UIMessage<

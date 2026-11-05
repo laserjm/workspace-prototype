@@ -24,7 +24,9 @@ describe("baseInstructions", () => {
 
 describe("instructionsFor", () => {
   it("is the base instructions alone without a skill or records", () => {
-    expect(instructionsFor({ model: opus })).toBe(baseInstructions);
+    expect(instructionsFor({ model: opus, offeredSkills: [] })).toBe(
+      baseInstructions,
+    );
   });
 
   it("adds the skill, then the attached records", () => {
@@ -34,6 +36,7 @@ describe("instructionsFor", () => {
     const prompt = instructionsFor({
       model: opus,
       skill,
+      offeredSkills: [],
       attached: { source, records: [record], recordCount: 1 },
     });
     expect(prompt.startsWith(baseInstructions)).toBe(true);
@@ -42,5 +45,26 @@ describe("instructionsFor", () => {
       prompt.indexOf("# Source records"),
     );
     expect(prompt).toContain("### PLAT-124:");
+  });
+
+  it("lists the skills to load by id, name and description, after the picked one", () => {
+    const prompt = instructionsFor({
+      model: opus,
+      skill: aSkill({ id: "summary", name: "Summary" }),
+      offeredSkills: [
+        aSkill({
+          id: "risk-review",
+          name: "Risk review",
+          description: "Surface blockers.",
+          instructions: "Loaded on demand.",
+        }),
+      ],
+    });
+    expect(prompt).toContain("# Skills you can load");
+    expect(prompt).toContain("- risk-review (Risk review): Surface blockers.");
+    expect(prompt).not.toContain("Loaded on demand.");
+    expect(prompt.indexOf("# Skill: Summary")).toBeLessThan(
+      prompt.indexOf("# Skills you can load"),
+    );
   });
 });

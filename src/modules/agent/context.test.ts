@@ -13,6 +13,7 @@ const opus: AgentModel = {
   gateway: "anthropic/claude-opus-5.5",
 };
 const riskReview = aSkill({ id: "risk-review", name: "Risk review" });
+const summary = aSkill({ id: "summary", name: "Summary" });
 const jira = aSource({
   id: "jira",
   records: [
@@ -21,14 +22,18 @@ const jira = aSource({
     aSourceRecord({ id: "PLAT-126" }),
   ],
 });
-const catalogs = { models: [opus], skills: [riskReview], sources: [jira] };
+const catalogs = {
+  models: [opus],
+  skills: [summary, riskReview],
+  sources: [jira],
+};
 const options: ChatOptions = { modelId: "opus" };
 
 describe("resolveContext", () => {
   it("resolves the model, with no skill or records when none are named", () => {
     expect(resolveContext(options, catalogs)).toEqual({
       ok: true,
-      value: { model: opus, skill: undefined },
+      value: { model: opus, skill: undefined, offeredSkills: [] },
     });
   });
 
@@ -71,5 +76,17 @@ describe("resolveContext", () => {
       ok: false,
       error: { _tag: "NotFound", entity, id },
     });
+  });
+
+  it("offers the switched-on skills but the picked one, in the catalogue's order, without stale ids", () => {
+    const result = resolveContext(
+      {
+        ...options,
+        skillId: "summary",
+        skillIds: ["risk-review", "gone", "summary"],
+      },
+      catalogs,
+    );
+    expect(result.ok && result.value.offeredSkills).toEqual([riskReview]);
   });
 });

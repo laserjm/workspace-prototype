@@ -1,4 +1,5 @@
 import "server-only";
+import type { Skill } from "@/modules/skills";
 import { recordCountLabel, type SourceRecord } from "@/modules/sources";
 import type { AgentContext, AttachedRecords } from "./context";
 import formatting from "./instructions/formatting.md";
@@ -32,11 +33,27 @@ function sourceContext({ source, records, recordCount }: AttachedRecords) {
   ].join("\n\n");
 }
 
-/** Base instructions, then the selected skill, then the attached records. */
-export function instructionsFor({ skill, attached }: AgentContext) {
+/** The skills the agent may load, by name and description only: their text comes on demand. */
+function skillList(skills: readonly Skill[]) {
+  return [
+    "# Skills you can load",
+    "The user switched these skills on. When a question fits one, call load_skill with its id and follow the instructions it returns. Otherwise answer without one.",
+    skills
+      .map((skill) => `- ${skill.id} (${skill.name}): ${skill.description}`)
+      .join("\n"),
+  ].join("\n\n");
+}
+
+/** Base instructions, then the selected skill, the skills to load, then the attached records. */
+export function instructionsFor({
+  skill,
+  offeredSkills,
+  attached,
+}: AgentContext) {
   return [
     baseInstructions,
     skill && `# Skill: ${skill.name}\n\n${skill.instructions}`,
+    offeredSkills.length > 0 && skillList(offeredSkills),
     attached && sourceContext(attached),
   ]
     .filter(Boolean)

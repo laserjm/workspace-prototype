@@ -106,4 +106,36 @@ describe("runAgent", () => {
       expect.objectContaining({ type: "text", text: "Two are in review." }),
     );
   });
+
+  it("lets the model load a switched-on skill it was offered", async () => {
+    const mock = new MockLanguageModelV4({
+      doStream: [
+        step([
+          { type: "stream-start", warnings: [] },
+          {
+            type: "tool-call",
+            toolCallId: "call-1",
+            toolName: "load_skill",
+            input: JSON.stringify({ id: "risk-review" }),
+          },
+          finish("tool-calls"),
+        ]),
+        reply(),
+      ],
+    });
+    model.current = mock;
+    const conversation = await run({ modelId: "mock", skillIds: ["risk-review"] });
+
+    expect(toolNames(mock, 0).sort()).toEqual(["html_render", "load_skill"]);
+    expect(JSON.stringify(mock.doStreamCalls[0]?.prompt)).toContain(
+      "- risk-review (Risk review): ",
+    );
+    expect(conversation[1]?.parts).toContainEqual(
+      expect.objectContaining({
+        type: "tool-load_skill",
+        state: "output-available",
+        output: expect.objectContaining({ id: "risk-review", name: "Risk review" }),
+      }),
+    );
+  });
 });
