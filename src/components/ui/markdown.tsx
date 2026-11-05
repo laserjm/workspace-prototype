@@ -31,13 +31,22 @@ import {
   markdownUrlTransform,
 } from "@/lib/markdown/plugins";
 import { splitMarkdownBlocks } from "@/lib/markdown/split-blocks";
+import {
+  tableSource,
+  tableToCsv,
+  tableToMarkdown,
+} from "@/lib/markdown/table";
 import { cn } from "@/lib/utils";
 import { CodeBlock } from "./code-block";
+import { CopyMenu } from "./copy-button";
 import { MathFormula } from "./math";
 import { MermaidDiagram } from "./mermaid-diagram";
 
 /** False for the block a reply is still streaming into, whose last fence may be unclosed. */
 const BlockSettled = createContext(true);
+
+/** The Markdown of the block being rendered, which hast positions index into. */
+const BlockSource = createContext("");
 
 /** The props react-markdown passes, without the hast node it adds for renderers that read it. */
 function withoutNode<P extends ExtraProps>(props: P): Omit<P, "node"> {
@@ -62,7 +71,7 @@ const heading = "mt-5 mb-2 font-semibold leading-snug text-foreground";
 
 // A link to a pull request, an issue or a file, set off from the text around it.
 const chip =
-  "inline-flex max-w-full items-center gap-1 rounded-md border border-border bg-muted/60 px-1.5 align-bottom text-xs leading-5 font-medium text-foreground no-underline [&>svg]:size-3 [&>svg]:shrink-0 [&>svg]:text-muted-foreground";
+  "inline-flex max-w-full items-center gap-1 rounded-md border border-border bg-muted/60 px-1.5 align-bottom whitespace-nowrap text-xs leading-5 font-medium text-foreground no-underline [&>svg]:size-3 [&>svg]:shrink-0 [&>svg]:text-muted-foreground";
 
 const components: Components = {
   h1: styled("h2", `text-xl ${heading}`),
@@ -89,13 +98,15 @@ const components: Components = {
   ),
   hr: styled("hr", "my-5 border-border"),
   strong: styled("strong", "font-semibold"),
+  // As in T3 Code: a cell wraps at words and is capped at 24rem, so a long path or URL wraps
+  // past the cap; a formula keeps its width and the table scrolls.
   th: styled(
     "th",
-    "border-b border-border px-2 py-1.5 text-start font-medium text-foreground first:ps-0 last:pe-0",
+    "max-w-96 border-b border-border px-2 py-1.5 text-start align-top font-medium text-pretty text-foreground wrap-break-word first:ps-0 last:pe-0 has-data-[slot=math]:max-w-none",
   ),
   td: styled(
     "td",
-    "border-b border-border/60 px-2 py-1.5 align-top first:ps-0 last:pe-0",
+    "max-w-96 border-b border-border/60 px-2 py-1.5 text-start align-top text-pretty wrap-break-word first:ps-0 last:pe-0 has-data-[slot=math]:max-w-none",
   ),
   a: function MarkdownLink({ node, className, href, children, ...rest }) {
     const file = filePathOf(href);
@@ -173,17 +184,36 @@ const components: Components = {
       </code>
     );
   },
-  table: function MarkdownTable(props) {
-    const { className, ...rest } = withoutNode(props);
+  table: function MarkdownTable({ node, className, ...rest }) {
+    const source = use(BlockSource);
     return (
-      <div className="my-3 max-w-full overflow-x-auto">
-        <table
-          {...rest}
-          className={cn(
-            "w-full border-collapse text-start text-xs [&_tbody_tr:last-child>td]:border-b-0",
-            className,
-          )}
-        />
+      <div data-slot="table" className="my-3">
+        <div className="max-w-full overflow-x-auto [scrollbar-width:thin]">
+          <table
+            {...rest}
+            className={cn(
+              // The message's wrap-anywhere would let columns shrink to a letter wide; a
+              // column is at least its longest word, and only wider tables scroll.
+              "w-full border-collapse text-start text-xs wrap-normal break-normal [&_tbody_tr:last-child>td]:border-b-0",
+              className,
+            )}
+          />
+        </div>
+        {node ? (
+          <div className="mt-0.5 flex justify-end select-none">
+            <CopyMenu
+              label="Copy table"
+              className="size-6"
+              formats={[
+                {
+                  label: "Copy as Markdown",
+                  text: () => tableSource(source, node) ?? tableToMarkdown(node),
+                },
+                { label: "Copy as CSV", text: () => tableToCsv(node) },
+              ]}
+            />
+          </div>
+        ) : null}
       </div>
     );
   },
@@ -201,13 +231,15 @@ const MarkdownBlock = memo(function MarkdownBlock({
 }) {
   return (
     <BlockSettled value={settled}>
-      <ReactMarkdown
-        remarkPlugins={lineBreaks ? markdownPluginsWithBreaks : markdownPlugins}
-        urlTransform={markdownUrlTransform}
-        components={components}
-      >
-        {text}
-      </ReactMarkdown>
+      <BlockSource value={text}>
+        <ReactMarkdown
+          remarkPlugins={lineBreaks ? markdownPluginsWithBreaks : markdownPlugins}
+          urlTransform={markdownUrlTransform}
+          components={components}
+        >
+          {text}
+        </ReactMarkdown>
+      </BlockSource>
     </BlockSettled>
   );
 });
