@@ -90,14 +90,12 @@ export function ThreadRow({
         >
           <span
             className={cn(
-              // thread-project-row: workspace.css sizes the SourceIcon here
-              // until it moves to utilities with the other source components.
-              "thread-project-row flex min-w-0 items-center gap-2 text-xs text-secondary-label",
+              "flex min-w-0 items-center gap-2 text-xs text-secondary-label",
               roomForActions,
             )}
           >
             {thread.scope ? (
-              <SourceIcon id={thread.scope.sourceId} />
+              <SourceIcon id={thread.scope.sourceId} size="xs" />
             ) : (
               <ProjectIcon />
             )}

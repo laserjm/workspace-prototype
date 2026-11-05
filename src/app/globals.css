@@ -137,6 +137,8 @@
 
   /* Floating surfaces that are not dialogs: menus, popovers, hover cards. */
   --shadow-popover: 0 12px 32px -12px rgb(0 0 0 / 19%);
+  /* The composer card: a soft lift off the canvas. */
+  --shadow-composer: 0 1px 3px rgb(0 0 0 / 4%), 0 1px 1px rgb(0 0 0 / 1%);
 
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);

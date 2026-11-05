@@ -467,11 +467,13 @@ export function WorkspaceShell({
 
             <main
               id="workspace-main"
-              // workspace-main and source-session stay as hooks while
-              // workspace.css still lays out the draft and the source session.
+              // source-session stays as a hook while workspace.css still lays
+              // out the conversation of a source session.
               className={cn(
-                "workspace-main group/main relative min-h-0 flex-1 outline-none",
-                activeThread?.scope && "source-session",
+                "group/main relative min-h-0 flex-1 outline-none",
+                activeThread?.scope && "source-session flex",
+                // A short window lets the new-thread draft scroll.
+                !activeThread && "short:overflow-y-auto",
               )}
               data-session={activeThread?.scope ? "source" : "plain"}
               data-source-panel={
@@ -480,7 +482,7 @@ export function WorkspaceShell({
               tabIndex={-1}
             >
               {!activeThread ? (
-                <div className="workspace-draft enterprise-draft">
+                <div className="absolute top-[47%] left-1/2 flex w-[min(var(--workspace-composer-width),calc(100%-4rem))] -translate-1/2 flex-col gap-5 max-desktop:w-[calc(100%-3rem)] max-md:top-[46%] max-md:w-[calc(100%-2rem)] max-md:gap-4 short:static short:mx-auto short:mt-7.5 short:mb-15 short:w-[min(var(--workspace-composer-width),calc(100%-2.5rem))] short:translate-none">
                   <NewThreadHeading
                     projectId={projectId}
                     projects={projects}
@@ -499,7 +501,7 @@ export function WorkspaceShell({
                     enabledSkills={enabledSkills}
                     onManageSkills={() => openSettings("skills")}
                   />
-                  <p className="draft-demo-note">
+                  <p className="mt-4 text-center text-2xs text-muted-foreground/70 max-md:text-3xs">
                     Explore with sample data. Live enterprise connections come
                     next.
                   </p>

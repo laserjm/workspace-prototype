@@ -6,6 +6,7 @@ import { useChat } from "@ai-sdk/react";
 import type { WorkspaceUIMessage } from "../contracts";
 import type { ModelChoice } from "../domain/model-choice";
 import type { Thread } from "../domain/thread";
+import { attachmentChipClassName } from "./attachment-chip";
 import { LiveResponse } from "./live-response";
 import { useChatStore, useConversationLoad } from "./use-chat-store";
 
@@ -145,7 +146,10 @@ function UserMessage({
     <div className="user-message">
       <p>{text}</p>
       {attachments?.map((name, index) => (
-        <span className="attachment-chip" key={`${name}-${index}`}>
+        <span
+          className={`${attachmentChipClassName} mt-2`}
+          key={`${name}-${index}`}
+        >
           <FileText size={14} />
           {name}
         </span>

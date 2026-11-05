@@ -1,9 +1,7 @@
 import { cn } from "@/lib/utils";
 import type { ModelProvider } from "../domain/thread";
 
-// `provider-icon` stays as a hook while workspace.css still resizes the icon
-// in the composer's model picker.
-const icon = "provider-icon size-4 shrink-0";
+const icon = "size-4 shrink-0";
 import { claudePath, openAIPath } from "./provider-paths";
 
 export function ProviderIcon({

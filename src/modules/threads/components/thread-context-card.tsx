@@ -75,10 +75,8 @@ export function ThreadContextCard({
       </div>
       {source && thread.scope ? (
         <div className="mt-3 border-t border-border pt-3">
-          {/* thread-context-source-heading: workspace.css sizes the SourceIcon
-              until it moves to utilities with the other source components. */}
-          <div className="thread-context-source-heading flex items-center gap-2">
-            <SourceIcon id={source.id} />
+          <div className="flex items-center gap-2">
+            <SourceIcon id={source.id} size="sm" />
             <strong className="font-medium text-accent-foreground">
               {source.name}
             </strong>
