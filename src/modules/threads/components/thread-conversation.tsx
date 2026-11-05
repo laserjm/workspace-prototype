@@ -62,6 +62,26 @@ export function ThreadConversation({
     observer.observe(layer);
     return () => observer.disconnect();
   }, []);
+  // "Forked from" opens the list and scrolls away with it, like T3 Code's
+  // parent-thread line.
+  const forkOrigin = thread.forkedFrom && (
+    <div className="flex shrink-0 items-center gap-1 overflow-hidden text-3xs whitespace-nowrap text-muted-foreground/70">
+      <GitFork size={12} />
+      <span>Forked from</span>
+      <button
+        type="button"
+        onClick={() => onOpenThread(thread.forkedFrom!.threadId)}
+        className="truncate rounded-xs text-slate-500 hover:underline dark:text-slate-400"
+      >
+        {thread.forkedFrom.title}
+      </button>
+      <span>· response {thread.forkedFrom.responseIndex + 1}</span>
+    </div>
+  );
+  const placed = shelfOf(thread) !== "active";
+  // Rows that stay put under the header. Without any, the list starts right
+  // under the header and fades out beneath it.
+  const hasTopRows = placed || Boolean(source && thread.scope);
   // The rows above and below the message list reserve the same scrollbar
   // gutters as the list, so all three lanes resolve to one width even where
   // the browser draws classic (space-taking) scrollbars.
@@ -72,72 +92,59 @@ export function ThreadConversation({
   return (
     <div
       ref={conversationRef}
-      className={cn(
-        "relative flex h-full min-w-0 flex-1 flex-col",
-        !thread.scope && "pt-25 max-md:pt-42",
-      )}
+      className="relative flex h-full min-w-0 flex-1 flex-col"
     >
-      <div className={gutters}>
-        <div className={lane}>
-          {shelfOf(thread) !== "active" && (
-            <div className="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-2 rounded-md border border-border px-3 py-2 text-xs text-muted-foreground">
-              <span>
-                {thread.snoozedUntil
-                  ? `Snoozed until ${formatWakeTime(thread.snoozedUntil)}`
-                  : "This session is settled."}
-              </span>
-              <button
-                type="button"
-                onClick={onRestore}
-                className="font-medium text-secondary-foreground"
-              >
-                {thread.snoozedUntil ? "Wake now" : "Return to active"}
-              </button>
-            </div>
-          )}
-          {thread.forkedFrom && (
-            <div className="flex shrink-0 items-center gap-1 overflow-hidden pt-3 text-3xs whitespace-nowrap text-muted-foreground/70">
-              <GitFork size={12} />
-              <span>Forked from</span>
-              <button
-                type="button"
-                onClick={() => onOpenThread(thread.forkedFrom!.threadId)}
-                className="truncate rounded-xs text-slate-500 hover:underline dark:text-slate-400"
-              >
-                {thread.forkedFrom.title}
-              </button>
-              <span>· response {thread.forkedFrom.responseIndex + 1}</span>
-            </div>
-          )}
-          {source && thread.scope && (
-            <div className="flex shrink-0 items-center gap-2.5 border-b border-border/60 py-4 max-md:py-3">
-              <SourceIcon id={source.id} size="md" iconClassName="size-4" />
-              <div className="min-w-0">
-                <strong className="block truncate text-xs font-medium text-accent-foreground max-md:max-w-47.5 max-md:text-2xs">
-                  {source.collection}
-                </strong>
-                <span className="mt-0.5 block text-3xs text-secondary-label">
-                  {recordCountLabel(source, thread.scope.recordIds.length)} ·
-                  Read-only sample snapshot
+      {hasTopRows && (
+        <div className={gutters}>
+          <div className={lane}>
+            {placed && (
+              <div className="mt-3 flex shrink-0 flex-wrap items-center justify-between gap-2 rounded-md border border-border px-3 py-2 text-xs text-muted-foreground">
+                <span>
+                  {thread.snoozedUntil
+                    ? `Snoozed until ${formatWakeTime(thread.snoozedUntil)}`
+                    : "This session is settled."}
                 </span>
+                <button
+                  type="button"
+                  onClick={onRestore}
+                  className="font-medium text-secondary-foreground"
+                >
+                  {thread.snoozedUntil ? "Wake now" : "Return to active"}
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={onViewSource}
-                className="ml-auto flex shrink-0 items-center gap-1 rounded-sm p-1 text-3xs text-secondary-label hover:text-foreground"
-              >
-                View source <ChevronDown size={12} />
-              </button>
-            </div>
-          )}
+            )}
+            {source && thread.scope && (
+              <div className="flex shrink-0 items-center gap-2.5 border-b border-border/60 py-4 max-md:py-3">
+                <SourceIcon id={source.id} size="md" iconClassName="size-4" />
+                <div className="min-w-0">
+                  <strong className="block truncate text-xs font-medium text-accent-foreground max-md:max-w-47.5 max-md:text-2xs">
+                    {source.collection}
+                  </strong>
+                  <span className="mt-0.5 block text-3xs text-secondary-label">
+                    {recordCountLabel(source, thread.scope.recordIds.length)} ·
+                    Read-only sample snapshot
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={onViewSource}
+                  className="ml-auto flex shrink-0 items-center gap-1 rounded-sm p-1 text-3xs text-secondary-label hover:text-foreground"
+                >
+                  View source <ChevronDown size={12} />
+                </button>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
       <ThreadMessages
         key={`conversation:${thread.id}`}
         thread={thread}
         models={models}
         onFork={onFork}
         laneClassName={lane}
+        fadeTop={!hasTopRows}
+        leading={forkOrigin}
       />
       {/* Over the list's end: messages fade out in a short strip above the
           composer, then pass behind a solid backdrop. Only the composer

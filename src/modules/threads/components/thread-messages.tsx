@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useLayoutEffect, useRef } from "react";
+import { Fragment, useLayoutEffect, useRef, type ReactNode } from "react";
 import { FileText } from "lucide-react";
 import { useChat } from "@ai-sdk/react";
 import { cn } from "@/lib/utils";
@@ -25,12 +25,18 @@ export function ThreadMessages({
   models,
   onFork,
   laneClassName,
+  fadeTop,
+  leading,
 }: {
   thread: Thread;
   models: ModelChoice[];
   onFork: (target: ForkTarget) => void;
   /** The centred column the messages sit in; the list scrolls across the full width. */
   laneClassName: string;
+  /** Nothing stays put above the list: it starts under the header and fades out there. */
+  fadeTop: boolean;
+  /** The first row of the list, which scrolls away with the messages. */
+  leading?: ReactNode;
 }) {
   const store = useChatStore();
   const load = useConversationLoad(thread.id);
@@ -81,6 +87,7 @@ export function ThreadMessages({
       className={cn(
         "min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable_both-edges]",
         thread.scope && "overscroll-contain [scrollbar-width:thin]",
+        fadeTop && "scroll-fade-top",
       )}
       ref={scrollRef}
       onScroll={(event) => {
@@ -95,11 +102,15 @@ export function ThreadMessages({
         // The end reserves the floating composer's height (--composer-height,
         // set by ThreadConversation), so the last message stops above it.
         className={cn(
-          "flex flex-col gap-6 pt-6 pb-(--composer-height)",
-          thread.scope && "gap-5.5 pt-6.5 max-md:pt-5.5",
+          // Under a fading top the first row starts below the fade (1.5rem);
+          // under a fixed row, a short gap is enough.
+          "flex flex-col gap-6 pb-(--composer-height)",
+          fadeTop ? "pt-6" : "pt-4 max-md:pt-3",
+          thread.scope && "gap-5.5",
           laneClassName,
         )}
       >
+        {leading}
         {messages.map((message, index) => {
           if (message.role === "user") {
             const reply = messages[index + 1];
