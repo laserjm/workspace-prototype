@@ -6,6 +6,8 @@ const nextConfig: NextConfig = {
   partialPrefetching: true,
   turbopack: {
     rules: {
+      // Prompts and skills are Markdown, imported as their text (src/markdown.d.ts).
+      "*.md": { type: "text" },
       "*.css": {
         loaders: ["@tailwindcss/turbopack"],
         as: "*.css",

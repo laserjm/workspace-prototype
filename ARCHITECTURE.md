@@ -242,7 +242,13 @@ The `agent` module is the runtime AI, flat by file:
   (unknown ids are `NotFound`, answered with a 400), so the prompt only ever holds what the
   server offers.
 - `models.ts`: the model allowlist with gateway ids, and `listModelChoices` for the composer.
-- `instructions.ts`: the base instructions, then the skill, then the attached records.
+- `instructions/*.md`: the prompt as Markdown, so it reads and diffs as text: `workspace.md`
+  (who the agent is, how it answers) and `formatting.md` (Mermaid, math, tables, when to call
+  `html_render`). A `.md` file imports as its text: Turbopack's `text` module type
+  (`next.config.ts`) bundles it into the server code, so nothing is read from disk at runtime;
+  the `markdownAsText` plugin does the same in Vitest, and `src/markdown.d.ts` types it.
+- `instructions.ts`: the two files, then the skill, then the attached records. The records stay
+  TypeScript, because they are built from data.
 - `tools.ts`: every tool the model can call. Stored conversations hold the tool names and every
   send validates the whole conversation against this set, so a tool is never renamed and a
   removed one keeps a stub under its name.

@@ -18,7 +18,7 @@ import type {
   WorkspaceMessageMetadata,
   WorkspaceUIMessage,
 } from "./contracts";
-import { instructionsFor, workspaceInstructions } from "./instructions";
+import { baseInstructions, instructionsFor } from "./instructions";
 import { models, type AgentModel } from "./models";
 import { tools } from "./tools";
 
@@ -46,7 +46,7 @@ const workspaceAgent = new ToolLoopAgent({
   id: "workspace",
   // Replaced on every call; required by the constructor.
   model: models[0]!.gateway,
-  instructions: workspaceInstructions,
+  instructions: baseInstructions,
   tools,
   // Lets the model call html_render and then write its reply.
   stopWhen: stepCountIs(5),
