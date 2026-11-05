@@ -23,7 +23,7 @@ export type ThreadPlacement = {
 export type ThreadShelf = "active" | "snoozed" | "settled";
 
 /**
- * Sidebar and session metadata. Conversation content lives in the thread's chat. `projectId`
+ * Sidebar and session metadata. The conversation is stored apart, in the thread's messages. `projectId`
  * refers to a project of the projects module; null: the thread has no project.
  */
 export type Thread = ThreadPlacement & {

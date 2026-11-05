@@ -4,16 +4,28 @@ import {
   err,
   notFound,
   type NotFound,
+  type OwnerRequester,
   type ValidationFailed,
 } from "@conventions/nextjs/core";
 import type { Skill } from "@/modules/skills";
 import type { Source } from "@/modules/sources";
 import type { ChatTurnDto } from "../contracts";
-import type { AttachedRecords, GatewayModel, ResponseAgent } from "./ports";
+import {
+  withLatestMessage,
+  type ConversationMessage,
+} from "../domain/conversation";
+import type {
+  AttachedRecords,
+  GatewayModel,
+  ResponseAgent,
+  ThreadRepository,
+} from "./ports";
 
 export type AnswerThreadInput = ChatTurnDto & { signal?: AbortSignal };
 
 export type AnswerThreadDeps = {
+  requester: OwnerRequester;
+  threads: ThreadRepository;
   models: readonly GatewayModel[];
   skills: readonly Skill[];
   sources: readonly Source[];
@@ -21,15 +33,17 @@ export type AnswerThreadDeps = {
 };
 
 /**
- * Answers the latest message of a thread. The request names the model, skill and records by
- * id; they are resolved here, so the prompt only ever holds what the server offers.
+ * Answers the latest message of one of the requester's threads and stores the conversation once
+ * the reply ends. The request names the model, skill and records by id; they are resolved here,
+ * so the prompt only ever holds what the server offers. The conversation before the message is
+ * the stored one, not the browser's.
  */
 export const answerThread = defineUseCase<
   AnswerThreadInput,
   Response,
   NotFound | ValidationFailed,
   AnswerThreadDeps
->(async (input, { models, skills, sources, agent }) => {
+>(async (input, { requester, threads, models, skills, sources, agent }) => {
   const model = models.find((item) => item.id === input.modelId);
   if (!model) return err(notFound("Model", input.modelId));
 
@@ -51,11 +65,18 @@ export const answerThread = defineUseCase<
       attached = { source, records, recordCount: recordIds.length };
   }
 
+  // Another user's thread is answered like a missing one: its id reveals nothing.
+  const { ownerId } = requester;
+  const thread = await threads.findById(ownerId, input.id);
+  if (!thread) return err(notFound("Thread", input.id));
+  const stored = await threads.listMessages(ownerId, thread.id);
+
   return agent.answer({
     model,
     skill,
     attached,
-    messages: input.messages,
+    messages: withLatestMessage<ConversationMessage>(stored, input.message),
     signal: input.signal,
+    onEnd: (messages) => threads.saveMessages(ownerId, thread.id, messages),
   });
 });

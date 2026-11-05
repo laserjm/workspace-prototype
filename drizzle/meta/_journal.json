@@ -15,6 +15,20 @@
       "when": 1793867809000,
       "tag": "0001_create-projects-and-threads",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793871194156,
+      "tag": "0002_add-thread-forks",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793871194649,
+      "tag": "0003_create-thread-messages",
+      "breakpoints": true
     }
   ]
 }

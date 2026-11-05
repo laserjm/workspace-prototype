@@ -1,5 +1,7 @@
 import "server-only";
 import type { OwnerRequester } from "@conventions/nextjs/core";
+import { z } from "zod";
+import type { WorkspaceUIMessage } from "./contracts";
 import type { ModelChoice } from "./domain/model-choice";
 import type { Thread } from "./domain/thread";
 import { aiGatewayModelCatalog } from "./infra/ai-gateway.model-catalog";
@@ -10,6 +12,18 @@ export async function listThreads(
   requester: OwnerRequester,
 ): Promise<Thread[]> {
   return threadRepository.listByOwner(requester.ownerId);
+}
+
+/**
+ * The conversation of one of the signed-in user's threads, in order. Empty for a thread they do
+ * not have, as for one without messages, and for an id that is not a thread's.
+ */
+export async function listThreadMessages(
+  requester: OwnerRequester,
+  threadId: string,
+): Promise<WorkspaceUIMessage[]> {
+  if (!z.uuid().safeParse(threadId).success) return [];
+  return threadRepository.listMessages(requester.ownerId, threadId);
 }
 
 /** The models the composer offers, without their gateway ids. */

@@ -1,4 +1,4 @@
 import "server-only";
 
-export { answerThread, startThread } from "./commands";
-export { listModelChoices, listThreads } from "./queries";
+export { answerThread, forkThread, startThread } from "./commands";
+export { listModelChoices, listThreadMessages, listThreads } from "./queries";

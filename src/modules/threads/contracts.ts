@@ -34,14 +34,27 @@ export const startThreadInputSchema = z.object({
 export type StartThreadInput = z.infer<typeof startThreadInputSchema>;
 
 /**
- * The POST body of /api/chat. `id` and `messages` come from the AI SDK chat transport; the
- * messages are validated separately against the agent's tools.
+ * The POST body of /api/chat: the thread's id and its latest message, which the AI SDK chat
+ * transport sends (`prepareSendMessagesRequest` in `ChatStore`). The server holds the rest of the
+ * conversation, so a browser cannot rewrite it. The message is validated with the conversation
+ * against the agent's tools.
  */
 export const chatTurnDtoSchema = chatOptionsSchema.extend({
-  id: z.string().min(1).max(200),
-  messages: z.array(z.unknown()).min(1).max(200),
+  id: z.uuid(),
+  message: z.looseObject({
+    id: z.string().min(1).max(200),
+    role: z.literal("user"),
+  }),
 });
 export type ChatTurnDto = z.infer<typeof chatTurnDtoSchema>;
+
+/** A fork of `fromThreadId` through one of its responses. `id` is the fork's, picked by the browser. */
+export const forkThreadInputSchema = z.object({
+  fromThreadId: z.uuid(),
+  id: z.uuid(),
+  throughMessageId: z.string().min(1).max(200),
+});
+export type ForkThreadInput = z.infer<typeof forkThreadInputSchema>;
 
 /** The `html_render` tool: the model shows a self-contained HTML page above its reply. */
 export const htmlRenderInputSchema = z.object({

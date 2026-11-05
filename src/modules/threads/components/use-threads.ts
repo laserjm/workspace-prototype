@@ -3,12 +3,11 @@
 import { useState } from "react";
 import type { Result } from "@conventions/nextjs/core";
 import type { SnoozeTimeInPast, ThreadStillWorking } from "../domain/errors";
-import { startThreadAction } from "../actions";
+import { forkThreadAction, startThreadAction } from "../actions";
 import type { StartThreadInput } from "../contracts";
 import {
   acknowledgeWake,
   continueThread,
-  forkThread,
   restore,
   settle,
   snooze,
@@ -20,8 +19,8 @@ import {
 import { useSnoozeWake } from "./use-snooze-wake";
 
 /**
- * The user's threads in this browser. A new thread is stored on the server first. Settle,
- * snooze, wake and fork are not stored yet: they go through a domain function and last for the
+ * The user's threads in this browser. A new thread and a fork are stored on the server first.
+ * Settle, snooze and wake are not stored yet: they go through a domain function and last for the
  * session. Conversations live in the `ChatStore`; `working` comes from there.
  */
 export function useThreads(initialThreads: Thread[]) {
@@ -90,15 +89,23 @@ export function useThreads(initialThreads: Thread[]) {
       return result;
     },
 
-    forkThread(thread: Thread, responseIndex: number) {
-      const fork = forkThread(
-        thread,
-        responseIndex,
-        crypto.randomUUID(),
-        new Date(),
-      );
-      setThreads((previous) => [fork, ...previous]);
-      return fork;
+    /**
+     * Stores a fork through response `throughMessageId`, then lists it. Null when the server
+     * refused (the response is not stored yet) or could not be reached.
+     */
+    async forkThread(
+      thread: Thread,
+      throughMessageId: string,
+    ): Promise<Thread | null> {
+      const result = await forkThreadAction({
+        fromThreadId: thread.id,
+        id: crypto.randomUUID(),
+        throughMessageId,
+      }).catch(() => undefined);
+      const forked = result?.data;
+      if (!forked?.ok) return null;
+      setThreads((previous) => [forked.value, ...previous]);
+      return forked.value;
     },
   };
 }
