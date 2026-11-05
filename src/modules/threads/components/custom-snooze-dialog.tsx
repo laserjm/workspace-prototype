@@ -37,7 +37,7 @@ export function CustomSnoozeDialog({
         if (!open) onClose();
       }}
     >
-      <DialogContent className="custom-snooze-dialog">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto wrap-anywhere">
         <DialogHeader>
           <DialogTitle>Custom snooze</DialogTitle>
           <DialogDescription>
@@ -70,7 +70,10 @@ export function CustomSnoozeDialog({
             onSnooze(until.value.toISOString());
           }}
         >
-          <div className="snooze-mode-picker" aria-label="Snooze schedule">
+          <div
+            className="flex gap-1 rounded-md bg-accent p-1 [&>button]:flex-1 [&>button]:rounded-sm [&>button]:p-1.5 [&>button]:text-xs [&>button]:text-secondary-label [&>button]:aria-pressed:bg-card [&>button]:aria-pressed:text-secondary-foreground [&>button]:aria-pressed:shadow-xs"
+            aria-label="Snooze schedule"
+          >
             <button
               type="button"
               aria-pressed={mode === "date"}
@@ -125,11 +128,11 @@ export function CustomSnoozeDialog({
             </>
           )}
           {error && (
-            <p role="alert" className="snooze-error">
+            <p role="alert" className="text-xs text-destructive-foreground">
               {error}
             </p>
           )}
-          <div className="snooze-dialog-actions">
+          <div className="mt-1.5 flex justify-end gap-1.5">
             <Button type="button" variant="ghost" onClick={onClose}>
               Cancel
             </Button>

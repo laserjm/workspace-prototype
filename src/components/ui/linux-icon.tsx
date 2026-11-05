@@ -9,7 +9,7 @@ export function LinuxIcon() {
       aria-hidden
       viewBox="-2 -2 28 28"
       fill="currentColor"
-      className="provider-icon"
+      className="provider-icon size-4 shrink-0"
     >
       <path d={linuxPath} />
     </svg>
