@@ -4,14 +4,60 @@ A connected-workspace prototype built with Next.js App Router, TypeScript, Tailw
 
 ## Development
 
-Use Node.js 20.9 or newer and pnpm.
+Use Node.js 20.9 or newer, pnpm and Docker.
 
 ```sh
 pnpm install
+cp .env.example .env.local   # then fill in AI_GATEWAY_API_KEY and BETTER_AUTH_SECRET
+pnpm stack:up                # Postgres and Keycloak, waits until both are healthy
+pnpm db:migrate              # applies drizzle/ to the workspace database
 pnpm dev
 ```
 
-Open [localhost:3000](http://localhost:3000).
+Open [localhost:3000](http://localhost:3000). It sends you to Keycloak; sign in as `alice` /
+`alice` or `bob` / `bob`.
+
+### Sign-in
+
+Users are created in Keycloak, never in the app: the admin console (Users → Create user, then
+Credentials → Set password with "Temporary" off) is the only way to add one. Their first sign-in
+creates their row in `users`, whose id is their Keycloak `sub`. The sign-out button in the
+sidebar ends the session here and in Keycloak. How it fits together is in
+[ARCHITECTURE.md](ARCHITECTURE.md) ("Sign-in"), and why Better Auth is in
+[docs/adr/0001](docs/adr/0001-auth-library-for-keycloak-sign-in.md).
+
+### Local stack
+
+`compose.yaml` runs Postgres 17 and Keycloak 26 (dev mode). The defaults need no `.env`; put
+overrides (ports, passwords) in a `.env` file next to `compose.yaml`, see `.env.example`.
+
+| Service | Address | Credentials |
+| --- | --- | --- |
+| Postgres, app database | `localhost:5433/workspace` | `workspace` / `workspace` |
+| Postgres, Keycloak's database | `localhost:5433/keycloak` | `keycloak` / `keycloak` |
+| Keycloak admin console | [localhost:8080/admin](http://localhost:8080/admin) | `admin` / `admin` |
+| Keycloak realm `workspace`, client `workspace-web` | `http://localhost:8080/realms/workspace` | users `alice` / `alice`, `bob` / `bob` |
+
+The realm is imported from `docker/keycloak/realms/workspace-realm.json`; that folder's README
+describes the client and users and how to export changes made in the admin console.
+
+```sh
+pnpm stack:down     # stop; data stays in the postgres-data volume
+pnpm stack:reset    # stop and delete the volume; the next start re-creates both databases
+```
+
+### Database
+
+The schema is code-first with Drizzle: tables live in `src/lib/db/schema.ts`. After a change,
+generate the migration and apply it:
+
+```sh
+pnpm db:generate --name create-threads   # writes drizzle/NNNN_create-threads.sql
+pnpm db:migrate
+pnpm db:studio                           # browse the data
+```
+
+Never edit a generated migration; CI fails when `schema.ts` and `drizzle/` disagree.
 
 ## Checks and production
 
@@ -45,7 +91,7 @@ New sample responses have a short, measured 2.4-second preparation phase so the 
 
 On smaller screens, **View source** and citations open the explorer in an accessible drawer. Closing it returns to the conversation.
 
-Conversations, including settle and snooze state, are kept in memory for the current session; refreshing resets them. Skill activation and the source panel width persist in browser storage. These are fictional, bundled sample records: no enterprise APIs are called, no external systems are changed, and responses are deterministic summaries, risk lists, or next steps derived from the selected records. Other prompts show an explanatory sample-summary fallback. The model and permission controls are demo preferences. File attachments are held in the browser and only their names are added to a thread; files are not uploaded, parsed, or used in responses. Live authentication, fetches, AI responses, and saved sessions are future integration work.
+Conversations, including settle and snooze state, are kept in memory for the current session; refreshing resets them. Skill activation and the source panel width persist in browser storage. These are fictional, bundled sample records: no enterprise APIs are called, no external systems are changed, and responses are deterministic summaries, risk lists, or next steps derived from the selected records. Other prompts show an explanatory sample-summary fallback. The model and permission controls are demo preferences. File attachments are held in the browser and only their names are added to a thread; files are not uploaded, parsed, or used in responses. Fetches and saved sessions are future integration work.
 
 ### Settle, snooze, and preview sessions
 

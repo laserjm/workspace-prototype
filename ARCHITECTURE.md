@@ -6,11 +6,12 @@ conventions: 0.3.0
 profile: nextjs
 bindings: [drizzle, zod, next-safe-action]   # plain Postgres: no database-platform binding
 app-root: src
-# schema-source: code-first      # decided with the first table, together with the database rulesets
+schema-source: code-first        # src/lib/db/schema.ts generates the migrations in drizzle/
 isolation: owner                 # each signed-in user owns their threads, projects and preferences
-# Adopted now. auth, cache, database, drizzle and next-safe-action follow with the backend.
-rulesets: [structure, layers, naming, types, errors, rich, cross-module, testing, zod, migration]
+# Adopted now. cache and next-safe-action follow (no cache tags or actions yet).
+rulesets: [structure, layers, naming, types, errors, rich, cross-module, testing, zod, migration, database, drizzle, auth]
 legacy: []
+migrations: drizzle/*.sql        # what `conventions check` replays for the inventory (NX-DB-02)
 ```
 
 This app follows the Next.js Architecture Rules, Naming Conventions and Testing Policy of the
@@ -19,8 +20,9 @@ rule. This file records how this project reads the rules where they leave room, 
 deviation (NX-MIG-04). Each entry says what was decided and where it is enforced or recorded.
 **Add an entry before you deviate; change one only with the decision that changes it.**
 
-Related: `docs/architecture/db-inventory.md` (every database function and trigger; empty until
-the database exists), `modules/*/MIGRATING.md` (half-migrated modules).
+Related: `docs/adr/` (why and in what order), `docs/architecture/db-inventory.md` (every
+database function and trigger; empty until the database exists), `modules/*/MIGRATING.md`
+(half-migrated modules).
 
 ## Interpretations
 
@@ -32,6 +34,39 @@ the package root.
 **Enforced by.** `tsconfig.json` paths; the `app-root` key above.
 **Recorded in.** This entry.
 
+### Local stack: Docker Compose with Postgres and Keycloak
+
+**Decision.** `compose.yaml` runs the stack the app develops against: Postgres 17 and Keycloak
+26 in dev mode (`start-dev`). One Postgres server holds two databases with their own roles:
+`workspace`, the app's, which `drizzle/` migrates, and `keycloak`, which only Keycloak writes
+(`docker/postgres/initdb/10-keycloak.sh` creates it on the first start of an empty volume).
+Host ports are 5433 (Postgres) and 8080 (Keycloak), overridable in `.env`. Keycloak's issuer is
+`http://localhost:8080/realms/<realm>` for the browser and the Next.js server alike
+(`KC_HOSTNAME`). Realm exports in `docker/keycloak/realms/` are imported on start, so a
+configured realm is reproducible from the repository. The app's realm is `workspace`: one
+confidential client, `workspace-web` (authorization code with PKCE, no direct grants), no
+self-registration, no roles, and development users with fixed ids, so a user's `sub` is the
+same after every reset. Its only redirect URI is `http://localhost:3000/api/auth/callback/keycloak`,
+and its post-logout URI is `http://localhost:3000/`. `pnpm stack:up|down|reset` drive it.
+Integration tests (NX-TEST-03) will pass `describeIntegration` a probe for this stack instead
+of the default `supabase status`.
+**Enforced by.** The compose health checks (`pnpm stack:up` waits for both).
+**Recorded in.** This entry; `.env.example`.
+
+### Schema source: code-first with Drizzle
+
+**Decision.** `schema-source: code-first` (NX-DB-01). Tables and enums are declared in
+`lib/db/schema.ts` (NX-DRZ-04, `<nouns>Table`, `<noun>StatusEnum`); `pnpm db:generate --name
+<verb>-<what>` writes the SQL migration to `drizzle/` and `pnpm db:migrate` applies it. The
+migrations are never edited by hand. `lib/db/client.ts` is the profile's starter on postgres.js,
+with prepared statements on because the app connects to Postgres directly, not through a
+transaction pooler. `withTransaction` keeps the default statement timeouts (NX-DRZ-05: 8 s
+interactive, 5 min system). The first tables are the sign-in's four.
+**Enforced by.** CI (`drizzle-kit check`, and `drizzle-kit generate` must leave `drizzle/`
+unchanged); `conventions check` (`inventory`, reading `drizzle/*.sql` per the `migrations` key);
+`boundaries/external` (NX-DRZ-01).
+**Recorded in.** This entry.
+
 ### Data ownership
 
 **Decision.** `isolation: owner`. Each signed-in user owns their threads, projects and skill
@@ -39,10 +74,13 @@ preferences; there are no shared workspaces. The enterprise source catalogue and
 catalogue are shared data (NX-AUTH-05). Shared workspaces, such as a team seeing each other's
 threads or source connections configured once per organisation, would make this a `tenant`
 app, recorded here as a migration.
-**Enforced by.** Nothing yet: there are no owned tables. `conventions check` (`owner-id-type`,
-`isolation-test`) and `tsc` take over with the first repository on owned data, together with
-the `auth` and `database` rulesets.
-**Recorded in.** This entry.
+The owner is the signed-in Keycloak user: `ownerId` is their `sub`, which is also `users.id`
+(see the sign-in). The four sign-in tables are Better Auth's, not owned data the app reads; there
+is no owned table yet.
+**Enforced by.** `OwnerId` from `lib/auth/requester.ts` and `tsc` through the brand.
+`conventions check` (`owner-id-type`, `isolation-test`) takes over with the first repository on
+owned data.
+**Recorded in.** This entry; `lib/auth/requester.ts`.
 
 ### Modules
 
@@ -65,9 +103,52 @@ title, breadcrumb, board view, list label) is data on the source, not a branch o
 **Enforced by.** `boundaries/element-types`.
 **Recorded in.** This entry.
 
-### No database or sign-in yet: sample data and client-side session state
+### Sign-in: Better Auth against Keycloak
 
-**Decision.** The prototype has no database or auth. Read-only sample data (sources and their
+**Decision.** `docs/adr/0001` chose Better Auth 1.7 with only the `genericOAuth` plugin and its
+`keycloak()` helper. Users are created in Keycloak; there is no sign-up, password or profile
+editing in the app. A user's first sign-in creates their `users` row, and every sign-in refreshes
+name and email from Keycloak.
+
+- **One place.** `lib/auth/` is the only importer of `better-auth`. `auth.ts` builds the instance
+  lazily on `db()` (NX-TYPE-06). `requester.ts` turns the session into an `OwnerRequester`.
+  `handlers.ts` serves the routes. `session-cookie.ts` is the proxy's cookie check. The settings
+  are validated in `lib/env.ts`.
+- **`ownerId` is the Keycloak `sub`.** Better Auth drops the provider's id when it creates a
+  user. `mapProfileToUser` therefore copies `sub` into `users.keycloak_sub`, and the
+  `user.create.before` hook makes it `users.id`. The `users_id_is_keycloak_sub` check keeps the
+  two equal. The realm's users have fixed ids, so a user's `ownerId` survives `pnpm stack:reset`.
+  Account linking is off: a user deleted and re-created in Keycloak gets a new `sub` and cannot
+  take over the old row by email.
+- **Tables.** `users`, `sessions`, `accounts` and `verifications` are declared in
+  `lib/db/schema.ts` and migrated by `drizzle/0000_create-auth-tables.sql`. Sessions live in
+  Postgres (7 days), and signing out deletes the row. The cookie cache stays off. Keycloak's
+  access and refresh tokens are stored encrypted with `BETTER_AUTH_SECRET`, and Better Auth
+  refreshes them when they expire. OAuth state, the PKCE verifier and the nonce live in
+  `verifications`, not in a cookie.
+- **Routes.**
+  - `GET /sign-in?returnTo=` starts the code flow with PKCE. `returnTo` must stay on the app's
+    origin (`sameOriginPath`).
+  - `/api/auth/*` is Better Auth's handler; the Keycloak callback is
+    `/api/auth/callback/keycloak`.
+  - `POST /sign-out` deletes the session and ends the Keycloak session (RP-initiated logout with
+    `id_token_hint`), then returns to `/`.
+  - `/update-user`, `/change-email` and `/delete-user` are disabled.
+- **Who checks what.** `proxy.ts` checks only that a session cookie exists, the optimistic check
+  Next.js recommends for Proxy. Without one, a page goes to `/sign-in` and `/api/*` gets 401. The
+  real check is `getRequester()` next to the data: `app/(workspace)/page.tsx` redirects a visitor
+  whose session has ended, and `/api/chat` answers 401. `lib/safe-action.ts` builds the action
+  clients on the same `getRequester()`; there is no action yet.
+
+**Enforced by.** The `auth` ruleset (NX-AUTH-01: only `app/`, `lib/` and `queries.ts` import
+the requester); `boundaries/external`. The check constraint `users_id_is_keycloak_sub`. Better
+Auth's startup schema check, which refuses to run when `schema.ts` and its fields disagree.
+**Recorded in.** This entry; `docs/adr/0001-auth-library-for-keycloak-sign-in.md`.
+
+### No owned tables yet: sample data and client-side session state
+
+**Decision.** Users sign in and their identity is stored (see the sign-in), but threads,
+projects and preferences are not stored yet. Read-only sample data (sources and their
 records, skills, seed threads with their sample turn, projects) lives in each module's
 `infra/sample.*.ts` adapter. It is read through `queries.ts` and `server.ts` in
 `app/(workspace)/page.tsx`, a server component. The catalogues reach the browser through
@@ -79,19 +160,18 @@ applies them. Live conversations live in the `ChatStore`, one AI SDK `Chat` per 
 for the session. Skill activation and the source panel width persist in `localStorage`; the
 stored skill ids are parsed with `storedSkillIdsSchema` (NX-TYPE-03).
 
-With the database, the sample adapters become repositories with integration tests
-(NX-TEST-02), the session writes become use cases wired in `commands.ts`, and the starters
-`conventions init` writes (`lib/env.ts`, `lib/safe-action.ts`, `lib/db/client.ts`,
-`lib/auth/requester.ts`) come back. They were removed in the first commit because nothing uses
-them yet.
+With the first owned tables, the sample adapters become repositories on `ownerId` with
+integration tests (NX-TEST-02, NX-AUTH-03), and the session writes become use cases wired in
+`commands.ts`. The four starters that `conventions init` writes are back: `lib/env.ts`,
+`lib/safe-action.ts`, `lib/db/client.ts` and `lib/auth/requester.ts`.
 **Enforced by.** `boundaries/element-types` (components never import `infra/` or `queries.ts`);
 the `server-only` import in every `queries.ts`, `commands.ts` and `server.ts`.
 **Recorded in.** This entry.
 
 ### Answers come from the Vercel AI Gateway
 
-**Decision.** `POST /api/chat` (`app/api/chat/route.ts`) only hands the body to
-`answerThread` from `modules/threads/server.ts`. `modules/threads/commands.ts` validates it
+**Decision.** `POST /api/chat` (`app/api/chat/route.ts`) only reads the requester and hands it
+and the body to `answerThread` from `modules/threads/server.ts`. `modules/threads/commands.ts` validates it
 with `chatTurnDtoSchema` at the edge and runs the use case `application/answer-thread.ts`.
 The use case resolves the model, skill and records from their ids against the server's
 catalogues (unknown ids are `NotFound`, answered with a 400) and asks the `ResponseAgent`
@@ -99,9 +179,10 @@ port to stream. `infra/ai-gateway.response-agent.ts` implements the port with an
 `ToolLoopAgent` on the gateway, with the instructions in `infra/ai-gateway.instructions.ts`,
 the model allowlist in `infra/ai-gateway.model-catalog.ts` and the `html_render` tool in
 `infra/ai-sdk.html-render-tool.ts`. The tool's input and output schemas are in
-`contracts.ts`, so the browser's message types never import `infra/`. There is no sign-in, so
-the command takes no `Requester` yet (NX-LAYER-11); it becomes the first argument with the
-`auth` ruleset. The frame that shows an `html_render` page is feature-agnostic and lives in
+`contracts.ts`, so the browser's message types never import `infra/`. The route reads the
+requester and answers 401 without one. The command takes it as its first argument
+(NX-LAYER-11). It decides nothing yet, because threads are not stored, and reaches the use case
+with the first owned thread. The frame that shows an `html_render` page is feature-agnostic and lives in
 `components/ui/html-render-*.tsx`; the helpers both sides share are in `lib/html-render/`.
 **Enforced by.** `conventions check` (`use-case-test`, `rich-shape`), `boundaries/element-types`,
 `boundaries/external` (the ORM-free, framework-free `application/`).

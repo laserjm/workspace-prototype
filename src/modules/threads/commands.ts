@@ -1,6 +1,7 @@
 import "server-only";
-// The module's use cases wired to what they run on (NX-LAYER-11). There is no sign-in yet, so
-// no Requester; it becomes the first argument with the auth ruleset (see ARCHITECTURE.md).
+// The module's use cases wired to what they run on (NX-LAYER-11), each taking the Requester its
+// caller signed in as first.
+import type { OwnerRequester } from "@conventions/nextjs/core";
 import { listSkills } from "@/modules/skills/server";
 import { listSources } from "@/modules/sources/server";
 import { answerThread as answer } from "./application/answer-thread";
@@ -12,8 +13,16 @@ function badRequest(error: string) {
   return Response.json({ error }, { status: 400 });
 }
 
-/** POST /api/chat: validates the body at the edge, then streams the thread's next response. */
-export async function answerThread(body: unknown, signal?: AbortSignal) {
+/**
+ * POST /api/chat: validates the body at the edge, then streams the thread's next response.
+ * Threads are not stored yet, so nothing here is owned and the requester decides nothing; it
+ * reaches the use case with the first owned thread.
+ */
+export async function answerThread(
+  requester: OwnerRequester,
+  body: unknown,
+  signal?: AbortSignal,
+) {
   const request = chatTurnDtoSchema.safeParse(body);
   if (!request.success) return badRequest("Invalid chat request.");
   const [skills, sources] = await Promise.all([listSkills(), listSources()]);

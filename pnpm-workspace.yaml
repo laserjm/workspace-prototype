@@ -12,6 +12,18 @@ minimumReleaseAgeExclude:
   - eslint-config-next@16.4.4
   - lucide-react@1.67.0
   - next@16.4.4
+  # better-auth 1.7.17 is younger than the release-age window. Its predecessor 1.7.16 carries the
+  # 2026-11-03 security fixes (among them: OAuth sign-in treating an unverified provider email as
+  # verified), so the app needs >= 1.7.16 either way (docs/adr/0001). Drop these once they age out.
+  - '@better-auth/core@1.7.17'
+  - '@better-auth/drizzle-adapter@1.7.17'
+  - '@better-auth/kysely-adapter@1.7.17'
+  - '@better-auth/memory-adapter@1.7.17'
+  - '@better-auth/mongo-adapter@1.7.17'
+  - '@better-auth/prisma-adapter@1.7.17'
+  - '@better-auth/telemetry@1.7.17'
+  - better-auth@1.7.17
+  - better-call@1.4.5
 
 # @conventions/nextjs depends on @conventions/cli by its release-tarball URL, which pnpm treats as
 # an exotic subdependency. Both tarballs are pinned to the same release in package.json.
@@ -19,3 +31,4 @@ blockExoticSubdeps: false
 
 allowBuilds:
   '@ast-grep/cli': true
+  esbuild: true

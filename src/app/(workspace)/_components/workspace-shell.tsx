@@ -64,10 +64,12 @@ export function WorkspaceShell({
   initialThreads,
   initialProjects,
   models,
+  user,
 }: {
   initialThreads: Thread[];
   initialProjects: string[];
   models: ModelChoice[];
+  user: { name: string; email: string };
 }) {
   const { sourceById } = useSources();
   const {
@@ -338,6 +340,7 @@ export function WorkspaceShell({
             />
           )}
           <WorkspaceSidebar
+            user={user}
             threads={threads}
             projects={projects}
             activeId={activeThread?.id}
