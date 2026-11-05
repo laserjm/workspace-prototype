@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { IconButton } from "@/components/ui/icon-button";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { addProject, ProjectForm, ProjectIcon } from "@/modules/projects";
+import { ProjectForm, ProjectIcon, type Project } from "@/modules/projects";
 import { useSkillPreferences } from "@/modules/skills";
 import {
   allRecordIds,
@@ -67,7 +67,7 @@ export function WorkspaceShell({
   user,
 }: {
   initialThreads: Thread[];
-  initialProjects: string[];
+  initialProjects: Project[];
   models: ModelChoice[];
   user: { name: string; email: string };
 }) {
@@ -93,7 +93,8 @@ export function WorkspaceShell({
     };
   }>();
   const [projects, setProjects] = useState(initialProjects);
-  const [project, setProject] = useState<string | null>("workspace-prototype");
+  // The project a new thread goes into; null: no project.
+  const [projectId, setProjectId] = useState<string | null>(null);
   const [history, setHistory] = useState<(string | null)[]>([null]);
   const [historyIndex, setHistoryIndex] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -103,7 +104,7 @@ export function WorkspaceShell({
   const [settingsSection, setSettingsSection] =
     useState<SettingsSection>("general");
   const { enabledSkills, toggleSkill } = useSkillPreferences();
-  const [projectName, setProjectName] = useState("");
+  const [newProjectName, setNewProjectName] = useState("");
   const [draftScope, setDraftScope] = useState<ThreadScope>();
   const [editingScope, setEditingScope] = useState(false);
   const [sourceOpen, setSourceOpen] = useState(true);
@@ -111,7 +112,10 @@ export function WorkspaceShell({
   const activeThread = threads.find(
     (thread) => thread.id === history[historyIndex],
   );
-  const currentProject = activeThread?.project ?? project;
+  const currentProjectId = activeThread ? activeThread.projectId : projectId;
+  const currentProject = currentProjectId
+    ? projectName(currentProjectId)
+    : null;
   const responseWorking = useThreadWorking(activeThread?.id, chatStore);
 
   useEffect(() => {
@@ -119,6 +123,12 @@ export function WorkspaceShell({
     const timer = setTimeout(() => setThreadNotice(undefined), 8_000);
     return () => clearTimeout(timer);
   }, [threadNotice]);
+
+  function projectName(id: string | null) {
+    return (
+      (id && projects.find((item) => item.id === id)?.name) || "No project"
+    );
+  }
 
   function navigate(threadId: string | null) {
     setSelectedRecordId(null);
@@ -132,7 +142,7 @@ export function WorkspaceShell({
   }
 
   function newThread() {
-    setProject(currentProject);
+    setProjectId(currentProjectId);
     setDraftScope(undefined);
     navigate(null);
   }
@@ -158,7 +168,7 @@ export function WorkspaceShell({
     });
     if (returnToThread) {
       const next = threads.find((item) => item.id === nextId);
-      setProject(next?.project ?? previous.project);
+      setProjectId(next ? next.projectId : previous.projectId);
       setDraftScope(undefined);
       navigate(nextId ?? null);
     }
@@ -199,7 +209,7 @@ export function WorkspaceShell({
     returnThread(threadId, placement);
     if (returnToThread) {
       const thread = threads.find((item) => item.id === threadId);
-      if (thread) setProject(thread.project);
+      if (thread) setProjectId(thread.projectId);
       navigate(threadId);
     }
     setThreadNotice(undefined);
@@ -209,7 +219,7 @@ export function WorkspaceShell({
     const scope = createScope(sourceId, allRecordIds(sourceById(sourceId)));
     setDraftScope(scope.ok ? scope.value : undefined);
     if (activeThread) {
-      setProject(currentProject);
+      setProjectId(currentProjectId);
       navigate(null);
     }
     setDialog(null);
@@ -223,14 +233,9 @@ export function WorkspaceShell({
   function clearSource() {
     setDraftScope(undefined);
     if (activeThread) {
-      setProject(currentProject);
+      setProjectId(currentProjectId);
       navigate(null);
     }
-  }
-
-  function openRecord(id: string) {
-    setSelectedRecordId(id);
-    setSourceOpen(true);
   }
 
   function showSource() {
@@ -240,16 +245,9 @@ export function WorkspaceShell({
 
   function handleFork(target: ForkTarget) {
     if (!activeThread) return;
-    const fork = forkThread(
-      activeThread,
-      target.kind === "sample" ? 0 : target.responseIndex,
-    );
-    chatStore.fork(
-      activeThread.id,
-      fork.id,
-      target.kind === "live" ? target.messageId : undefined,
-    );
-    setProject(fork.project);
+    const fork = forkThread(activeThread, target.responseIndex);
+    chatStore.fork(activeThread.id, fork.id, target.messageId);
+    setProjectId(fork.projectId);
     navigate(fork.id);
   }
 
@@ -277,14 +275,14 @@ export function WorkspaceShell({
     return () => window.removeEventListener("keydown", handleKey);
   }, []);
 
-  function sendMessage(
+  async function sendMessage(
     prompt: string,
     attachments: string[],
     modelId: string,
     skillId?: string,
-  ) {
+  ): Promise<boolean> {
     const model = models.find((item) => item.id === modelId);
-    if (!model) return;
+    if (!model) return false;
     const message = { text: prompt, attachments };
     if (activeThread) {
       const continued = continueThread(
@@ -292,7 +290,7 @@ export function WorkspaceShell({
         model.provider,
         responseWorking,
       );
-      if (!continued.ok) return;
+      if (!continued.ok) return false;
       if (threadNotice?.undo?.threadId === activeThread.id)
         setThreadNotice(undefined);
       void chatStore.send(activeThread.id, message, {
@@ -300,21 +298,28 @@ export function WorkspaceShell({
         skillId,
         scope: activeThread.scope,
       });
-      return;
+      return true;
     }
-    const thread = startThread({
+    const thread = await startThread({
       id: crypto.randomUUID(),
-      project: project ?? "No project",
+      projectId,
       prompt,
       provider: model.provider,
       scope: draftScope,
     });
+    if (!thread) {
+      setThreadNotice({
+        message: "The thread could not be started. Try again.",
+      });
+      return false;
+    }
     void chatStore.send(thread.id, message, {
       modelId,
       skillId,
       scope: thread.scope,
     });
     navigate(thread.id);
+    return true;
   }
 
   function describeScope(scope: ThreadScope) {
@@ -343,10 +348,11 @@ export function WorkspaceShell({
             user={user}
             threads={threads}
             projects={projects}
+            projectName={projectName}
             activeId={activeThread?.id}
             onSelect={(thread) => {
               if (thread.wokeAt) acknowledgeWake(thread.id);
-              setProject(thread.project);
+              setProjectId(thread.projectId);
               navigate(thread.id);
             }}
             onNewThread={newThread}
@@ -442,13 +448,13 @@ export function WorkspaceShell({
               {!activeThread ? (
                 <div className="workspace-draft enterprise-draft">
                   <NewThreadHeading
-                    project={project}
+                    projectId={projectId}
                     projects={projects}
-                    onProject={setProject}
+                    onProject={setProjectId}
                     onAddProject={() => setDialog("project")}
                   />
                   <PromptForm
-                    key={project ?? "no-project"}
+                    key={projectId ?? "no-project"}
                     models={models}
                     onSend={sendMessage}
                     onSources={() => setDialog("sources")}
@@ -471,7 +477,6 @@ export function WorkspaceShell({
                   onRestore={() => handleRestore(activeThread.id)}
                   onOpenThread={navigate}
                   onViewSource={showSource}
-                  onOpenRecord={openRecord}
                   onFork={handleFork}
                   composer={
                     <PromptForm
@@ -488,7 +493,7 @@ export function WorkspaceShell({
                         chatStore
                           .peekMessages(activeThread.id)
                           .findLast((message) => message.role === "user")
-                          ?.metadata?.skillId ?? activeThread.sample?.skillId
+                          ?.metadata?.skillId
                       }
                       onManageSkills={() => openSettings("skills")}
                       onChooseSource={chooseSource}
@@ -576,14 +581,16 @@ export function WorkspaceShell({
 
             {dialog === "project" && (
               <ProjectForm
-                name={projectName}
-                onNameChange={setProjectName}
-                onCreate={(name) => {
-                  const added = addProject(projects, name);
-                  if (!added.ok) return;
-                  setProjects(added.value.projects);
-                  setProject(added.value.name);
-                  setProjectName("");
+                name={newProjectName}
+                onNameChange={setNewProjectName}
+                onCreated={(project) => {
+                  // A name the user already uses answers with that project.
+                  setProjects((previous) =>
+                    previous.some((item) => item.id === project.id)
+                      ? previous
+                      : [...previous, project],
+                  );
+                  setProjectId(project.id);
                   navigate(null);
                   setDialog(null);
                 }}
@@ -624,7 +631,7 @@ export function WorkspaceShell({
                     type="button"
                     key={thread.id}
                     onClick={() => {
-                      setProject(thread.project);
+                      setProjectId(thread.projectId);
                       navigate(thread.id);
                       setDialog(null);
                     }}

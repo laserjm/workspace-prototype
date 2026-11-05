@@ -7,26 +7,21 @@ import type { WorkspaceUIMessage } from "../contracts";
 import type { ModelChoice } from "../domain/model-choice";
 import type { Thread } from "../domain/thread";
 import { LiveResponse } from "./live-response";
-import { SampleResponse } from "./sample-response";
 import { useChatStore } from "./use-chat-store";
 
-export type ForkTarget =
-  | { kind: "sample" }
-  | { kind: "live"; messageId: string; responseIndex: number };
+export type ForkTarget = { messageId: string; responseIndex: number };
 
 // Keep following the stream while the reader is within this distance of the end.
 const PINNED_DISTANCE = 80;
 
-/** The thread's messages: its sample turn, if any, then the live chat. */
+/** The thread's messages from its chat. */
 export function ThreadMessages({
   thread,
   models,
-  onOpenRecord,
   onFork,
 }: {
   thread: Thread;
   models: ModelChoice[];
-  onOpenRecord: (id: string) => void;
   onFork: (target: ForkTarget) => void;
 }) {
   const store = useChatStore();
@@ -54,7 +49,7 @@ export function ThreadMessages({
 
   const inFlight = status === "submitted" || status === "streaming";
   const last = messages.at(-1);
-  let responseIndex = thread.sample ? 1 : 0;
+  let responseIndex = 0;
 
   return (
     <div
@@ -67,24 +62,6 @@ export function ThreadMessages({
           PINNED_DISTANCE;
       }}
     >
-      {thread.sample && (
-        <>
-          <UserMessage
-            text={thread.sample.prompt}
-            attachments={thread.sample.attachments}
-          />
-          {thread.scope && (
-            <SampleResponse
-              scope={thread.scope}
-              prompt={thread.sample.prompt}
-              onOpenRecord={onOpenRecord}
-              timing={thread.sample.responseTiming}
-              skillId={thread.sample.skillId}
-              onFork={() => onFork({ kind: "sample" })}
-            />
-          )}
-        </>
-      )}
       {messages.map((message, index) => {
         if (message.role === "user") {
           const reply = messages[index + 1];
@@ -124,7 +101,6 @@ export function ThreadMessages({
             models={models}
             onFork={() =>
               onFork({
-                kind: "live",
                 messageId: message.id,
                 responseIndex: currentIndex,
               })

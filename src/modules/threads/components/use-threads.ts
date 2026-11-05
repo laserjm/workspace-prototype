@@ -3,6 +3,8 @@
 import { useState } from "react";
 import type { Result } from "@conventions/nextjs/core";
 import type { SnoozeTimeInPast, ThreadStillWorking } from "../domain/errors";
+import { startThreadAction } from "../actions";
+import type { StartThreadInput } from "../contracts";
 import {
   acknowledgeWake,
   continueThread,
@@ -10,19 +12,17 @@ import {
   restore,
   settle,
   snooze,
-  startThread,
   withPlacement,
   type ModelProvider,
-  type NewThread,
   type Thread,
   type ThreadPlacement,
 } from "../domain/thread";
 import { useSnoozeWake } from "./use-snooze-wake";
 
 /**
- * The threads of this browser session. Every change goes through a domain function; the
- * session keeps them in memory until threads are stored per owner. Conversations live in
- * the `ChatStore`; `working` comes from there.
+ * The user's threads in this browser. A new thread is stored on the server first. Settle,
+ * snooze, wake and fork are not stored yet: they go through a domain function and last for the
+ * session. Conversations live in the `ChatStore`; `working` comes from there.
  */
 export function useThreads(initialThreads: Thread[]) {
   const [threads, setThreads] = useState(initialThreads);
@@ -67,10 +67,13 @@ export function useThreads(initialThreads: Thread[]) {
       update(id, acknowledgeWake);
     },
 
-    startThread(input: NewThread) {
-      const thread = startThread(input);
-      setThreads((previous) => [thread, ...previous]);
-      return thread;
+    /** Stores the thread, then lists it. Null when the server refused or could not be reached. */
+    async startThread(input: StartThreadInput): Promise<Thread | null> {
+      const result = await startThreadAction(input).catch(() => undefined);
+      const started = result?.data;
+      if (!started?.ok) return null;
+      setThreads((previous) => [started.value, ...previous]);
+      return started.value;
     },
 
     continueThread(
@@ -88,7 +91,12 @@ export function useThreads(initialThreads: Thread[]) {
     },
 
     forkThread(thread: Thread, responseIndex: number) {
-      const fork = forkThread(thread, responseIndex, crypto.randomUUID());
+      const fork = forkThread(
+        thread,
+        responseIndex,
+        crypto.randomUUID(),
+        new Date(),
+      );
       setThreads((previous) => [fork, ...previous]);
       return fork;
     },

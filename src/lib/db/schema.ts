@@ -6,11 +6,14 @@ import { sql } from "drizzle-orm";
 import {
   boolean,
   check,
+  foreignKey,
   index,
   pgTable,
   text,
   timestamp,
+  unique,
   uniqueIndex,
+  uuid,
 } from "drizzle-orm/pg-core";
 
 // ---- Sign-in (Better Auth, ARCHITECTURE.md "Sign-in: Better Auth against Keycloak") ------------
@@ -121,4 +124,59 @@ export const verificationsTable = pgTable(
       .defaultNow(),
   },
   (table) => [index("verifications_identifier_idx").on(table.identifier)],
+);
+
+// ---- Owned data (ARCHITECTURE.md "Data ownership") ---------------------------------------------
+// Every row names its owner, the signed-in user's `users.id` (their Keycloak `sub`). Repositories
+// name `owner_id` in every query (NX-AUTH-03); deleting a user deletes what they own.
+
+/** A user's project. Names are unique per owner. */
+export const projectsTable = pgTable(
+  "projects",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ownerId: text("owner_id")
+      .notNull()
+      .references(() => usersTable.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("projects_owner_id_name_key").on(table.ownerId, table.name),
+    // The target of threads' (project_id, owner_id) reference.
+    unique("projects_id_owner_id_key").on(table.id, table.ownerId),
+  ],
+);
+
+/**
+ * A user's thread. `project_id` is null for a thread without a project. The reference includes
+ * `owner_id`, so a thread can only belong to a project of the same owner. The browser picks `id`
+ * (its chat needs it before the server answers). The conversation is not stored yet.
+ */
+export const threadsTable = pgTable(
+  "threads",
+  {
+    id: uuid("id").primaryKey(),
+    ownerId: text("owner_id")
+      .notNull()
+      .references(() => usersTable.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id"),
+    title: text("title").notNull(),
+    provider: text("provider").notNull(),
+    sourceId: text("source_id"),
+    recordIds: text("record_ids").array(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    foreignKey({
+      name: "threads_project_id_owner_id_fkey",
+      columns: [table.projectId, table.ownerId],
+      foreignColumns: [projectsTable.id, projectsTable.ownerId],
+    }),
+    index("threads_owner_id_created_at_idx").on(table.ownerId, table.createdAt),
+  ],
 );

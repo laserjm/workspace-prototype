@@ -12,7 +12,13 @@ import { formatWakeTime } from "./time-format";
 import { useChatStore } from "./use-chat-store";
 
 /** A thread's full title, project, shelf and the exact records it uses. */
-export function ThreadContextCard({ thread }: { thread: Thread }) {
+export function ThreadContextCard({
+  thread,
+  projectName,
+}: {
+  thread: Thread;
+  projectName: string;
+}) {
   const { sourceById } = useSources();
   const source = thread.scope ? sourceById(thread.scope.sourceId) : undefined;
   const records =
@@ -22,20 +28,18 @@ export function ThreadContextCard({ thread }: { thread: Thread }) {
   const userMessages = useChatStore()
     .peekMessages(thread.id)
     .filter((message) => message.role === "user");
-  const turns = (thread.sample ? 1 : 0) + userMessages.length;
-  const attachments =
-    (thread.sample?.attachments?.length ?? 0) +
-    userMessages.reduce(
-      (count, message) => count + (message.metadata?.attachments?.length ?? 0),
-      0,
-    );
+  const turns = userMessages.length;
+  const attachments = userMessages.reduce(
+    (count, message) => count + (message.metadata?.attachments?.length ?? 0),
+    0,
+  );
   return (
     <div className="thread-context-card">
       <strong className="thread-context-title">{thread.title}</strong>
       <div className="thread-context-meta">
         <span>
           <Folder aria-hidden="true" />
-          {thread.project}
+          {projectName}
         </span>
         <span>
           <MessageSquare aria-hidden="true" />

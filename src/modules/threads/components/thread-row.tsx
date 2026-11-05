@@ -24,11 +24,12 @@ import { snoozePresets } from "../domain/snooze";
 import { shelfOf, type Thread } from "../domain/thread";
 import { ProviderIcon } from "./provider-icon";
 import { ThreadContextCard } from "./thread-context-card";
-import { formatWakeTime } from "./time-format";
+import { formatAge, formatWakeTime } from "./time-format";
 import { useThreadWorking } from "./use-chat-store";
 
 export function ThreadRow({
   thread,
+  projectName,
   active,
   onSelect,
   onSettle,
@@ -38,6 +39,8 @@ export function ThreadRow({
   onContext,
 }: {
   thread: Thread;
+  /** The thread's project, or "No project". */
+  projectName: string;
   active: boolean;
   onSelect: () => void;
   onSettle: () => void;
@@ -74,9 +77,11 @@ export function ThreadRow({
             ) : (
               <ProjectIcon />
             )}
-            <span className="thread-project-name">{thread.project}</span>
+            <span className="thread-project-name">{projectName}</span>
             <span
               className={`thread-age ${thread.wokeAt ? "thread-woke" : ""}`}
+              // The age is relative to the clock; server and browser may differ by a minute.
+              suppressHydrationWarning
             >
               {working ? (
                 "Working…"
@@ -90,7 +95,7 @@ export function ThreadRow({
               ) : shelf === "snoozed" ? (
                 <Clock aria-label="Snoozed" />
               ) : (
-                thread.age
+                formatAge(thread.createdAt, new Date())
               )}
             </span>
           </span>
@@ -114,7 +119,7 @@ export function ThreadRow({
             className="thread-context-positioner"
           >
             <Tooltip.Popup className="thread-context-popup">
-              <ThreadContextCard thread={thread} />
+              <ThreadContextCard thread={thread} projectName={projectName} />
             </Tooltip.Popup>
           </Tooltip.Positioner>
         </Tooltip.Portal>

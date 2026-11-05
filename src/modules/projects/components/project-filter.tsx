@@ -3,8 +3,9 @@
 import { useMemo, useRef, useState, type RefObject } from "react";
 import { Combobox } from "@base-ui/react/combobox";
 import { Check, Folder, ListFilter, Search } from "lucide-react";
-import { projectInitials } from "../domain/project";
+import { projectInitials, type Project } from "../domain/project";
 
+// `project` is the project's id; null: "All projects".
 type ProjectItem = { value: string; label: string; project: string | null };
 
 function ProjectBadge({ name }: { name: string }) {
@@ -21,9 +22,10 @@ export function ProjectFilter({
   onChange,
   anchor,
 }: {
-  projects: string[];
+  projects: Project[];
+  /** Project ids. */
   selected: string[];
-  onChange: (projects: string[]) => void;
+  onChange: (projectIds: string[]) => void;
   anchor: RefObject<HTMLDivElement | null>;
 }) {
   const [open, setOpen] = useState(false);
@@ -32,10 +34,10 @@ export function ProjectFilter({
   const items = useMemo<ProjectItem[]>(
     () => [
       { value: "all", label: "All projects", project: null },
-      ...projects.map((name) => ({
-        value: `project:${name}`,
+      ...projects.map(({ id, name }) => ({
+        value: `project:${id}`,
         label: name,
-        project: name,
+        project: id,
       })),
     ],
     [projects],
@@ -49,15 +51,18 @@ export function ProjectFilter({
     : items;
   const selectedItem =
     items.find((item) => item.project === selected[0]) ?? items[0];
+  const selectedNames = selected.map(
+    (id) => projects.find((project) => project.id === id)?.name ?? id,
+  );
   const label = selected.length
-    ? `Filter threads by project: ${selected.join(", ")}`
+    ? `Filter threads by project: ${selectedNames.join(", ")}`
     : "Filter threads by project";
 
-  function toggleProject(name: string) {
+  function toggleProject(id: string) {
     onChange(
-      selected.includes(name)
-        ? selected.filter((project) => project !== name)
-        : [...selected, name],
+      selected.includes(id)
+        ? selected.filter((project) => project !== id)
+        : [...selected, id],
     );
   }
 
@@ -95,7 +100,7 @@ export function ProjectFilter({
       >
         {selected.length ? (
           <span className="project-filter-badge-stack">
-            {selected.slice(0, 2).map((name) => (
+            {selectedNames.slice(0, 2).map((name) => (
               <ProjectBadge key={name} name={name} />
             ))}
           </span>
@@ -152,7 +157,7 @@ export function ProjectFilter({
                   >
                     <span className="project-filter-row-icon">
                       {item.project ? (
-                        <ProjectBadge name={item.project} />
+                        <ProjectBadge name={item.label} />
                       ) : (
                         <Folder aria-hidden="true" />
                       )}

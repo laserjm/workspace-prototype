@@ -8,8 +8,8 @@ bindings: [drizzle, zod, next-safe-action]   # plain Postgres: no database-platf
 app-root: src
 schema-source: code-first        # src/lib/db/schema.ts generates the migrations in drizzle/
 isolation: owner                 # each signed-in user owns their threads, projects and preferences
-# Adopted now. cache and next-safe-action follow (no cache tags or actions yet).
-rulesets: [structure, layers, naming, types, errors, rich, cross-module, testing, zod, migration, database, drizzle, auth]
+# cache: adopted with nothing to check yet (no cache tags; every read is per request).
+rulesets: [structure, layers, naming, types, errors, rich, cross-module, testing, zod, migration, database, drizzle, auth, next-safe-action, cache]
 legacy: []
 migrations: drizzle/*.sql        # what `conventions check` replays for the inventory (NX-DB-02)
 ```
@@ -48,8 +48,9 @@ confidential client, `workspace-web` (authorization code with PKCE, no direct gr
 self-registration, no roles, and development users with fixed ids, so a user's `sub` is the
 same after every reset. Its only redirect URI is `http://localhost:3000/api/auth/callback/keycloak`,
 and its post-logout URI is `http://localhost:3000/`. `pnpm stack:up|down|reset` drive it.
-Integration tests (NX-TEST-03) will pass `describeIntegration` a probe for this stack instead
-of the default `supabase status`.
+Integration tests (NX-TEST-03) pass `describeIntegration` the probe `composeStack`
+(`tests/support/compose-stack.ts`, `pg_isready` in the compose Postgres) instead of the default
+`supabase status`, and read `DATABASE_URL` from `.env.local` (`tests/support/env.ts`).
 **Enforced by.** The compose health checks (`pnpm stack:up` waits for both).
 **Recorded in.** This entry; `.env.example`.
 
@@ -75,17 +76,19 @@ catalogue are shared data (NX-AUTH-05). Shared workspaces, such as a team seeing
 threads or source connections configured once per organisation, would make this a `tenant`
 app, recorded here as a migration.
 The owner is the signed-in Keycloak user: `ownerId` is their `sub`, which is also `users.id`
-(see the sign-in). The four sign-in tables are Better Auth's, not owned data the app reads; there
-is no owned table yet.
-**Enforced by.** `OwnerId` from `lib/auth/requester.ts` and `tsc` through the brand.
-`conventions check` (`owner-id-type`, `isolation-test`) takes over with the first repository on
-owned data.
+(see the sign-in). The four sign-in tables are Better Auth's, not owned data the app reads. The
+owned tables are `projects` and `threads`: each row has an `owner_id` referencing `users.id`
+(deleting a user deletes what they own), and every repository method takes the `OwnerId` first
+and names it in its query.
+**Enforced by.** `OwnerId` from `lib/auth/requester.ts` and `tsc` through the brand;
+`conventions check` (`owner-id-type`); `assertIsolation()` in each module's command test (see
+"Command tests").
 **Recorded in.** This entry; `lib/auth/requester.ts`.
 
 ### Modules
 
 **Decision.** Four modules. `threads` (rich: sessions, settle, snooze, wake, fork, the live
-chat and its answers, sample turns), `sources` (the enterprise systems and their records; a read-only domain),
+chat and its answers), `sources` (the enterprise systems and their records; a read-only domain),
 `skills` (the skill catalogue and its activation in this browser) and `projects` (the project
 list, the add-project rule and the sidebar filter). `app/(workspace)/` composes them; its
 `_components/` hold the shell, sidebar, settings and new-thread heading, which only that route
@@ -138,35 +141,71 @@ name and email from Keycloak.
   Next.js recommends for Proxy. Without one, a page goes to `/sign-in` and `/api/*` gets 401. The
   real check is `getRequester()` next to the data: `app/(workspace)/page.tsx` redirects a visitor
   whose session has ended, and `/api/chat` answers 401. `lib/safe-action.ts` builds the action
-  clients on the same `getRequester()`; there is no action yet.
+  clients on the same `getRequester()`; every action uses `memberActionClient`, so a visitor
+  gets `SignedOut` and the action does not run.
 
 **Enforced by.** The `auth` ruleset (NX-AUTH-01: only `app/`, `lib/` and `queries.ts` import
 the requester); `boundaries/external`. The check constraint `users_id_is_keycloak_sub`. Better
 Auth's startup schema check, which refuses to run when `schema.ts` and its fields disagree.
 **Recorded in.** This entry; `docs/adr/0001-auth-library-for-keycloak-sign-in.md`.
 
-### No owned tables yet: sample data and client-side session state
+### Stored projects and threads; session-only thread state
 
-**Decision.** Users sign in and their identity is stored (see the sign-in), but threads,
-projects and preferences are not stored yet. Read-only sample data (sources and their
-records, skills, seed threads with their sample turn, projects) lives in each module's
-`infra/sample.*.ts` adapter. It is read through `queries.ts` and `server.ts` in
-`app/(workspace)/page.tsx`, a server component. The catalogues reach the browser through
-`SourcesProvider` and `SkillsProvider`; the rest arrives as props. Thread metadata (new
-threads, settle, snooze, wake, fork, projects added) lives in the browser for the session and
-changes only through the pure functions in `modules/threads/domain/` and
-`modules/projects/domain/`, which return `Result` where a change can be refused; `useThreads`
-applies them. Live conversations live in the `ChatStore`, one AI SDK `Chat` per thread, also
-for the session. Skill activation and the source panel width persist in `localStorage`; the
-stored skill ids are parsed with `storedSkillIdsSchema` (NX-TYPE-03).
+**Decision.** Projects and threads are stored per owner (see "Data ownership"); creating
+either is a use case (`projects/application/create-project.ts`,
+`threads/application/start-thread.ts`) wired in the module's `commands.ts` and called from its
+`actions.ts`, which the module's components call (`ProjectForm`, `useThreads`).
+`app/(workspace)/page.tsx` reads the requester once and passes it to `listProjects` and
+`listThreads`. A name the user already uses answers with that project instead of adding it
+twice; the `projects_owner_id_name_key` index catches a race, answered as `Conflict`. The
+browser picks a new thread's id (its chat needs it before the server answers) and stores the
+thread before it sends the first message; a taken id is a `Conflict`, a project that is not
+the user's a `NotFound`.
 
-With the first owned tables, the sample adapters become repositories on `ownerId` with
-integration tests (NX-TEST-02, NX-AUTH-03), and the session writes become use cases wired in
-`commands.ts`. The four starters that `conventions init` writes are back: `lib/env.ts`,
-`lib/safe-action.ts`, `lib/db/client.ts` and `lib/auth/requester.ts`.
+Not stored yet: the conversation (it lives in the `ChatStore`, one AI SDK `Chat` per thread,
+for the session, so a reloaded thread shows its title and no messages), and settle, snooze,
+wake and fork, which change the thread in the browser through the pure functions in
+`modules/threads/domain/` and are lost on reload. A stored thread reads as active. Read-only
+sample data (sources and their records, skills) lives in each module's `infra/sample.*.ts`
+adapter, read through `queries.ts` and `server.ts`; the catalogues reach the browser through
+`SourcesProvider` and `SkillsProvider`. Skill activation and the source panel width persist in
+`localStorage`; the stored skill ids are parsed with `storedSkillIdsSchema` (NX-TYPE-03). There
+are no cache tags: every read is per request, and an action returns what it stored, which the
+browser adds to its state.
 **Enforced by.** `boundaries/element-types` (components never import `infra/` or `queries.ts`);
-the `server-only` import in every `queries.ts`, `commands.ts` and `server.ts`.
+the `server-only` import in every `queries.ts`, `commands.ts` and `server.ts`; the command
+tests.
 **Recorded in.** This entry.
+
+### Threads without a project
+
+**Decision.** A thread's `project_id` is nullable: null is a thread without a project, not a
+hidden per-user default project, which would need creating at sign-in and hiding from every
+list. The reference `(project_id, owner_id)` → `projects(id, owner_id)` lets a thread belong
+only to a project of its own owner; with a null `project_id` it does not apply. In the domain,
+`Thread.projectId` is the project's id (cross-module references are ids); the workspace
+resolves it to a name through the project list, and the sidebar filter lists threads without
+a project under "No project". A new thread starts without a project unless one is picked.
+**Enforced by.** The `threads_project_id_owner_id_fkey` constraint; `startThread` answers
+`NotFound` for a project the requester does not own.
+**Recorded in.** This entry.
+
+### Command tests
+
+**Decision.** A thin write use case is tested at the command level, not by a unit test with
+fakes plus a repository integration test: each module with stored data has one
+`commands.integration.test.ts` that calls its commands and queries against the compose
+Postgres with a requester the test builds (`tests/factories/requester.ts`), so no session or
+auth mocking is needed. `withOwners()` (`tests/support/owners.ts`) signs the test's users up and
+deletes them afterwards. The same file calls `assertIsolation()` through the commands and
+queries (NX-AUTH-03). Actions are not tested: they only validate and hand the requester to the
+command. A use case with rules worth example tables keeps its unit test (`answer-thread.test.ts`);
+pure domain rules are tested by example in `domain/*.test.ts` (NX-TEST-06). The conventions
+change that lets a command test stand in for both is proposed upstream; until it is released,
+the Deviations below cover the two use cases and their repositories.
+**Enforced by.** `conventions check` (as warnings, per the Deviations rows); the command tests
+skip loudly without the stack (NX-TEST-03).
+**Recorded in.** This entry; Deviations.
 
 ### Answers come from the Vercel AI Gateway
 
@@ -181,20 +220,11 @@ the model allowlist in `infra/ai-gateway.model-catalog.ts` and the `html_render`
 `infra/ai-sdk.html-render-tool.ts`. The tool's input and output schemas are in
 `contracts.ts`, so the browser's message types never import `infra/`. The route reads the
 requester and answers 401 without one. The command takes it as its first argument
-(NX-LAYER-11). It decides nothing yet, because threads are not stored, and reaches the use case
-with the first owned thread. The frame that shows an `html_render` page is feature-agnostic and lives in
+(NX-LAYER-11). It decides nothing yet: threads are stored, but the conversation is not, and
+the route does not yet check that the thread is the requester's. The frame that shows an `html_render` page is feature-agnostic and lives in
 `components/ui/html-render-*.tsx`; the helpers both sides share are in `lib/html-render/`.
 **Enforced by.** `conventions check` (`use-case-test`, `rich-shape`), `boundaries/element-types`,
 `boundaries/external` (the ORM-free, framework-free `application/`).
-**Recorded in.** This entry.
-
-### Sample responses
-
-**Decision.** The seeded threads keep one sample turn, answered locally. Its kind (summary,
-risks, next steps) is chosen by `modules/threads/domain/sample-response.ts` from the prompt
-and the skill, and rendered by `modules/threads/components/sample-response.tsx` from the
-records in scope. Every message after it goes to the model.
-**Enforced by.** `boundaries/external` (the domain imports no framework).
 **Recorded in.** This entry.
 
 ## Deviations
@@ -203,6 +233,8 @@ records in scope. Every message after it goes to the model.
 
 | Rule | Deviation | Why | Until |
 | --- | --- | --- | --- |
+| NX-TEST-01 | `modules/projects/application/create-project.ts`, `modules/threads/application/start-thread.ts`: no unit test with fakes; the module's `commands.integration.test.ts` covers them | Thin use cases over one repository; see "Command tests" | The conventions release with command tests (laserjm/conventions#29, PR #30) |
+| NX-TEST-02 | `modules/projects/infra/project.repository.ts`, `modules/threads/infra/thread.repository.ts`: no repository integration test; the module's `commands.integration.test.ts` covers them, with `assertIsolation()` | See "Command tests" | The conventions release with command tests (laserjm/conventions#29, PR #30) |
 
 ## Legacy
 

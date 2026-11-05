@@ -1246,6 +1246,10 @@
   padding: 0 10px;
   font-size: 13px;
 }
+.workspace-dialog-error {
+  color: #b42318;
+  font-size: 12px;
+}
 .workspace-dialog-form > button {
   align-self: flex-end;
   margin-top: 12px;
@@ -2185,20 +2189,6 @@
     pointer-events: auto;
   }
 }
-.response-read-receipt {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 16px;
-  color: #6b8a7b;
-  font-size: 10px;
-}
-.response-read-receipt > span {
-  margin-left: auto;
-  color: #a0a0aa;
-  font-size: 9px;
-}
 .response-body h2 {
   margin-bottom: 8px;
   color: #32323b;
@@ -2210,88 +2200,6 @@
   color: #787883;
   font-size: 12px;
   line-height: 1.8;
-}
-.response-statuses {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 16px 0 22px;
-}
-.response-statuses span {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  border: 1px solid #e8e8ee;
-  border-radius: 6px;
-  background: #fff;
-  padding: 5px 8px;
-  color: #82828e;
-  font-size: 10px;
-}
-.response-statuses strong {
-  color: #575763;
-  font-size: 12px;
-  font-weight: 550;
-}
-.response-items {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  margin-top: 17px;
-}
-.response-item {
-  position: relative;
-  border-left: 2px solid #e8edf5;
-  padding-left: 12px;
-}
-.record-citation {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  border: 1px solid #dee7f8;
-  border-radius: 4px;
-  background: #f2f6ff;
-  padding: 1px 5px;
-  color: #5379b8;
-  font-size: 9px;
-  line-height: 1.5;
-}
-.record-citation:hover {
-  border-color: #a9bfe8;
-  background: #e8f0ff;
-}
-.response-item h3 {
-  margin: 4px 0 3px;
-  color: #4a4a55;
-  font-size: 12px;
-  font-weight: 550;
-}
-.response-item p {
-  color: #7a7a86;
-  font-size: 12px;
-  line-height: 1.8;
-}
-.response-conclusion {
-  margin-top: 22px;
-  border-top: 1px solid #ededf1;
-  padding-top: 13px;
-}
-.response-conclusion strong {
-  color: #5f5f6c;
-  font-size: 11px;
-  font-weight: 500;
-}
-.response-conclusion p {
-  margin-top: 4px;
-  color: #8a8a95;
-  font-size: 11px;
-  line-height: 1.8;
-}
-.response-demo-note {
-  margin-top: 10px;
-  border-radius: 6px;
-  background: #f3f4f8;
-  padding: 9px 11px;
 }
 .source-panel {
   position: relative;
@@ -2785,11 +2693,7 @@
   .response-body h2 {
     font-size: 24px;
   }
-  .response-body > p,
-  .response-item p {
-    font-size: 13px;
-  }
-  .response-item h3 {
+  .response-body > p {
     font-size: 13px;
   }
 }
@@ -2905,16 +2809,6 @@
   }
   .response-body h2 {
     font-size: 21px;
-  }
-  .response-read-receipt > span {
-    display: none;
-  }
-  .response-statuses {
-    gap: 5px;
-  }
-  .response-statuses span {
-    padding: 4px 6px;
-    font-size: 9px;
   }
   .source-session .workspace-composer textarea {
     font-size: 16px;
@@ -3056,21 +2950,6 @@
 }
 .composer-skill-hint > span {
   color: #71717a;
-}
-.response-skill-receipt {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0 0 14px;
-  color: #52525b;
-  font-size: 11px;
-}
-.response-skill-receipt svg {
-  width: 13px;
-  height: 13px;
-}
-.response-skill-receipt span {
-  color: #a1a1aa;
 }
 .skills-settings-dialog {
   width: 760px;

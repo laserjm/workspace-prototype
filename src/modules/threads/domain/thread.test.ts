@@ -132,19 +132,22 @@ describe("settle, snooze, restore and wake", () => {
 describe("startThread", () => {
   it("titles the thread with its first message and copies the scope", () => {
     const scope = { sourceId: "jira", recordIds: ["PLAT-124"] };
-    const thread = startThread({
-      id: "new",
-      project: "workspace-prototype",
-      prompt: "Summarize",
-      provider: "openai",
-      scope,
-    });
+    const thread = startThread(
+      {
+        id: "new",
+        projectId: null,
+        prompt: "Summarize",
+        provider: "openai",
+        scope,
+      },
+      now,
+    );
     expect(thread).toEqual({
       id: "new",
-      project: "workspace-prototype",
+      projectId: null,
       title: "Summarize",
       branch: "main",
-      age: "now",
+      createdAt: now.toISOString(),
       provider: "openai",
       scope,
     });
@@ -172,18 +175,18 @@ describe("continueThread", () => {
 });
 
 describe("forkThread", () => {
-  it("copies the thread as active, keeps its sample turn and scope, and names its origin", () => {
+  it("copies the thread as active, keeps its project and scope, and names its origin", () => {
     const thread = aThread({
       title: "Fork: Sprint 24 summary",
       settledAt: now.toISOString(),
     });
-    const fork = forkThread(thread, 2, "fork-1");
+    const fork = forkThread(thread, 2, "fork-1", now);
     expect(fork).toMatchObject({
       id: "fork-1",
       title: "Fork: Sprint 24 summary",
-      age: "now",
+      createdAt: now.toISOString(),
       settledAt: undefined,
-      sample: thread.sample,
+      projectId: thread.projectId,
       scope: thread.scope,
       forkedFrom: {
         threadId: "thread-1",

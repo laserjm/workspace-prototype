@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
-import { getSignedInUser } from "@/lib/auth/requester";
+import { getRequester, getSignedInUser } from "@/lib/auth/requester";
 import { listProjects } from "@/modules/projects/server";
 import { SkillsProvider } from "@/modules/skills";
 import { listSkills } from "@/modules/skills/server";
@@ -22,13 +22,16 @@ export default function WorkspacePage() {
 
 async function Workspace() {
   // proxy.ts only saw a cookie; an ended or revoked session lands here.
-  const user = await getSignedInUser();
-  if (!user) redirect("/sign-in");
+  const [requester, user] = await Promise.all([
+    getRequester(),
+    getSignedInUser(),
+  ]);
+  if (!requester || !user) redirect("/sign-in");
   const [sources, skills, threads, projects, models] = await Promise.all([
     listSources(),
     listSkills(),
-    listThreads(),
-    listProjects(),
+    listThreads(requester),
+    listProjects(requester),
     listModelChoices(),
   ]);
   return (

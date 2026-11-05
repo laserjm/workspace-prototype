@@ -1,29 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { addProject, projectInitials } from "./project";
+import { nameProject, projectInitials } from "./project";
 
-describe("addProject", () => {
+describe("nameProject", () => {
   it.each([
-    {
-      projects: ["a"],
-      name: "b",
-      expected: { projects: ["a", "b"], name: "b" },
-    },
-    {
-      projects: ["a"],
-      name: "  b  ",
-      expected: { projects: ["a", "b"], name: "b" },
-    },
-    {
-      projects: ["a", "b"],
-      name: "a",
-      expected: { projects: ["a", "b"], name: "a" },
-    },
-  ])("adds '$name' to $projects", ({ projects, name, expected }) => {
-    expect(addProject(projects, name)).toEqual({ ok: true, value: expected });
+    { name: "b", expected: "b" },
+    { name: "  battery management  ", expected: "battery management" },
+  ])("names the project '$expected'", ({ name, expected }) => {
+    expect(nameProject(name)).toEqual({ ok: true, value: expected });
   });
 
   it.each(["", "   "])("refuses the blank name '%s'", (name) => {
-    expect(addProject(["a"], name)).toEqual({
+    expect(nameProject(name)).toEqual({
       ok: false,
       error: { _tag: "ProjectNameMissing" },
     });

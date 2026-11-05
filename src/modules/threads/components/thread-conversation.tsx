@@ -16,7 +16,6 @@ export function ThreadConversation({
   onRestore,
   onOpenThread,
   onViewSource,
-  onOpenRecord,
   onFork,
 }: {
   thread: Thread;
@@ -25,7 +24,6 @@ export function ThreadConversation({
   onRestore: () => void;
   onOpenThread: (id: string) => void;
   onViewSource: () => void;
-  onOpenRecord: (id: string) => void;
   onFork: (target: ForkTarget) => void;
 }) {
   const { sourceById } = useSources();
@@ -76,7 +74,6 @@ export function ThreadConversation({
         key={`conversation:${thread.id}`}
         thread={thread}
         models={models}
-        onOpenRecord={onOpenRecord}
         onFork={onFork}
       />
       {composer}

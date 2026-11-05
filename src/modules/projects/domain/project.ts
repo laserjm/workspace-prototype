@@ -3,25 +3,18 @@ import type { ProjectNameMissing } from "./errors";
 
 /** Selects a project's icon. Every project created in the app is a `workspace` project. */
 export type ProjectKind =
-  | "rocket"
-  | "chart"
-  | "conventions"
-  | "automation"
-  | "workspace";
+  "rocket" | "chart" | "conventions" | "automation" | "workspace";
 
-/** Adds a project by name; a name already in the list is not added twice. */
-export function addProject(
-  projects: readonly string[],
-  name: string,
-): Result<{ projects: string[]; name: string }, ProjectNameMissing> {
+/** A project a user owns. Threads refer to it by `id`. */
+export type Project = { id: string; name: string };
+
+export const PROJECT_NAME_MAX_LENGTH = 80;
+
+/** A project's name as stored: trimmed and not blank. */
+export function nameProject(name: string): Result<string, ProjectNameMissing> {
   const trimmed = name.trim();
   if (!trimmed) return err({ _tag: "ProjectNameMissing" });
-  return ok({
-    projects: projects.includes(trimmed)
-      ? [...projects]
-      : [...projects, trimmed],
-    name: trimmed,
-  });
+  return ok(trimmed);
 }
 
 /** Up to two initials for a project badge: "enterprise-platform" → "EP". */
