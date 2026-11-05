@@ -6,6 +6,8 @@ The source explorer’s neutral surfaces and resize interaction also follow `Pul
 
 The `html_render` tool is adapted from T3 Code at commit `8b44f42b14c8e273156474a924ccf29680dd7857`: `src/lib/html-render/html-render.ts` from `packages/shared/src/htmlRender.ts` (theme and layout guides, bootstrap injection, frame messages), the viewport height check from `apps/server/src/htmlRender/HtmlRender.ts`, the tool description from `apps/server/src/mcp/toolkits/html/tools.ts` (used by `src/modules/threads/infra/ai-sdk.html-render-tool.ts`), and `src/components/ui/html-render-*.tsx` from `apps/web/src/components/chat/HtmlRenderFrame.tsx` and `HtmlRenderDocument` in `apps/web/src/components/files/BrowserDocumentFrame.tsx`.
 
+Message Markdown follows T3 Code at commit `67eebaca23f8f7bc46e8817434087fc9c5acf8e3`: `src/lib/markdown/split-blocks.ts` and its test are adapted from `apps/web/src/components/chat/markdownStreamBlocks.ts` and `markdownStreamBlocks.test.tsx`, and `src/components/ui/markdown.tsx` follows the component overrides in `apps/web/src/components/ChatMarkdown.tsx` and the `.chat-markdown` rules in `apps/web/src/index.css`.
+
 MIT License
 
 Copyright (c) 2026 T3 Tools Inc.

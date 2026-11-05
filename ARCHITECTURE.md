@@ -250,6 +250,9 @@ the model allowlist in `infra/ai-gateway.model-catalog.ts` and the `html_render`
 requester and answers 401 without one. The command takes it as its first argument
 (NX-LAYER-11), and the use case answers and stores only the requester's threads. The frame that shows an `html_render` page is feature-agnostic and lives in
 `components/ui/html-render-*.tsx`; the helpers both sides share are in `lib/html-render/`.
+Message text renders as Markdown through `components/ui/markdown.tsx`: GitHub-flavoured, raw
+HTML shown as text, a user's single newlines kept. `lib/markdown/` holds the plugins and the
+block splitting that lets a streamed reply re-render only its last block.
 **Enforced by.** `conventions check` (`use-case-test`, `rich-shape`), `boundaries/element-types`,
 `boundaries/external` (the ORM-free, framework-free `application/`).
 **Recorded in.** This entry.

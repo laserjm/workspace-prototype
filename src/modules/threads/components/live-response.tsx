@@ -5,7 +5,11 @@ import { findSource, recordCountLabel, useSources } from "@/modules/sources";
 import type { WorkspaceUIMessage } from "../contracts";
 import type { ModelChoice } from "../domain/model-choice";
 import type { ThreadScope } from "../domain/thread";
-import { hasVisibleParts, MessageParts } from "./message-parts";
+import {
+  hasVisibleParts,
+  MessageParts,
+  messageMarkdown,
+} from "./message-parts";
 import { ResponseTurn } from "./response-turn";
 
 /** A model response, or the placeholder while the request is in flight. */
@@ -63,9 +67,10 @@ export function LiveResponse({
       }
       preparingLabel={model ? `${model.label} is thinking…` : "Thinking…"}
       streaming={hasVisibleParts(message)}
+      copyText={message ? messageMarkdown(message) : ""}
       onFork={onFork}
     >
-      {message && <MessageParts message={message} />}
+      {message && <MessageParts message={message} streaming={working} />}
     </ResponseTurn>
   );
 }

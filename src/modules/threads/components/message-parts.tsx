@@ -1,6 +1,7 @@
 "use client";
 
 import { HtmlRenderFrame } from "@/components/ui/html-render-frame";
+import { Markdown } from "@/components/ui/markdown";
 import type { WorkspaceUIMessage } from "../contracts";
 import { preparingDotClassName } from "./response-turn";
 
@@ -16,19 +17,35 @@ export function hasVisibleParts(message: WorkspaceUIMessage | undefined) {
   );
 }
 
+/** The message's text as its author wrote it, Markdown and all: what copying it copies. */
+export function messageMarkdown(message: WorkspaceUIMessage) {
+  return message.parts
+    .flatMap((part) =>
+      part.type === "text" && part.text.trim() ? [part.text.trim()] : [],
+    )
+    .join("\n\n");
+}
+
 /** Renders an assistant message's parts in stream order. */
-export function MessageParts({ message }: { message: WorkspaceUIMessage }) {
+export function MessageParts({
+  message,
+  streaming = false,
+}: {
+  message: WorkspaceUIMessage;
+  /** The message is still arriving: its new blocks fade in. */
+  streaming?: boolean;
+}) {
   return message.parts.map((part, index) => {
     switch (part.type) {
       case "text":
         return part.text.trim() ? (
-          <p
+          <Markdown
             key={index}
+            text={part.text}
+            streaming={streaming}
             // A source session (data-session on <main>) reads a step denser.
-            className="text-sm leading-relaxed whitespace-pre-wrap wrap-anywhere text-foreground group-data-[session=source]/main:leading-5 [p+&]:mt-3"
-          >
-            {part.text}
-          </p>
+            className="text-sm leading-relaxed text-foreground group-data-[session=source]/main:leading-5 [[data-slot=markdown]+&]:mt-3"
+          />
         ) : null;
       case "tool-html_render":
         return <HtmlRenderToolPart key={part.toolCallId} part={part} />;

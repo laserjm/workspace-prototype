@@ -3,6 +3,7 @@
 import { Fragment, useLayoutEffect, useRef, type ReactNode } from "react";
 import { FileText } from "lucide-react";
 import { useChat } from "@ai-sdk/react";
+import { Markdown } from "@/components/ui/markdown";
 import { cn } from "@/lib/utils";
 import type { WorkspaceUIMessage } from "../contracts";
 import type { ModelChoice } from "../domain/model-choice";
@@ -200,7 +201,7 @@ function UserMessage({
         inSession && "max-w-[88%] px-4 text-secondary-foreground",
       )}
     >
-      <p className="whitespace-pre-wrap wrap-anywhere">{text}</p>
+      <Markdown text={text} lineBreaks />
       {attachments?.map((name, index) => (
         <span
           className={`${attachmentChipClassName} mt-2`}
