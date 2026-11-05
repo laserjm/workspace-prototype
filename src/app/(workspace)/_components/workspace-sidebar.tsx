@@ -7,6 +7,7 @@ import {
   ChevronRight,
   FolderPlus,
   GitPullRequest,
+  LogOut,
   PanelLeftClose,
   Search,
   Settings,
@@ -31,6 +32,7 @@ import {
 } from "@/modules/threads";
 
 type SidebarProps = {
+  user: { name: string; email: string };
   threads: Thread[];
   projects: string[];
   activeId?: string;
@@ -240,6 +242,15 @@ export function WorkspaceSidebar(props: SidebarProps) {
             <BarChart3 />
           </IconButton>
           <span className="sidebar-footer-spacer" />
+          {/* A plain form post: /sign-out ends the session here and in Keycloak. */}
+          <form action="/sign-out" method="post">
+            <IconButton
+              type="submit"
+              label={`Sign out ${props.user.name || props.user.email}`}
+            >
+              <LogOut />
+            </IconButton>
+          </form>
           <IconButton
             label="About this prototype"
             onClick={props.onSettings}
