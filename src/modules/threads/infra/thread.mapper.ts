@@ -1,14 +1,14 @@
 import type { OwnerId } from "@conventions/nextjs/core";
 import type { threadMessagesTable, threadsTable } from "@/lib/db/schema";
 import type { WorkspaceUIMessage } from "../contracts";
-import type { ModelProvider, Thread } from "../domain/thread";
+import type { ModelProvider, Thread, ThreadPlacement } from "../domain/thread";
 
 type ThreadRow = typeof threadsTable.$inferSelect;
 type NewThreadRow = typeof threadsTable.$inferInsert;
 type MessageRow = typeof threadMessagesTable.$inferSelect;
 type NewMessageRow = typeof threadMessagesTable.$inferInsert;
 
-// Placement (settle, snooze, wake) is not stored yet: a stored thread reads as active.
+/** The thread as stored; a due snooze still reads as snoozed here (`wakeIfDue`). */
 export function toThread(row: ThreadRow): Thread {
   return {
     id: row.id,
@@ -31,7 +31,25 @@ export function toThread(row: ThreadRow): Thread {
             responseIndex: row.forkedFromResponseIndex,
           }
         : undefined,
+    ...placementOfRow(row),
   };
+}
+
+function placementOfRow(row: ThreadRow): ThreadPlacement {
+  if (row.settledAt) return { settledAt: row.settledAt.toISOString() };
+  if (row.snoozedUntil) return { snoozedUntil: row.snoozedUntil.toISOString() };
+  if (row.wokeAt) return { wokeAt: row.wokeAt.toISOString() };
+  return {};
+}
+
+/** The columns that change as a thread is used. */
+export function toThreadChanges(thread: Thread) {
+  return {
+    provider: thread.provider,
+    settledAt: thread.settledAt ? new Date(thread.settledAt) : null,
+    snoozedUntil: thread.snoozedUntil ? new Date(thread.snoozedUntil) : null,
+    wokeAt: thread.wokeAt ? new Date(thread.wokeAt) : null,
+  } satisfies Partial<NewThreadRow>;
 }
 
 export function toThreadRow(ownerId: OwnerId, thread: Thread): NewThreadRow {
@@ -40,12 +58,12 @@ export function toThreadRow(ownerId: OwnerId, thread: Thread): NewThreadRow {
     ownerId,
     projectId: thread.projectId,
     title: thread.title,
-    provider: thread.provider,
     sourceId: thread.scope?.sourceId ?? null,
     recordIds: thread.scope?.recordIds ?? null,
     forkedFromThreadId: thread.forkedFrom?.threadId ?? null,
     forkedFromTitle: thread.forkedFrom?.title ?? null,
     forkedFromResponseIndex: thread.forkedFrom?.responseIndex ?? null,
+    ...toThreadChanges(thread),
     createdAt: new Date(thread.createdAt),
   };
 }

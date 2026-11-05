@@ -12,10 +12,12 @@ import { listSkills } from "@/modules/skills/server";
 import { listSources } from "@/modules/sources/server";
 import { answerThread as answer } from "./application/answer-thread";
 import { forkThread as fork } from "./application/fork-thread";
+import { placeThread as place } from "./application/place-thread";
 import { startThread as start } from "./application/start-thread";
 import {
   chatTurnDtoSchema,
   type ForkThreadInput,
+  type PlaceThreadInput,
   type StartThreadInput,
 } from "./contracts";
 import { aiGatewayModelCatalog } from "./infra/ai-gateway.model-catalog";
@@ -64,6 +66,14 @@ export async function forkThread(
       return err(conflict(error.constraint));
     throw error;
   }
+}
+
+/** Settles, snoozes, restores or wakes one of the user's threads, or undoes that. */
+export async function placeThread(
+  requester: OwnerRequester,
+  input: PlaceThreadInput,
+) {
+  return place(input, { requester, threads: threadRepository, clock });
 }
 
 function badRequest(error: string) {

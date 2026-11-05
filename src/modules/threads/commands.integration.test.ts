@@ -9,8 +9,12 @@ import { createProject } from "@/modules/projects/server";
 import { composeStack } from "@/tests/support/compose-stack";
 import { withOwners } from "@/tests/support/owners";
 import { aRequester } from "@/tests/factories/requester";
-import { answerThread, forkThread, startThread } from "./commands";
-import type { StartThreadInput, WorkspaceUIMessage } from "./contracts";
+import { answerThread, forkThread, placeThread, startThread } from "./commands";
+import type {
+  StartThreadInput,
+  ThreadChange,
+  WorkspaceUIMessage,
+} from "./contracts";
 import { threadRepository } from "./infra/thread.repository";
 import { listThreadMessages, listThreads } from "./queries";
 
@@ -210,6 +214,118 @@ describeIntegration(
         error: { _tag: "NotFound", entity: "Thread", id: thread.id },
       });
       expect(await listThreadMessages(ana, id)).toEqual([]);
+    });
+
+    async function aStartedThreadOf(requester: ReturnType<typeof aRequester>) {
+      const thread = await startThread(requester, aNewThread());
+      if (!thread.ok) throw new Error("the thread was not started");
+      return thread.value;
+    }
+
+    async function listed(
+      requester: ReturnType<typeof aRequester>,
+      id: string,
+    ) {
+      return (await listThreads(requester)).find((thread) => thread.id === id);
+    }
+
+    const inAnHour = () => new Date(Date.now() + 3_600_000).toISOString();
+    const anHourAgo = () => new Date(Date.now() - 3_600_000).toISOString();
+
+    it.each<{ name: string; change: () => ThreadChange; placement: object }>([
+      {
+        name: "settles",
+        change: () => ({ kind: "settle" }),
+        placement: { settledAt: expect.any(String) },
+      },
+      {
+        name: "snoozes",
+        change: () => ({ kind: "snooze", until: "2099-01-05T09:00:00.000Z" }),
+        placement: { snoozedUntil: "2099-01-05T09:00:00.000Z" },
+      },
+      {
+        name: "puts back where it was (an undo)",
+        change: () => ({
+          kind: "return",
+          placement: { settledAt: "2026-11-04T09:00:00.000Z" },
+        }),
+        placement: { settledAt: "2026-11-04T09:00:00.000Z" },
+      },
+    ])("$name a thread and keeps it there", async ({ change, placement }) => {
+      const thread = await aStartedThreadOf(ana);
+      const result = await placeThread(ana, {
+        threadId: thread.id,
+        change: change(),
+      });
+      expect(result).toEqual({
+        ok: true,
+        value: expect.objectContaining(placement),
+      });
+      expect(await listed(ana, thread.id)).toEqual(result.ok && result.value);
+    });
+
+    it("restores a settled thread to active", async () => {
+      const thread = await aStartedThreadOf(ana);
+      await placeThread(ana, {
+        threadId: thread.id,
+        change: { kind: "settle" },
+      });
+      await placeThread(ana, {
+        threadId: thread.id,
+        change: { kind: "restore" },
+      });
+      expect(await listed(ana, thread.id)).toEqual(thread);
+    });
+
+    it("reads a snooze whose time has come as woken, until the thread is opened", async () => {
+      const thread = await aStartedThreadOf(ana);
+      await placeThread(ana, {
+        threadId: thread.id,
+        change: { kind: "return", placement: { snoozedUntil: anHourAgo() } },
+      });
+      expect(await listed(ana, thread.id)).toMatchObject({
+        snoozedUntil: undefined,
+        wokeAt: expect.any(String),
+      });
+      await placeThread(ana, {
+        threadId: thread.id,
+        change: { kind: "acknowledgeWake" },
+      });
+      expect(await listed(ana, thread.id)).toEqual(thread);
+    });
+
+    it("refuses a snooze that ends in the past and keeps the thread as it was", async () => {
+      const thread = await aStartedThreadOf(ana);
+      expect(
+        await placeThread(ana, {
+          threadId: thread.id,
+          change: { kind: "snooze", until: anHourAgo() },
+        }),
+      ).toEqual({ ok: false, error: { _tag: "SnoozeTimeInPast" } });
+      expect(await listed(ana, thread.id)).toEqual(thread);
+    });
+
+    // Ben cannot settle or snooze Ana's thread; it is a NotFound and her thread stays active.
+    let placedThreadId = "";
+    assertIsolation({
+      name: "placeThread, listThreads",
+      ownerA: OwnerId(ana.userId),
+      ownerB: OwnerId(ben.userId),
+      arrange: async (owner) => {
+        placedThreadId = (await aStartedThreadOf(aRequester(owner))).id;
+      },
+      read: (owner) => listed(aRequester(owner), placedThreadId),
+      change: async (owner) => {
+        const ben = aRequester(owner);
+        await placeThread(ben, {
+          threadId: placedThreadId,
+          change: { kind: "settle" },
+        });
+        await placeThread(ben, {
+          threadId: placedThreadId,
+          change: { kind: "snooze", until: inAnHour() },
+        });
+      },
     });
 
     // Ben sending a thread id Ana already uses is refused; her thread stays as it was.

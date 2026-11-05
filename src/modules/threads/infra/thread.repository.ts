@@ -15,6 +15,7 @@ import {
   toMessage,
   toMessageRows,
   toThread,
+  toThreadChanges,
   toThreadRow,
 } from "./thread.mapper";
 
@@ -56,6 +57,20 @@ export const threadRepository = defineRepository<ThreadRepository>({
             .insert(threadMessagesTable)
             .values(toMessageRows(ownerId, thread.id, messages));
       }),
+    );
+  },
+
+  async update(ownerId: OwnerId, thread: Thread): Promise<void> {
+    await writing(() =>
+      db()
+        .update(threadsTable)
+        .set(toThreadChanges(thread))
+        .where(
+          and(
+            eq(threadsTable.ownerId, ownerId),
+            eq(threadsTable.id, thread.id),
+          ),
+        ),
     );
   },
 

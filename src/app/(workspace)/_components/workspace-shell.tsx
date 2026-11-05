@@ -72,6 +72,14 @@ export function WorkspaceShell({
   user: { name: string; email: string };
 }) {
   const { sourceById } = useSources();
+  const [threadNotice, setThreadNotice] = useState<{
+    message: string;
+    undo?: {
+      threadId: string;
+      placement: ThreadPlacement;
+      returnToThread: boolean;
+    };
+  }>();
   const {
     threads,
     settleThread,
@@ -82,16 +90,13 @@ export function WorkspaceShell({
     startThread,
     continueThread,
     forkThread,
-  } = useThreads(initialThreads);
+  } = useThreads(initialThreads, {
+    onPlacementNotStored: () =>
+      setThreadNotice({
+        message: "The session could not be moved. Try again.",
+      }),
+  });
   const [chatStore] = useState(() => new ChatStore());
-  const [threadNotice, setThreadNotice] = useState<{
-    message: string;
-    undo?: {
-      threadId: string;
-      placement: ThreadPlacement;
-      returnToThread: boolean;
-    };
-  }>();
   const [projects, setProjects] = useState(initialProjects);
   // The project a new thread goes into; null: no project.
   const [projectId, setProjectId] = useState<string | null>(null);
@@ -291,6 +296,9 @@ export function WorkspaceShell({
     if (!model) return false;
     const message = { text: prompt, attachments };
     if (activeThread) {
+      // Until the stored conversation is here, the composer keeps the draft: a send now would
+      // show without the messages before it.
+      if (chatStore.loadState(activeThread.id) === "loading") return false;
       const continued = continueThread(
         activeThread,
         model.provider,
