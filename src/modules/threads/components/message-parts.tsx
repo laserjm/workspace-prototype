@@ -2,7 +2,7 @@
 
 import { HtmlRenderFrame } from "@/components/ui/html-render-frame";
 import { Markdown } from "@/components/ui/markdown";
-import type { WorkspaceUIMessage } from "../contracts";
+import type { WorkspaceUIMessage } from "@/modules/agent";
 import { preparingDotClassName } from "./response-turn";
 
 type MessagePart = WorkspaceUIMessage["parts"][number];

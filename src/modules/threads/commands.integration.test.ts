@@ -10,11 +10,8 @@ import { withUsers } from "@/tests/support/users";
 import { callAs } from "@/tests/support/session";
 import { aUser } from "@/tests/factories/user";
 import { answerThread, forkThread, placeThread, startThread } from "./commands";
-import type {
-  StartThreadInput,
-  ThreadChange,
-  WorkspaceUIMessage,
-} from "./contracts";
+import type { WorkspaceUIMessage } from "@/modules/agent";
+import type { StartThreadInput, ThreadChange } from "./contracts";
 import { threadRepository } from "./infra/thread.repository";
 import { listThreadMessages, listThreads } from "./queries";
 

@@ -1,7 +1,6 @@
 import "server-only";
-import type { Skill } from "@/modules/skills";
 import { recordCountLabel, type SourceRecord } from "@/modules/sources";
-import type { AttachedRecords } from "../application/ports";
+import type { AgentContext, AttachedRecords } from "./context";
 
 export const workspaceInstructions = `# Identity
 
@@ -56,7 +55,7 @@ function sourceContext({ source, records, recordCount }: AttachedRecords) {
 }
 
 /** Base instructions, then the selected skill, then the attached records. */
-export function instructionsFor(skill?: Skill, attached?: AttachedRecords) {
+export function instructionsFor({ skill, attached }: AgentContext) {
   return [
     workspaceInstructions,
     skill && `# Skill: ${skill.name}\n\n${skill.instructions}`,

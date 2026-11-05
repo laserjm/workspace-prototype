@@ -1,6 +1,6 @@
 // The errors more than one module answers with. Same shapes as `@conventions/nextjs/core`'s, so
-// either can be returned while the app moves off the package (ARCHITECTURE.md, "Leaving
-// @conventions/nextjs").
+// either can be returned while the app moves off the package (ARCHITECTURE.md, "Runtime
+// helpers from @conventions/nextjs").
 
 /** A constraint refused the write: a unique key, a check, a foreign key. */
 export type Conflict = { readonly _tag: "Conflict"; readonly constraint: string };
@@ -16,6 +16,12 @@ export type NotFound = {
   readonly entity: string;
   readonly id?: string;
 };
+
+export const notFound = (entity: string, id?: string): NotFound => ({
+  _tag: "NotFound",
+  entity,
+  ...(id === undefined ? {} : { id }),
+});
 
 /** The input did not match the action's schema. `path` is dotted: `change.until`. */
 export type ValidationFailed = {

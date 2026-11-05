@@ -1,5 +1,5 @@
 import type { UserId } from "@/lib/auth/user";
-import type { WorkspaceUIMessage } from "../../contracts";
+import type { WorkspaceUIMessage } from "@/modules/agent";
 import type { Thread } from "../../domain/thread";
 import type { ThreadRepository } from "../ports";
 

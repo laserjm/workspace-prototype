@@ -40,13 +40,13 @@ import {
   useThreads,
   useThreadWorking,
   type ForkTarget,
-  type ModelChoice,
   type SnoozeTimeInPast,
   type Thread,
   type ThreadPlacement,
   type ThreadScope,
   type ThreadStillWorking,
 } from "@/modules/threads";
+import type { ModelChoice } from "@/modules/agent";
 import { NewThreadHeading } from "./new-thread-heading";
 import { WorkspaceSettings, type SettingsSection } from "./workspace-settings";
 import { WorkspaceSidebar } from "./workspace-sidebar";

@@ -135,7 +135,8 @@ app/
     sign-in/, sign-out/         start the Keycloak sign-in and end the session
     auth/[...all]/              Better Auth's endpoints (the Keycloak callback)
 modules/
-  threads/                      sessions: settle, snooze, wake, fork, the AI chat and its agent
+  agent/                        the runtime AI: models, instructions, tools, the agent loop
+  threads/                      conversations: settle, snooze, wake, fork, the chat UI
   sources/                      Jira, Confluence and Codebeamer sample records, picker, explorer
   skills/                       skill catalogue, picker, settings panel, browser-stored activation
   projects/                     project list, add-project form, sidebar filter
@@ -148,8 +149,8 @@ A module is reached from outside only through `index.ts` (browser-safe) or `serv
 (server-only); ESLint refuses any deeper import. Inside, `contracts.ts` holds types and input
 schemas, `queries.ts` the reads, `actions.ts` the server actions and `components/` the browser
 UI. `threads` still has its older layers (`domain/`, `application/`, `infra/`); its
-`application/answer-thread.ts` is the use case behind `POST /api/threads/[id]/messages`, with
-the AI Gateway adapters in `infra/ai-gateway.*.ts`. See "Module shape" in ARCHITECTURE.md.
+`application/answer-thread.ts` is the use case behind `POST /api/threads/[id]/messages`, and it
+hands the conversation to `runAgent` (`agent/run.ts`). See "Module shape" in ARCHITECTURE.md.
 
 ```sh
 pnpm lint          # ESLint, design tokens (scripts/check-styles.mjs), server actions (scripts/check-actions.mjs)

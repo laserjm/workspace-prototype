@@ -7,10 +7,10 @@ import {
   normalizeHtmlRenderTitle,
   viewportHeightErrorMessage,
 } from "@/lib/html-render/html-render";
-import { htmlRenderInputSchema, type HtmlRenderOutput } from "../contracts";
+import { htmlRenderInputSchema, type HtmlRenderOutput } from "./contracts";
 
 /** `html_render`, adapted from T3 Code (MIT); see THIRD_PARTY_NOTICES.md. */
-export const aiSdkHtmlRenderTool = tool({
+export const htmlRenderTool = tool({
   description: HTML_RENDER_DESCRIPTION,
   inputSchema: htmlRenderInputSchema,
   // The page itself stays in the tool input, which the client renders. A thrown error goes

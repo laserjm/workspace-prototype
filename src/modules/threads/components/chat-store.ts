@@ -2,7 +2,7 @@
 
 import { Chat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
-import type { ChatOptions, WorkspaceUIMessage } from "../contracts";
+import type { ChatOptions, WorkspaceUIMessage } from "@/modules/agent";
 
 export type ConversationLoad = "loading" | "failed" | "ready";
 

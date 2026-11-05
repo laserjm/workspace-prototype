@@ -1,7 +1,7 @@
 import type { UserId } from "@/lib/auth/user";
 import type { threadMessagesTable, threadsTable } from "@/lib/db/schema";
-import type { WorkspaceUIMessage } from "../contracts";
-import type { ModelProvider, Thread, ThreadPlacement } from "../domain/thread";
+import type { ModelProvider, WorkspaceUIMessage } from "@/modules/agent";
+import type { Thread, ThreadPlacement } from "../domain/thread";
 
 type ThreadRow = typeof threadsTable.$inferSelect;
 type NewThreadRow = typeof threadsTable.$inferInsert;
@@ -68,7 +68,7 @@ export function toThreadRow(userId: UserId, thread: Thread): NewThreadRow {
   };
 }
 
-// The rows hold what the agent validated before it streamed (ai-gateway.response-agent.ts).
+// The rows hold what the agent validated before it streamed (runAgent, modules/agent/run.ts).
 export function toMessage(row: MessageRow): WorkspaceUIMessage {
   return {
     id: row.id,

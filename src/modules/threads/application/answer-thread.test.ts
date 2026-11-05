@@ -1,31 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { err } from "@/lib/result";
+import type { WorkspaceUIMessage } from "@/modules/agent";
 import { aUser } from "@/tests/factories/user";
-import { aSkill } from "@/tests/factories/skill";
-import { aSource, aSourceRecord } from "@/tests/factories/source";
 import { aThread } from "@/tests/factories/thread";
-import type { WorkspaceUIMessage } from "../contracts";
 import type { Thread } from "../domain/thread";
-import { inMemoryResponseAgent } from "./__fakes__/response-agent.fake";
+import { fakeAgent } from "./__fakes__/agent.fake";
 import { inMemoryThreadRepository } from "./__fakes__/thread-repository.fake";
 import { answerThread, type AnswerThreadInput } from "./answer-thread";
-import type { GatewayModel } from "./ports";
-
-const opus: GatewayModel = {
-  id: "opus",
-  label: "Opus 5.5",
-  effort: "High",
-  provider: "claude",
-  gateway: "anthropic/claude-opus-5.5",
-};
-const riskReview = aSkill({ id: "risk-review", name: "Risk review" });
-const jira = aSource({
-  id: "jira",
-  records: [
-    aSourceRecord({ id: "PLAT-124" }),
-    aSourceRecord({ id: "PLAT-125" }),
-    aSourceRecord({ id: "PLAT-126" }),
-  ],
-});
 
 const ana = aUser("ana");
 const threadId = "6f1c1c1e-2d6b-4f43-9a51-2a0d9a3c1e01";
@@ -45,21 +26,14 @@ async function setup(
   stored: WorkspaceUIMessage[] = [],
   thread: Partial<Thread> = {},
 ) {
-  const { agent, requests } = inMemoryResponseAgent();
+  const { agent, requests } = fakeAgent();
   const { repository, conversations, threadOf } = inMemoryThreadRepository();
   await repository.save(
     ana.id,
     aThread({ id: threadId, ...thread }),
     stored,
   );
-  const deps = {
-    user: ana,
-    threads: repository,
-    models: [opus],
-    skills: [riskReview],
-    sources: [jira],
-    agent,
-  };
+  const deps = { user: ana, threads: repository, agent };
   return { deps, requests, conversations, threadOf };
 }
 
@@ -70,15 +44,17 @@ const request: AnswerThreadInput = {
 };
 
 describe("answerThread", () => {
-  it("answers with the chosen model and no context when nothing is attached", async () => {
+  it("asks the agent with the browser's options and the conversation", async () => {
     const { deps, requests } = await setup();
-    const result = await answerThread(request, deps);
+    const scope = { sourceId: "jira", recordIds: ["PLAT-124"] };
+    const result = await answerThread(
+      { ...request, skillId: "risk-review", scope },
+      deps,
+    );
     expect(result.ok).toBe(true);
     expect(requests).toEqual([
       {
-        model: opus,
-        skill: undefined,
-        attached: undefined,
+        options: { modelId: "opus", skillId: "risk-review", scope },
         messages: [request.message],
         signal: undefined,
         onEnd: expect.any(Function),
@@ -123,7 +99,7 @@ describe("answerThread", () => {
     },
     { name: "woken", placement: { wokeAt: "2026-11-04T09:00:00.000Z" } },
   ])(
-    "returns a $name thread to active, talking to the model's provider",
+    "returns a $name thread to active, talking to the answering model's provider",
     async ({ placement }) => {
       const { deps, threadOf } = await setup([], {
         ...placement,
@@ -150,61 +126,19 @@ describe("answerThread", () => {
     expect(requests).toEqual([]);
   });
 
-  it("resolves the skill and only the records the thread named, in the source's order", async () => {
-    const { deps, requests } = await setup();
-    await answerThread(
-      {
-        ...request,
-        skillId: "risk-review",
-        scope: { sourceId: "jira", recordIds: ["PLAT-126", "PLAT-124"] },
-      },
-      deps,
-    );
-    expect(requests[0]?.skill).toBe(riskReview);
-    expect(requests[0]?.attached?.records.map((record) => record.id)).toEqual([
-      "PLAT-124",
-      "PLAT-126",
-    ]);
-    expect(requests[0]?.attached?.recordCount).toBe(2);
-  });
-
-  it("attaches nothing when none of the named records exist", async () => {
-    const { deps, requests } = await setup();
-    await answerThread(
-      { ...request, scope: { sourceId: "jira", recordIds: ["GONE-1"] } },
-      deps,
-    );
-    expect(requests[0]?.attached).toBeUndefined();
-  });
-
-  it.each([
-    {
-      name: "model",
-      change: { modelId: "gpt-0" },
+  it("passes on the agent's refusal and leaves the thread where it was", async () => {
+    const placement = { settledAt: "2026-11-04T09:00:00.000Z" };
+    const { deps, threadOf } = await setup([], placement);
+    const refusal = err({
+      _tag: "NotFound" as const,
       entity: "Model",
       id: "gpt-0",
-    },
-    {
-      name: "skill",
-      change: { skillId: "poetry" },
-      entity: "Skill",
-      id: "poetry",
-    },
-    {
-      name: "source",
-      change: { scope: { sourceId: "sharepoint", recordIds: ["X-1"] } },
-      entity: "Source",
-      id: "sharepoint",
-    },
-  ])(
-    "refuses an unknown $name without calling the agent",
-    async ({ change, entity, id }) => {
-      const { deps, requests } = await setup();
-      expect(await answerThread({ ...request, ...change }, deps)).toEqual({
-        ok: false,
-        error: { _tag: "NotFound", entity, id },
-      });
-      expect(requests).toEqual([]);
-    },
-  );
+    });
+    const result = await answerThread(request, {
+      ...deps,
+      agent: async () => refusal,
+    });
+    expect(result).toEqual(refusal);
+    expect(threadOf(threadId)).toMatchObject(placement);
+  });
 });

@@ -7,9 +7,8 @@ import {
   err,
 } from "@conventions/nextjs/core";
 import type { User } from "@/lib/auth/user";
+import { runAgent } from "@/modules/agent/server";
 import { findProject } from "@/modules/projects/server";
-import { listSkills } from "@/modules/skills/server";
-import { listSources } from "@/modules/sources/server";
 import { answerThread as answer } from "./application/answer-thread";
 import { forkThread as fork } from "./application/fork-thread";
 import { placeThread as place } from "./application/place-thread";
@@ -21,8 +20,6 @@ import {
   type PlaceThreadInput,
   type StartThreadInput,
 } from "./contracts";
-import { aiGatewayModelCatalog } from "./infra/ai-gateway.model-catalog";
-import { aiGatewayResponseAgent } from "./infra/ai-gateway.response-agent";
 import { threadRepository } from "./infra/thread.repository";
 
 /** Stores the new thread the user's first message starts. */
@@ -99,17 +96,9 @@ export async function answerThread(
   if (!threadIdSchema.safeParse(threadId).success) return threadNotFound();
   const request = chatTurnDtoSchema.safeParse(body);
   if (!request.success) return badRequest("Invalid chat request.");
-  const [skills, sources] = await Promise.all([listSkills(), listSources()]);
   const result = await answer(
     { ...request.data, threadId, signal },
-    {
-      user,
-      threads: threadRepository,
-      models: aiGatewayModelCatalog,
-      skills,
-      sources,
-      agent: aiGatewayResponseAgent,
-    },
+    { user, threads: threadRepository, agent: runAgent },
   );
   if (result.ok) return result.value;
   switch (result.error._tag) {

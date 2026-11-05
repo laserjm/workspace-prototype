@@ -70,8 +70,9 @@ test (see "Command tests").
 
 ### Modules
 
-**Decision.** Four modules. `threads` (rich: sessions, settle, snooze, wake, fork, the live
-chat and its answers), `sources` (the enterprise systems and their records; a read-only domain),
+**Decision.** Five modules. `agent` (the runtime AI: the model allowlist, instructions, tools
+and the agent loop; see "Answers come from the Vercel AI Gateway"), `threads` (rich:
+conversations, settle, snooze, wake, fork, the live chat), `sources` (the enterprise systems and their records; a read-only domain),
 `skills` (the skill catalogue and its activation in this browser) and `projects` (the project
 list, the add-project rule and the sidebar filter). `app/(workspace)/` composes them; its
 `_components/` hold the shell, sidebar, settings and new-thread heading, which only that route
@@ -84,7 +85,8 @@ by anything but `index` or `server` is an error); the `server-only` import in ev
 
 ### Cross-module references are ids
 
-**Decision.** A module's `domain/` imports nothing from another module, so a
+**Decision.** A module's `domain/` imports no value from another module, only a type such as
+`ModelProvider` from `agent`, so a
 thread refers to its source, records and skill by id (`ThreadScope = { sourceId, recordIds }`,
 `skillId`). Components resolve the ids through the other module's public API
 (`useSources().sourceById`, `useSkills().skillById`). Source-specific presentation (overview
@@ -159,7 +161,7 @@ The conversation follows the AI SDK's message persistence: one `thread_messages`
 message (`prepareSendMessagesRequest` in `ChatStore`); the server puts it after the stored
 conversation, or in its old place when it is sent again, dropping what came after it, which is
 how a regenerate replaces a reply (`withLatestMessage`, `domain/conversation.ts`). When the
-reply ends, finished, stopped or failed, the response agent hands the conversation with the
+reply ends, finished, stopped or failed, `runAgent` hands the conversation with the
 reply to `saveMessages`, which replaces the stored one in a transaction; the stream is read to
 its end on the server (`consumeSseStream`) so the reply is stored even if the browser went away.
 The server names the replies (`generateMessageId`). A thread's chat loads its conversation from
@@ -223,18 +225,32 @@ pure domain rules are tested by example in `domain/*.test.ts`.
 ### Answers come from the Vercel AI Gateway
 
 **Decision.** `POST /api/threads/[id]/messages` (`app/api/threads/[id]/messages/route.ts`) only
-reads the user and hands them, the thread id and the body to `answerThread` from `modules/threads/server.ts`. `modules/threads/commands.ts` validates them
-with `threadIdSchema` (an id that is not a uuid is a 404) and `chatTurnDtoSchema` at the edge and runs the use case `application/answer-thread.ts`.
-The use case resolves the model, skill and records from their ids against the server's
-catalogues (unknown ids are `NotFound`, answered with a 400), finds the thread among the
-user's (another user's thread is a `NotFound` like a missing one, answered with a 404) and
-asks the `ResponseAgent` port to stream the stored conversation with the new message, then to
-store it when the reply ends (see "Stored projects, threads, conversations and placement"). `infra/ai-gateway.response-agent.ts` implements the port with an AI SDK
-`ToolLoopAgent` on the gateway, with the instructions in `infra/ai-gateway.instructions.ts`,
-the model allowlist in `infra/ai-gateway.model-catalog.ts` and the `html_render` tool in
-`infra/ai-sdk.html-render-tool.ts`. The tool's input and output schemas are in
-`contracts.ts`, so the browser's message types never import `infra/`. The route reads the
-user and answers 401 without one. The command takes them as its first argument, and the use case answers and stores only the user's threads. The frame that shows an `html_render` page is feature-agnostic and lives in
+reads the user and hands them, the thread id and the body to `answerThread` from
+`modules/threads/server.ts`. `modules/threads/commands.ts` validates the id with
+`threadIdSchema` (an id that is not a uuid is a 404) and the body with `chatTurnDtoSchema`, and
+runs the use case `application/answer-thread.ts`. The use case finds the thread among the
+user's (another user's thread is a `NotFound` like a missing one, answered with a 404), puts
+the new message after the stored conversation and hands both to `runAgent` from
+`modules/agent/server.ts`. Once the agent answers, the thread returns to active and records the
+provider of the model that answered.
+
+The `agent` module is the runtime AI, flat by file:
+- `run.ts`: `runAgent(request)` resolves the context, validates the conversation against the
+  tools and streams the reply with an AI SDK `ToolLoopAgent` on the gateway (at most 5 steps),
+  then hands the conversation to `onEnd`. It returns the response and the model.
+- `context.ts`: `resolveContext` turns the browser's ids into the model, skill and records
+  (unknown ids are `NotFound`, answered with a 400), so the prompt only ever holds what the
+  server offers.
+- `models.ts`: the model allowlist with gateway ids, and `listModelChoices` for the composer.
+- `instructions.ts`: the base instructions, then the skill, then the attached records.
+- `tools.ts`: every tool the model can call. Stored conversations hold the tool names and every
+  send validates the whole conversation against this set, so a tool is never renamed and a
+  removed one keeps a stub under its name.
+- `html-render.tool.ts`: the agent's own tool; a module's tool lives in that module.
+- `contracts.ts`: the browser-safe types (`WorkspaceUIMessage`, the tool schemas, `ModelChoice`,
+  `ChatOptions`), so the chat UI never imports the server side.
+
+The frame that shows an `html_render` page is feature-agnostic and lives in
 `components/ui/html-render-*.tsx`; the helpers both sides share are in `lib/html-render/`.
 Message text renders as Markdown through `components/ui/markdown.tsx`: GitHub-flavoured, `$$`
 math, raw HTML shown as text, a user's single newlines kept. `lib/markdown/` holds the plugins,
@@ -247,7 +263,7 @@ all three take their colours from the tokens, so `globals.css` stays the only st
 to GitHub pull requests and issues, GitLab merge requests and files show as chips. The
 instructions point diagrams at Mermaid, math at `$$`, tables at Markdown, and charts from
 data and long or sortable tables at `html_render`.
-**Enforced by.** `answer-thread.test.ts` and the command tests.
+**Enforced by.** `agent/context.test.ts`, `answer-thread.test.ts` and the command tests.
 **Recorded in.** This entry.
 
 ### Styling: design tokens and Tailwind classes

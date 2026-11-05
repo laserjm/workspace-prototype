@@ -1,6 +1,5 @@
 // Browser-safe public API of the threads module.
 export type {
-  ModelProvider,
   NewThread,
   ResponseTiming,
   Thread,
@@ -9,7 +8,6 @@ export type {
   ThreadShelf,
 } from "./domain/thread";
 export { createScope, placementOf, shelfOf } from "./domain/thread";
-export type { ModelChoice } from "./domain/model-choice";
 export type { SnoozePreset } from "./domain/snooze";
 export type {
   ScopeHasNoRecords,
@@ -19,13 +17,9 @@ export type {
   ThreadStillWorking,
 } from "./domain/errors";
 export {
-  chatOptionsSchema,
   chatTurnDtoSchema,
-  type ChatOptions,
   type ChatTurnDto,
   type StartThreadInput,
-  type WorkspaceMessageMetadata,
-  type WorkspaceUIMessage,
 } from "./contracts";
 export { ChatStore } from "./components/chat-store";
 export { ChatStoreProvider } from "./components/chat-store-provider";
