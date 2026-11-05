@@ -12,6 +12,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: lint (eslint + ast-grep + ls-lint, rule ids in every message)
         run: pnpm exec conventions lint
+      - name: styling on the design tokens (STYLE-01…03, scripts/check-styles.mjs)
+        run: pnpm lint:styles
       - name: structural checks (modules, tests, header, deviations, inventory)
         run: pnpm exec conventions check
       - name: schema drift (NX-DB-01) — a schema.ts change needs its generated migration

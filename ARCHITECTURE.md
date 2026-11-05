@@ -254,6 +254,33 @@ requester and answers 401 without one. The command takes it as its first argumen
 `boundaries/external` (the ORM-free, framework-free `application/`).
 **Recorded in.** This entry.
 
+### Styling: design tokens and Tailwind classes
+
+**Decision.** `src/app/globals.css` is the only stylesheet. It holds the design tokens in three
+layers, after T3 Code's `apps/web/src/index.css`: Tailwind's scales plus the dense type sizes
+below `text-xs` (`text-2xs` 11px down to `text-5xs` 7px, registered with `cn` in
+`lib/utils.ts`); semantic variables in `:root` (the workspace's warm greys) and `.dark`; and
+`@theme inline` mappings that make them utilities (`bg-sidebar-row-hover`,
+`text-secondary-label`, `shadow-popover`). Components style themselves with Tailwind classes
+on those tokens and nothing else: no hex colours, no font sizes off the type scale, no CSS
+files beside `globals.css`. Colours that only identify something (project letters, source
+marks, record status, priority, issue type) use Tailwind's palette with a `dark:` variant; a
+colour with meaning (errors, warnings, success) uses its token. Layout state that descendants
+react to is a data attribute on a named group: `data-sidebar` and `data-mobile-sidebar` on
+`group/app`, `data-session` and `data-source-panel` on `group/main` (read as
+`group-data-[sidebar=collapsed]/app:…`). Class names are literal strings, never assembled at
+runtime, because Tailwind finds them by scanning the source. The custom breakpoints keep the
+workspace's widths: `max-desktop:` (below 1200px), `3xl:` (1600px), `4xl:` (1800px), plus
+`short:`/`shorter:` for windows 720/650px tall and `touch:` for screens without hover. The
+type scale is the same at every width. Appearance is System, Light or Dark (Settings → General,
+`lib/theme/`), stored in this browser; an inline script in the root layout sets `.dark` on
+`<html>` before the first paint and follows the operating system while the choice is System.
+**Enforced by.** `scripts/check-styles.mjs` (`pnpm lint`, CI): STYLE-01 one stylesheet, STYLE-02
+no hex colours or colour functions, STYLE-03 no arbitrary font sizes. Its allowlist names two
+files: `lib/html-render/html-render.ts`, whose iframe pages cannot read the app's CSS
+variables, and the VS Code brand colour in `components/ui/vscode-icon.tsx`.
+**Recorded in.** This entry; the colour-mapping comment in `globals.css`.
+
 ## Deviations
 
 <!-- Rules this project does not follow yet. Name the files or globs in backticks in the Deviation column: findings of that rule there are warnings, not errors; a row without paths covers the whole project. A disabled rule in source without a row here fails `conventions check`. Review quarterly. -->

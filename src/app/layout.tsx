@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist_Mono, Inter } from "next/font/google";
+import { themeScript } from "@/lib/theme/theme";
 import "./globals.css";
 
 const inter = Inter({
@@ -20,10 +21,16 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
+    // The theme script may add `.dark` to <html> before React hydrates.
     <html
       lang="en"
       className={`${inter.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
+      <head>
+        {/* Before the first paint, so the page never flashes the wrong theme. */}
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );
