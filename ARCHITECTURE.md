@@ -252,7 +252,10 @@ requester and answers 401 without one. The command takes it as its first argumen
 `components/ui/html-render-*.tsx`; the helpers both sides share are in `lib/html-render/`.
 Message text renders as Markdown through `components/ui/markdown.tsx`: GitHub-flavoured, raw
 HTML shown as text, a user's single newlines kept. `lib/markdown/` holds the plugins and the
-block splitting that lets a streamed reply re-render only its last block.
+block splitting that lets a streamed reply re-render only its last block. A ```` ```mermaid ````
+fence is drawn by `components/ui/mermaid-diagram.tsx` with Pele, themed through the tokens, once
+its block has finished streaming; the instructions point diagrams there and charts from data at
+`html_render`.
 **Enforced by.** `conventions check` (`use-case-test`, `rich-shape`), `boundaries/element-types`,
 `boundaries/external` (the ORM-free, framework-free `application/`).
 **Recorded in.** This entry.

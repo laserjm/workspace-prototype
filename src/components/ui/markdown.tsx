@@ -16,15 +16,20 @@ import ReactMarkdown, {
   type Components,
   type ExtraProps,
 } from "react-markdown";
+import { mermaidSource } from "@/lib/markdown/mermaid";
 import {
   markdownPlugins,
   markdownPluginsWithBreaks,
 } from "@/lib/markdown/plugins";
 import { splitMarkdownBlocks } from "@/lib/markdown/split-blocks";
 import { cn } from "@/lib/utils";
+import { MermaidDiagram } from "./mermaid-diagram";
 
 /** Inside a fenced or indented code block, where `code` is not inline code. */
 const InCodeBlock = createContext(false);
+
+/** False for the block a reply is still streaming into, whose last fence may be unclosed. */
+const BlockSettled = createContext(true);
 
 /** The props react-markdown passes, without the hast node it adds for renderers that read it. */
 function withoutNode<P extends ExtraProps>(props: P): Omit<P, "node"> {
@@ -96,9 +101,10 @@ const components: Components = {
       />
     );
   },
-  pre: function MarkdownCodeBlock(props) {
-    const { className, ...rest } = withoutNode(props);
-    return (
+  pre: function MarkdownCodeBlock({ node, className, ...rest }) {
+    // A diagram is drawn once its block can no longer change.
+    const diagram = use(BlockSettled) ? mermaidSource(node) : null;
+    const block = (
       <InCodeBlock value>
         <pre
           {...rest}
@@ -109,6 +115,11 @@ const components: Components = {
           )}
         />
       </InCodeBlock>
+    );
+    return diagram ? (
+      <MermaidDiagram source={diagram}>{block}</MermaidDiagram>
+    ) : (
+      block
     );
   },
   code: function MarkdownCode(props) {
@@ -145,17 +156,21 @@ const components: Components = {
 const MarkdownBlock = memo(function MarkdownBlock({
   text,
   lineBreaks,
+  settled,
 }: {
   text: string;
   lineBreaks: boolean;
+  settled: boolean;
 }) {
   return (
-    <ReactMarkdown
-      remarkPlugins={lineBreaks ? markdownPluginsWithBreaks : markdownPlugins}
-      components={components}
-    >
-      {text}
-    </ReactMarkdown>
+    <BlockSettled value={settled}>
+      <ReactMarkdown
+        remarkPlugins={lineBreaks ? markdownPluginsWithBreaks : markdownPlugins}
+        components={components}
+      >
+        {text}
+      </ReactMarkdown>
+    </BlockSettled>
   );
 });
 
@@ -175,6 +190,7 @@ export function Markdown({
   lineBreaks?: boolean;
   streaming?: boolean;
 } & Omit<ComponentProps<"div">, "children">) {
+  const blocks = splitMarkdownBlocks(text);
   return (
     <div
       {...props}
@@ -188,9 +204,14 @@ export function Markdown({
         className,
       )}
     >
-      {splitMarkdownBlocks(text).map((block, index) => (
+      {blocks.map((block, index) => (
         // Blocks only change at the end of the text, so an index keeps its block.
-        <MarkdownBlock key={index} text={block} lineBreaks={lineBreaks} />
+        <MarkdownBlock
+          key={index}
+          text={block}
+          lineBreaks={lineBreaks}
+          settled={!streaming || index < blocks.length - 1}
+        />
       ))}
     </div>
   );

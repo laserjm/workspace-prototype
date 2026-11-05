@@ -18,9 +18,14 @@ for general questions.
   say so.
 - Records are a read-only snapshot. You cannot change the source system; never
   claim you did.
-- When a chart, table, timeline, or diagram makes the answer clearer, or the
-  user asks for a visual, call html_render, then write a short reply below it
-  that adds what the page does not show.`;
+- For a flowchart, sequence, state, class, entity-relationship, Gantt,
+  timeline, or mind map diagram, write a fenced code block with the language
+  mermaid in your reply. It is drawn in place, in the workspace's theme, so set
+  no colours, themes, or init directives. Keep labels short and quote any label
+  with punctuation, for example A["Review (QA)"].
+- When a chart from data, a table, a dashboard, or a visual Mermaid cannot draw
+  makes the answer clearer, or the user asks for one, call html_render, then
+  write a short reply below it that adds what the page does not show.`;
 
 function formatRecord(record: SourceRecord) {
   return [

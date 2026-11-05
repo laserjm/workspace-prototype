@@ -60,7 +60,7 @@ export const HTML_RENDER_LAYOUT_GUIDE = [
 export const HTML_RENDER_PAGE_RULES =
   "Write a complete, self-contained document. Inline <style> and <script>. Remote URLs (for example a chart library from a CDN) load as-is.";
 
-export const HTML_RENDER_DESCRIPTION = `Show a finished HTML page (chart, table, diagram, timeline, mockup) inline in this thread, above your final reply. Use it when a visual makes the answer clearer or the user asks for one. Do not announce or restate the page. Frame fits height up to ${HTML_RENDER_MAX_FIT_HEIGHT}px. ${HTML_RENDER_PAGE_RULES} ${HTML_RENDER_LAYOUT_GUIDE} ${HTML_RENDER_THEME_GUIDE}`;
+export const HTML_RENDER_DESCRIPTION = `Show a finished HTML page (chart, table, dashboard, mockup, or a diagram Mermaid cannot draw) inline in this thread, above your final reply. Use it when a visual makes the answer clearer or the user asks for one. Do not announce or restate the page. Frame fits height up to ${HTML_RENDER_MAX_FIT_HEIGHT}px. ${HTML_RENDER_PAGE_RULES} ${HTML_RENDER_LAYOUT_GUIDE} ${HTML_RENDER_THEME_GUIDE}`;
 
 // Check only stylesheets and style attributes, even inside scripts; skip comments whole.
 // Consume unclosed comments, tags, or quotes through EOF to keep both patterns linear.
