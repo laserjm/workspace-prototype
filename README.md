@@ -121,7 +121,7 @@ On desktop, drag the source panel’s left edge to resize it. The width is remem
 
 ## Project structure
 
-The app follows the [`nextjs` conventions profile](https://github.com/laserjm/conventions) 0.3.0.
+The app follows the [`nextjs` conventions profile](https://github.com/laserjm/conventions) 0.3.2.
 [ARCHITECTURE.md](ARCHITECTURE.md) pins the version and records how this project applies the
 rules. Paths below are relative to `src/`, which `@/` points to.
 

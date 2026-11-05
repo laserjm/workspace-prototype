@@ -12,7 +12,7 @@ import { listProjects } from "./queries";
 
 // Command-level: the commands and queries against the compose Postgres, with a requester built
 // here instead of a session. Stands in for the use case's unit test and the repository's
-// integration test (ARCHITECTURE.md "Command tests", Deviations).
+// integration test (NX-TEST-01, NX-TEST-02; ARCHITECTURE.md "Command tests").
 describeIntegration(
   "projects commands",
   () => {

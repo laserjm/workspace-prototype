@@ -1,7 +1,7 @@
 # Project conventions
 
 This project follows the `nextjs` conventions profile pinned in `ARCHITECTURE.md` (version
-0.3.0). Before writing or changing code:
+0.3.2). Before writing or changing code:
 
 - Read `ARCHITECTURE.md`: the header names the profile, bindings, app root, legacy folders and
   rulesets; the sections record this project's interpretations and deviations.

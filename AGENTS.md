@@ -10,7 +10,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## Conventions
 
-Conventions profile `nextjs` 0.3.0, pinned in `ARCHITECTURE.md` (read it first).
+Conventions profile `nextjs` 0.3.2, pinned in `ARCHITECTURE.md` (read it first).
 Lint what you change with `pnpm exec conventions lint <files>`, run `pnpm exec conventions check`
 before finishing, and read any rule with `pnpm exec conventions explain <RULE-ID>`. Never disable
 a rule; record a deviation in `ARCHITECTURE.md` instead.

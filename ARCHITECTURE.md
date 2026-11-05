@@ -2,7 +2,7 @@
 
 <!-- conventions header: read by the linter, `conventions check` and the conventions skill. Keep the keys. -->
 ```yaml
-conventions: 0.3.0
+conventions: 0.3.2
 profile: nextjs
 bindings: [drizzle, zod, next-safe-action]   # plain Postgres: no database-platform binding
 app-root: src
@@ -200,12 +200,11 @@ auth mocking is needed. `withOwners()` (`tests/support/owners.ts`) signs the tes
 deletes them afterwards. The same file calls `assertIsolation()` through the commands and
 queries (NX-AUTH-03). Actions are not tested: they only validate and hand the requester to the
 command. A use case with rules worth example tables keeps its unit test (`answer-thread.test.ts`);
-pure domain rules are tested by example in `domain/*.test.ts` (NX-TEST-06). The conventions
-change that lets a command test stand in for both is proposed upstream; until it is released,
-the Deviations below cover the two use cases and their repositories.
-**Enforced by.** `conventions check` (as warnings, per the Deviations rows); the command tests
-skip loudly without the stack (NX-TEST-03).
-**Recorded in.** This entry; Deviations.
+pure domain rules are tested by example in `domain/*.test.ts` (NX-TEST-06). Conventions 0.3.2
+accepts a command test in place of both (laserjm/conventions#29).
+**Enforced by.** `conventions check` (`use-case-test`, `repository-test`, `isolation-test`); the
+command tests skip loudly without the stack (NX-TEST-03).
+**Recorded in.** This entry.
 
 ### Answers come from the Vercel AI Gateway
 
@@ -233,8 +232,6 @@ the route does not yet check that the thread is the requester's. The frame that 
 
 | Rule | Deviation | Why | Until |
 | --- | --- | --- | --- |
-| NX-TEST-01 | `modules/projects/application/create-project.ts`, `modules/threads/application/start-thread.ts`: no unit test with fakes; the module's `commands.integration.test.ts` covers them | Thin use cases over one repository; see "Command tests" | The conventions release with command tests (laserjm/conventions#29, PR #30) |
-| NX-TEST-02 | `modules/projects/infra/project.repository.ts`, `modules/threads/infra/thread.repository.ts`: no repository integration test; the module's `commands.integration.test.ts` covers them, with `assertIsolation()` | See "Command tests" | The conventions release with command tests (laserjm/conventions#29, PR #30) |
 
 ## Legacy
 
