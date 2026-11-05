@@ -17,10 +17,8 @@ const TONES: Record<string, string> = {
     "border-violet-100 bg-violet-50 text-violet-600 dark:border-violet-400/20 dark:bg-violet-400/10 dark:text-violet-300",
 };
 
-// `source-mark` stays as a hook while workspace.css still sizes the mark in
-// the source-session heading.
 const mark = cva(
-  "source-mark inline-flex shrink-0 items-center justify-center",
+  "inline-flex shrink-0 items-center justify-center",
   {
     variants: {
       size: {

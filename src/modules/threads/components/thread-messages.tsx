@@ -3,6 +3,7 @@
 import { Fragment, useLayoutEffect, useRef } from "react";
 import { FileText } from "lucide-react";
 import { useChat } from "@ai-sdk/react";
+import { cn } from "@/lib/utils";
 import type { WorkspaceUIMessage } from "../contracts";
 import type { ModelChoice } from "../domain/model-choice";
 import type { Thread } from "../domain/thread";
@@ -11,6 +12,9 @@ import { LiveResponse } from "./live-response";
 import { useChatStore, useConversationLoad } from "./use-chat-store";
 
 export type ForkTarget = { messageId: string; responseIndex: number };
+
+const errorNotice =
+  "flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-destructive/20 bg-destructive/5 px-3.5 py-2.5 text-xs text-destructive-foreground [&>button]:rounded-sm [&>button]:border [&>button]:border-destructive/25 [&>button]:bg-card [&>button]:px-2.5 [&>button]:py-1 [&>button]:hover:bg-destructive/10";
 
 // Keep following the stream while the reader is within this distance of the end.
 const PINNED_DISTANCE = 80;
@@ -55,7 +59,11 @@ export function ThreadMessages({
 
   return (
     <div
-      className="conversation-messages"
+      className={cn(
+        "flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto py-6",
+        thread.scope &&
+          "gap-5.5 py-6.5 overscroll-contain [scrollbar-width:thin] max-md:pt-5.5",
+      )}
       ref={scrollRef}
       onScroll={(event) => {
         const element = event.currentTarget;
@@ -71,6 +79,7 @@ export function ThreadMessages({
           return (
             <Fragment key={message.id}>
               <UserMessage
+                inSession={!!thread.scope}
                 text={textOf(message)}
                 attachments={message.metadata?.attachments}
               />
@@ -111,12 +120,12 @@ export function ThreadMessages({
         );
       })}
       {load === "loading" && messages.length === 0 && (
-        <p className="conversation-loading" role="status">
+        <p className="text-xs text-secondary-label" role="status">
           Loading the conversation…
         </p>
       )}
       {load === "failed" && messages.length === 0 && (
-        <div className="response-error" role="alert">
+        <div className={errorNotice} role="alert">
           <span>The conversation could not be loaded.</span>
           <button type="button" onClick={() => void store.load(thread.id)}>
             Try again
@@ -124,7 +133,7 @@ export function ThreadMessages({
         </div>
       )}
       {error && !inFlight && (
-        <div className="response-error" role="alert">
+        <div className={errorNotice} role="alert">
           <span>The response did not finish. {error.message}</span>
           <button type="button" onClick={() => void store.retry(thread.id)}>
             Try again
@@ -138,13 +147,20 @@ export function ThreadMessages({
 function UserMessage({
   text,
   attachments,
+  inSession,
 }: {
   text: string;
   attachments?: string[];
+  inSession: boolean;
 }) {
   return (
-    <div className="user-message">
-      <p>{text}</p>
+    <div
+      className={cn(
+        "max-w-4/5 self-end rounded-2xl rounded-br-sm bg-accent px-4.5 py-3 text-sm",
+        inSession && "max-w-[88%] px-4 text-secondary-foreground",
+      )}
+    >
+      <p className="whitespace-pre-wrap wrap-anywhere">{text}</p>
       {attachments?.map((name, index) => (
         <span
           className={`${attachmentChipClassName} mt-2`}

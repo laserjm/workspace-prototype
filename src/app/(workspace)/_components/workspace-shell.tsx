@@ -467,11 +467,10 @@ export function WorkspaceShell({
 
             <main
               id="workspace-main"
-              // source-session stays as a hook while workspace.css still lays
-              // out the conversation of a source session.
+              // A source session sets the conversation beside the source panel.
               className={cn(
                 "group/main relative min-h-0 flex-1 outline-none",
-                activeThread?.scope && "source-session flex",
+                activeThread?.scope && "flex",
                 // A short window lets the new-thread draft scroll.
                 !activeThread && "short:overflow-y-auto",
               )}

@@ -8,12 +8,25 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { IconButton } from "@/components/ui/icon-button";
+import { cn } from "@/lib/utils";
 import type { ResponseTiming } from "../domain/thread";
 import {
   formatResponseDuration,
   formatResponseTime,
   formatResponseTimeTooltip,
 } from "./time-format";
+
+// Shown on hover or focus of their group, and always on touch screens.
+const revealOnWork =
+  "pointer-events-none opacity-0 transition-opacity duration-150 group-focus-within/work:pointer-events-auto group-focus-within/work:opacity-100 group-hover/work:pointer-events-auto group-hover/work:opacity-100 touch:pointer-events-auto touch:opacity-100";
+const revealOnMessage =
+  "pointer-events-none opacity-0 transition-opacity duration-200 group-focus-within/message:pointer-events-auto group-focus-within/message:opacity-100 group-hover/message:pointer-events-auto group-hover/message:opacity-100 touch:pointer-events-auto touch:opacity-100";
+const metaButton =
+  "size-6 rounded-sm [&_svg:not([class*='size-'])]:size-3.5";
+
+/** The small dot beside a response or page that is still being prepared. */
+export const preparingDotClassName =
+  "size-1.25 shrink-0 rounded-full bg-slate-400 dark:bg-slate-500";
 
 export function ResponseTurn({
   timing,
@@ -84,35 +97,43 @@ export function ResponseTurn({
   }
 
   return (
-    <article className="source-response" aria-label={label} aria-busy={working}>
-      <div className="response-work-group">
-        <div className="response-duration-row">
+    <article className="shrink-0 pb-2" aria-label={label} aria-busy={working}>
+      <div className="group/work mb-4 border-b border-border pb-2">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground tabular-nums">
           <button
             type="button"
-            className="response-duration-toggle"
+            className="inline-flex min-w-0 items-center gap-1 rounded-sm py-0.5 text-left hover:text-secondary-foreground"
             aria-expanded={expanded}
             aria-controls={workId}
             onClick={() => setExpanded((value) => !value)}
           >
-            <span className={working ? "response-working-label" : ""}>
-              {durationLabel}
-            </span>
+            <span>{durationLabel}</span>
             <ChevronRight
               size={14}
-              className={expanded ? "duration-chevron-open" : ""}
+              strokeWidth={1.7}
+              className={cn(
+                "shrink-0 transition-transform duration-120",
+                expanded && "rotate-90",
+              )}
             />
           </button>
           <ResponseTimestamp
             timestamp={timing.startedAt}
             kind="Started"
-            className="response-start-time"
+            className={cn("ml-auto rounded-xs text-xs", revealOnWork)}
           />
         </div>
-        <div id={workId} className="response-work-details" hidden={!expanded}>
+        <div
+          id={workId}
+          className="mt-2 border-l border-border pt-0.75 pb-1.25 pl-3 text-3xs text-muted-foreground/70 tabular-nums [&>div]:mb-2 [&>div]:flex [&>div]:items-center [&>div]:gap-3 [&>div>span]:w-10.5"
+          hidden={!expanded}
+        >
           {details.map((detail) => (
             <div key={detail.label}>
               <span>{detail.label}</span>
-              <strong>{detail.value}</strong>
+              <strong className="font-normal text-muted-foreground">
+                {detail.value}
+              </strong>
             </div>
           ))}
           <div>
@@ -129,36 +150,42 @@ export function ResponseTurn({
               </time>
             </div>
           )}
-          {note && <p>{note}</p>}
+          {note && (
+            <p className="max-w-92.5 pt-1 leading-relaxed">{note}</p>
+          )}
         </div>
       </div>
       {working && streaming ? (
-        <div className="response-message">
-          <div className="response-body" ref={bodyRef}>
-            {children}
-          </div>
+        <div className="group/message">
+          <div ref={bodyRef}>{children}</div>
         </div>
       ) : working ? (
-        <div className="response-preparing" role="status">
-          <span className="response-preparing-dot" />
+        <div
+          className="flex items-center gap-2 pt-px pb-3 text-2xs text-secondary-label"
+          role="status"
+        >
+          <span className={preparingDotClassName} />
           {preparingLabel}
         </div>
       ) : (
-        <div className="response-message">
-          <div className="response-body" ref={bodyRef}>
-            {children}
-          </div>
-          <div className="response-message-meta">
+        <div className="group/message">
+          <div ref={bodyRef}>{children}</div>
+          <div
+            className={cn(
+              "mt-2 flex min-h-7 items-center gap-2 text-placeholder tabular-nums",
+              revealOnMessage,
+            )}
+          >
             <IconButton
               label={copyState === "copied" ? "Copied message" : "Copy message"}
-              className="response-meta-button"
+              className={metaButton}
               onClick={copyMessage}
             >
               {copyState === "copied" ? <Check /> : <Copy />}
             </IconButton>
             <IconButton
               label="Fork from this response"
-              className="response-meta-button"
+              className={metaButton}
               onClick={onFork}
             >
               <GitFork />
@@ -166,9 +193,9 @@ export function ResponseTurn({
             <ResponseTimestamp
               timestamp={timing.completedAt!}
               kind="Completed"
-              className="response-end-time"
+              className="rounded-xs text-2xs"
             />
-            <span className="response-copy-feedback" role="status">
+            <span className="text-3xs text-secondary-label" role="status">
               {copyState === "copied"
                 ? "Copied"
                 : copyState === "error"

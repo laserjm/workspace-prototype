@@ -24,15 +24,15 @@ export function HtmlRenderDialog({
         if (!open) onClose();
       }}
     >
-      <DialogContent className="html-render-dialog">
-        <DialogTitle className="html-render-dialog-title">{title}</DialogTitle>
+      <DialogContent className="flex h-[calc(100svh-3rem)] w-[min(1200px,calc(100vw-3rem))] max-w-none flex-col gap-3 bg-background sm:max-w-none">
+        <DialogTitle className="pr-8 text-sm font-medium">{title}</DialogTitle>
         <DialogDescription className="sr-only">
           Full-screen view of a page from the assistant.
         </DialogDescription>
         <HtmlRenderDocument
           html={html}
           title={title}
-          className="html-render-dialog-document"
+          className="min-h-0 w-full flex-1 border-0"
         />
       </DialogContent>
     </Dialog>
