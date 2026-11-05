@@ -24,8 +24,9 @@ export function NewThreadHeading({
 }) {
   const project = projects.find((item) => item.id === projectId)?.name;
   return (
-    <div className="draft-heading">
+    <div className="px-3 pb-2.5 text-center max-md:px-0 max-md:pb-2">
       <h1
+        className="text-3xl leading-snug font-normal tracking-tight text-balance text-foreground max-md:text-2xl short:text-2xl"
         aria-label={
           project
             ? `What would you like to know in ${project}?`
@@ -40,7 +41,7 @@ export function NewThreadHeading({
                 render={
                   <button
                     type="button"
-                    className="heading-project"
+                    className="inline max-w-full rounded-sm align-baseline font-medium wrap-anywhere hover:bg-accent"
                     aria-label="Choose project"
                   />
                 }
@@ -70,7 +71,7 @@ export function NewThreadHeading({
       </h1>
       <button
         type="button"
-        className="start-without-project"
+        className="mt-2.5 text-sm text-muted-foreground hover:text-secondary-foreground"
         // A user without projects adds their first one.
         onClick={() =>
           project

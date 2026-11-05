@@ -18,16 +18,53 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { IconButton } from "@/components/ui/icon-button";
+import { cn } from "@/lib/utils";
 import {
   RECORD_STATUSES,
   recordCountLabel,
   recordsIn,
+  type RecordPriority,
   type SourceRecord,
 } from "../domain/source";
 import { RecordStatusBadge } from "./record-status-badge";
 import { ResizableSourcePanel } from "./resizable-source-panel";
 import { SourceIcon } from "./source-icon";
 import { useSources } from "./use-sources";
+
+const PRIORITY_DOTS: Record<RecordPriority, string> = {
+  High: "bg-red-300 dark:bg-red-400",
+  Medium: "bg-amber-300 dark:bg-amber-400",
+  Low: "bg-emerald-300 dark:bg-emerald-400",
+};
+
+// Bugs are red, tasks and test cases blue, everything else green.
+function issueTypeTone(type: string) {
+  if (type === "Bug") return "bg-red-400";
+  if (type === "Task" || type === "Test case") return "bg-blue-400";
+  return "bg-emerald-500/80";
+}
+
+function PriorityDot({ priority }: { priority: RecordPriority }) {
+  return (
+    <span
+      className={cn(
+        "inline-block size-1.25 shrink-0 rounded-full",
+        PRIORITY_DOTS[priority],
+      )}
+    />
+  );
+}
+
+function OwnerAvatar({ owner }: { owner: string }) {
+  return (
+    <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full border border-border bg-muted text-5xs text-muted-foreground">
+      {owner
+        .split(" ")
+        .map((part) => part[0])
+        .join("")}
+    </span>
+  );
+}
 
 /** The records a thread uses, as a list, a board or one record's details. */
 export function SourceExplorer({
@@ -64,57 +101,75 @@ export function SourceExplorer({
   const content = (
     <aside
       id="source-explorer"
-      className="source-explorer"
+      className={cn(
+        "flex size-full min-w-0 shrink-0 flex-col overflow-hidden bg-background text-xs leading-normal",
+        !isDrawer && "border-l border-border",
+      )}
       aria-label={`${source.name} source explorer`}
     >
-      <div className="explorer-heading">
+      <div className="flex shrink-0 items-center gap-2 px-4 pt-4 pb-3">
         <SourceIcon id={source.id} />
-        <div>
-          <strong>{source.name}</strong>
-          <small>{source.workspace}</small>
+        <div className="min-w-0">
+          <strong className="block text-sm font-medium text-secondary-foreground">
+            {source.name}
+          </strong>
+          <small className="mt-px block truncate text-3xs text-muted-foreground">
+            {source.workspace}
+          </small>
         </div>
-        <span className="demo-badge">Sample data</span>
-        <IconButton label="Close source explorer" onClick={onClose}>
+        <span className="ml-auto shrink-0 rounded-sm border border-border bg-muted px-1.5 py-0.5 text-3xs whitespace-nowrap text-muted-foreground">
+          Sample data
+        </span>
+        <IconButton
+          label="Close source explorer"
+          onClick={onClose}
+          className="h-6 w-5.5 [&_svg:not([class*='size-'])]:size-3.75"
+        >
           <X />
         </IconButton>
       </div>
-      <div className="explorer-location">{source.location}</div>
+      <div className="shrink-0 truncate border-b border-border/60 px-4 pb-3 text-3xs text-muted-foreground/70">
+        {source.location}
+      </div>
       {selected ? (
-        <div className="record-detail" key={selected.id}>
+        <div
+          className="min-h-0 flex-1 overflow-y-auto px-5 pt-4 pb-7.5 [scrollbar-width:thin]"
+          key={selected.id}
+        >
           <button
             type="button"
-            className="record-back"
+            className="mb-5.5 inline-flex items-center gap-1.5 rounded-xs text-3xs text-muted-foreground hover:text-secondary-foreground"
             onClick={() => onSelect(null)}
           >
             <ArrowLeft size={14} />
             All {source.plural}
           </button>
-          <div className="record-detail-key">
+          <div className="flex items-center gap-1.5 text-3xs text-muted-foreground/70">
             <span>{selected.type}</span>
             <ChevronRight size={12} />
-            <strong>{selected.id}</strong>
+            <strong className="font-medium text-muted-foreground">
+              {selected.id}
+            </strong>
           </div>
-          <h2>{selected.title}</h2>
-          <RecordStatusBadge status={selected.status} />
-          <dl className="record-properties">
+          <h2 className="mt-2 mb-3 text-xl leading-snug font-medium tracking-tight text-secondary-foreground">
+            {selected.title}
+          </h2>
+          <RecordStatusBadge
+            status={selected.status}
+            className="px-2 py-0.75 text-3xs"
+          />
+          <dl className="my-6 flex flex-col gap-3 border-y border-border/60 py-5 [&>div]:flex [&>div]:items-center [&>div]:gap-2.5 [&_dd]:flex [&_dd]:items-center [&_dd]:gap-1.5 [&_dd]:text-2xs [&_dd]:text-accent-foreground [&_dt]:w-19 [&_dt]:shrink-0 [&_dt]:text-3xs [&_dt]:text-muted-foreground/70">
             <div>
               <dt>Assignee</dt>
               <dd>
-                <span className="owner-avatar">
-                  {selected.owner
-                    .split(" ")
-                    .map((part) => part[0])
-                    .join("")}
-                </span>
+                <OwnerAvatar owner={selected.owner} />
                 {selected.owner}
               </dd>
             </div>
             <div>
               <dt>Priority</dt>
               <dd>
-                <span
-                  className={`priority-dot priority-${selected.priority.toLowerCase()}`}
-                />
+                <PriorityDot priority={selected.priority} />
                 {selected.priority}
               </dd>
             </div>
@@ -127,32 +182,40 @@ export function SourceExplorer({
               <dd>{source.collection}</dd>
             </div>
           </dl>
-          <h3>Description</h3>
-          <p>{selected.description}</p>
+          <h3 className={detailHeading}>Description</h3>
+          <p className={detailText}>{selected.description}</p>
           {selected.risk && (
-            <div className="record-risk">
-              <strong>Needs attention</strong>
-              <p>{selected.risk}</p>
+            <div className="my-5 rounded-md border border-warning/25 bg-warning/5 p-3">
+              <strong className="text-3xs font-medium text-warning-foreground/80">
+                Needs attention
+              </strong>
+              <p className="mt-1 text-2xs text-warning-foreground/70">
+                {selected.risk}
+              </p>
             </div>
           )}
-          <h3>Next step</h3>
-          <p>{selected.nextStep}</p>
-          <div className="record-provenance">
+          <h3 className={detailHeading}>Next step</h3>
+          <p className={detailText}>{selected.nextStep}</p>
+          <div className="mt-7 flex items-center gap-1.5 text-3xs text-muted-foreground/70">
             <ShieldCheck size={14} />
             Included in this thread’s source snapshot
           </div>
         </div>
       ) : (
         <>
-          <div className="explorer-collection">
-            <span>{source.collectionPath}</span>
-            <h2>{source.collection}</h2>
-            <p>
+          <div className="shrink-0 px-4 pt-6 pb-4">
+            <span className="text-4xs font-semibold tracking-widest text-muted-foreground/70">
+              {source.collectionPath}
+            </span>
+            <h2 className="mt-2 text-lg font-medium tracking-tight text-secondary-foreground">
+              {source.collection}
+            </h2>
+            <p className="mt-1 text-2xs text-muted-foreground">
               {recordCountLabel(source, recordIds.length)} in this conversation
             </p>
           </div>
           <div
-            className="explorer-view-tabs"
+            className="flex shrink-0 gap-4.5 border-b border-border/60 px-4 [&>button]:-mb-px [&>button]:flex [&>button]:items-center [&>button]:gap-1.5 [&>button]:border-b-2 [&>button]:border-transparent [&>button]:px-px [&>button]:pb-2.5 [&>button]:text-2xs [&>button]:text-muted-foreground [&>button]:aria-pressed:border-accent-foreground [&>button]:aria-pressed:text-secondary-foreground"
             role="group"
             aria-label="Source view"
           >
@@ -175,10 +238,11 @@ export function SourceExplorer({
               </button>
             )}
           </div>
-          <div className="explorer-filters">
-            <label className="source-search">
-              <Search size={14} />
+          <div className="flex shrink-0 gap-2 px-4 pt-4 pb-2.5">
+            <label className="flex min-w-0 flex-1 items-center gap-2 rounded-sm border border-border bg-card px-2 py-1.5 text-icon-muted focus-within:border-ring">
+              <Search size={14} className="shrink-0" />
               <input
+                className="w-full min-w-0 bg-transparent text-2xs text-accent-foreground outline-none placeholder:text-placeholder"
                 aria-label={`Search ${source.name} records`}
                 placeholder={`Search ${source.plural}…`}
                 value={query}
@@ -187,6 +251,7 @@ export function SourceExplorer({
             </label>
             <select
               aria-label="Filter source by status"
+              className="w-27 rounded-sm border border-border bg-card px-1 text-3xs text-muted-foreground"
               value={status}
               onChange={(event) => setStatus(event.target.value)}
             >
@@ -196,22 +261,28 @@ export function SourceExplorer({
               ))}
             </select>
           </div>
-          <div className="explorer-results-count">
+          <div className="flex shrink-0 items-center px-4 pb-2.5 text-3xs text-muted-foreground/70">
             {filtered.length} of {records.length} {source.plural}
-            <span>
+            <span className="ml-auto inline-flex items-center gap-1 text-muted-foreground">
               <Check size={12} />
               Loaded
             </span>
           </div>
           <div
-            className={`explorer-record-list ${view === "board" ? "explorer-board" : ""}`}
+            className={cn(
+              "flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain px-3.5 pb-5 [scrollbar-width:thin]",
+              view === "board" && "gap-4",
+            )}
           >
             {view === "board"
               ? RECORD_STATUSES.map((column) => (
-                  <section key={column} className="explorer-board-column">
-                    <h3>
+                  <section
+                    key={column}
+                    className="flex flex-col gap-2 rounded-sm bg-sidebar p-2"
+                  >
+                    <h3 className="flex items-center gap-1.5 px-0.5 pb-1 text-3xs font-medium tracking-wider text-muted-foreground uppercase">
                       {column}
-                      <span>
+                      <span className="ml-auto">
                         {
                           filtered.filter((record) => record.status === column)
                             .length
@@ -237,14 +308,14 @@ export function SourceExplorer({
                   />
                 ))}
             {!filtered.length && (
-              <p className="source-no-results">
+              <p className={noResultsClassName}>
                 No matching {source.plural}. Try another search or status.
               </p>
             )}
           </div>
         </>
       )}
-      <div className="explorer-footer">
+      <div className="flex shrink-0 items-center justify-center gap-1.5 border-t border-border/60 px-2 py-3 text-3xs text-muted-foreground/70">
         <ShieldCheck size={13} />
         <span>Read-only sample snapshot · No live connection</span>
       </div>
@@ -259,7 +330,8 @@ export function SourceExplorer({
         }}
       >
         <DialogContent
-          className="source-explorer-dialog"
+          // A full-height drawer on the right instead of a centred dialog.
+          className="top-0 right-0 bottom-0 left-auto block h-svh w-[min(420px,100%)] max-w-full translate-x-0 translate-y-0 overflow-hidden rounded-none p-0 sm:max-w-full data-closed:animate-none! data-open:animate-none!"
           showCloseButton={false}
         >
           <DialogTitle className="sr-only">
@@ -274,6 +346,13 @@ export function SourceExplorer({
     );
   return <ResizableSourcePanel>{content}</ResizableSourcePanel>;
 }
+
+const detailHeading = "mt-5 mb-2 text-xs font-medium text-accent-foreground";
+const detailText = "text-xs leading-loose text-muted-foreground";
+
+/** The empty state of a filtered record list. */
+export const noResultsClassName =
+  "px-3 py-6 text-center text-xs text-muted-foreground";
 
 function subscribeToViewport(callback: () => void) {
   const media = window.matchMedia("(max-width: 1100px)");
@@ -295,32 +374,30 @@ function RecordCard({
   return (
     <button
       type="button"
-      className="explorer-record"
+      className="block w-full shrink-0 rounded-md border border-border/60 bg-card p-3 text-left hover:border-ring/50 hover:bg-muted"
       onClick={onClick}
       aria-label={`Open ${record.id}: ${record.title}`}
     >
-      <div className="explorer-record-top">
+      <div className="flex items-center gap-1.5 text-3xs text-muted-foreground">
         <span
-          className={`issue-type issue-type-${record.type.toLowerCase().replaceAll(" ", "-")}`}
+          className={cn(
+            "inline-flex size-3 items-center justify-center rounded-xs text-3xs text-white",
+            issueTypeTone(record.type),
+          )}
         >
           {record.type === "Bug" ? "●" : "✓"}
         </span>
         <span>{record.id}</span>
-        <RecordStatusBadge status={record.status} />
+        <RecordStatusBadge status={record.status} className="ml-auto" />
       </div>
-      <strong>{record.title}</strong>
-      <div className="explorer-record-bottom">
-        <span
-          className={`priority-dot priority-${record.priority.toLowerCase()}`}
-        />
+      <strong className="mt-2 block text-xs leading-relaxed font-medium text-secondary-foreground">
+        {record.title}
+      </strong>
+      <div className="mt-3 flex items-center gap-1 text-3xs text-muted-foreground/70">
+        <PriorityDot priority={record.priority} />
         {record.priority}
-        <span className="record-owner">{record.owner}</span>
-        <span className="owner-avatar">
-          {record.owner
-            .split(" ")
-            .map((part) => part[0])
-            .join("")}
-        </span>
+        <span className="ml-auto">{record.owner}</span>
+        <OwnerAvatar owner={record.owner} />
       </div>
     </button>
   );

@@ -21,6 +21,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { IconButton } from "@/components/ui/icon-button";
+import { cn } from "@/lib/utils";
 import { ProjectFilter, type Project } from "@/modules/projects";
 import { useSources } from "@/modules/sources";
 import {
@@ -118,18 +119,30 @@ export function WorkspaceSidebar(props: SidebarProps) {
   }
 
   return (
-    <aside className="workspace-sidebar" aria-label="Workspace sidebar">
-      <div className="sidebar-titlebar">
-        <span className="app-wordmark">
-          <strong>Workspace</strong>
-        </span>
+    <aside
+      className={cn(
+        "z-35 flex w-(--workspace-sidebar-width) shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground",
+        // Desktop: collapsing hides it. Phones: a drawer that slides in over the canvas.
+        "md:group-data-[sidebar=collapsed]/app:hidden",
+        "max-md:invisible max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:w-74 max-md:max-w-[calc(100vw-3rem)] max-md:-translate-x-full max-md:transition-[translate,visibility] max-md:duration-180 max-md:ease-in-out",
+        "max-md:group-data-[mobile-sidebar=open]/app:visible max-md:group-data-[mobile-sidebar=open]/app:translate-x-0",
+      )}
+      aria-label="Workspace sidebar"
+    >
+      <div className="flex h-13.5 shrink-0 items-center justify-between gap-2 px-3 max-desktop:gap-1.5 max-desktop:px-2.5">
+        <strong className="font-semibold whitespace-nowrap text-foreground">
+          Workspace
+        </strong>
         <IconButton label="Toggle sidebar" onClick={props.onToggle}>
           <PanelLeftClose />
         </IconButton>
       </div>
-      <div className="sidebar-search-row" ref={searchRow}>
-        <label className="sidebar-search">
-          <Search aria-hidden="true" />
+      <div
+        className="flex min-h-14 items-center gap-1 px-3 pb-0.5 4xl:min-h-15"
+        ref={searchRow}
+      >
+        <label className="flex min-w-0 flex-1 items-center gap-2 rounded-sm text-icon-muted focus-within:ring-2 focus-within:ring-border">
+          <Search aria-hidden="true" className="size-4 shrink-0" strokeWidth={1.6} />
           <input
             id="thread-search"
             type="search"
@@ -137,6 +150,7 @@ export function WorkspaceSidebar(props: SidebarProps) {
             placeholder="Search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
+            className="w-full min-w-0 border-0 bg-transparent py-1 text-sm text-foreground outline-none placeholder:text-placeholder [&::-webkit-search-cancel-button]:hidden"
           />
         </label>
         <ProjectFilter
@@ -153,11 +167,14 @@ export function WorkspaceSidebar(props: SidebarProps) {
         </IconButton>
       </div>
 
-      <nav className="sidebar-threads" aria-label="Threads">
-        <div className="sidebar-active-threads" aria-label="Active threads">
+      <nav
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto p-1.5 [scrollbar-width:thin]"
+        aria-label="Threads"
+      >
+        <div aria-label="Active threads">
           {activeThreads.map(renderThread)}
           {activeThreads.length === 0 && (
-            <p className="sidebar-empty">
+            <p className="px-2 py-6 text-center text-secondary-label">
               {query
                 ? "No active threads found."
                 : selectedProjects.length
@@ -166,7 +183,7 @@ export function WorkspaceSidebar(props: SidebarProps) {
             </p>
           )}
         </div>
-        <div className="sidebar-shelves">
+        <div className="mt-auto">
           {[
             { id: "snoozed", label: "Snoozed", threads: snoozedThreads },
             { id: "settled", label: "Settled", threads: settledThreads },
@@ -183,7 +200,7 @@ export function WorkspaceSidebar(props: SidebarProps) {
               <section key={section.id} aria-label={`${section.label} threads`}>
                 <button
                   type="button"
-                  className="archive-toggle"
+                  className="flex w-full items-center gap-2 rounded-sm px-1.5 py-2 text-xs text-secondary-label hover:bg-sidebar-row-hover"
                   aria-expanded={expanded || Boolean(query.trim())}
                   aria-controls={`shelf-${section.id}`}
                   onClick={() =>
@@ -195,23 +212,24 @@ export function WorkspaceSidebar(props: SidebarProps) {
                   }
                 >
                   <span>{section.label}</span>
-                  <span className="archive-count">
-                    {section.threads.length}
-                  </span>
+                  <span className="ml-auto">{section.threads.length}</span>
                   <ChevronRight
-                    className={
-                      expanded || query.trim() ? "chevron-expanded" : ""
-                    }
+                    aria-hidden="true"
+                    strokeWidth={1.5}
+                    className={cn(
+                      "size-3 transition-transform duration-120",
+                      (expanded || query.trim()) && "rotate-90",
+                    )}
                   />
                 </button>
                 <div
                   id={`shelf-${section.id}`}
-                  className="archive-content"
+                  className="pt-1 pb-2 text-xs text-secondary-label"
                   hidden={visible.length === 0 && !expanded && !query.trim()}
                 >
                   {visible.map(renderThread)}
                   {visible.length === 0 && (
-                    <p className="shelf-empty">
+                    <p className="px-2 pt-2 pb-3">
                       {query
                         ? `No matching ${section.label.toLowerCase()} threads.`
                         : `No ${section.label.toLowerCase()} threads.`}
@@ -224,18 +242,22 @@ export function WorkspaceSidebar(props: SidebarProps) {
         </div>
       </nav>
 
-      <div className="sidebar-bottom">
+      <div className="shrink-0 px-2">
         {props.notice && (
-          <div className="thread-undo-notice">
+          <div className="flex min-h-8.5 items-center gap-2 rounded-md border border-border px-2 py-1.5 text-xs text-muted-foreground">
             <span role="status">{props.notice.message}</span>
             {props.notice.onUndo && (
-              <button type="button" onClick={props.notice.onUndo}>
+              <button
+                type="button"
+                onClick={props.notice.onUndo}
+                className="ml-auto font-medium text-secondary-foreground"
+              >
                 Undo
               </button>
             )}
           </div>
         )}
-        <div className="sidebar-footer">
+        <div className="flex h-14 items-center gap-2.5">
           <IconButton label="Settings" onClick={props.onSettings}>
             <Settings />
           </IconButton>
@@ -245,7 +267,7 @@ export function WorkspaceSidebar(props: SidebarProps) {
           <IconButton label="Workspace activity" onClick={props.onActivity}>
             <BarChart3 />
           </IconButton>
-          <span className="sidebar-footer-spacer" />
+          <span className="flex-1" />
           {/* A plain form post: /sign-out ends the session here and in Keycloak. */}
           <form action="/sign-out" method="post">
             <IconButton
@@ -258,7 +280,7 @@ export function WorkspaceSidebar(props: SidebarProps) {
           <IconButton
             label="About this prototype"
             onClick={props.onSettings}
-            className="about-button"
+            className="size-8.5 rounded-full bg-accent text-foreground [&_svg:not([class*='size-'])]:size-4.5"
           >
             <ArrowUpCircle />
           </IconButton>
@@ -285,7 +307,7 @@ export function WorkspaceSidebar(props: SidebarProps) {
           if (!open) setContextId(null);
         }}
       >
-        <DialogContent className="thread-context-dialog">
+        <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Session context</DialogTitle>
             <DialogDescription>
@@ -296,6 +318,7 @@ export function WorkspaceSidebar(props: SidebarProps) {
             <ThreadContextCard
               thread={contextThread}
               projectName={props.projectName(contextThread.projectId)}
+              className="p-0"
             />
           )}
         </DialogContent>

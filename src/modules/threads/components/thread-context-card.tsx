@@ -7,6 +7,7 @@ import {
   SourceIcon,
   useSources,
 } from "@/modules/sources";
+import { cn } from "@/lib/utils";
 import { shelfOf, type Thread } from "../domain/thread";
 import { formatWakeTime } from "./time-format";
 import { useChatStore } from "./use-chat-store";
@@ -15,9 +16,11 @@ import { useChatStore } from "./use-chat-store";
 export function ThreadContextCard({
   thread,
   projectName,
+  className,
 }: {
   thread: Thread;
   projectName: string;
+  className?: string;
 }) {
   const { sourceById } = useSources();
   const source = thread.scope ? sourceById(thread.scope.sourceId) : undefined;
@@ -34,9 +37,16 @@ export function ThreadContextCard({
     0,
   );
   return (
-    <div className="thread-context-card">
-      <strong className="thread-context-title">{thread.title}</strong>
-      <div className="thread-context-meta">
+    <div
+      className={cn(
+        "min-w-0 p-4 text-xs leading-normal text-muted-foreground",
+        className,
+      )}
+    >
+      <strong className="block text-sm font-semibold wrap-anywhere text-secondary-foreground">
+        {thread.title}
+      </strong>
+      <div className="mt-3 grid gap-1.5 [&>span]:flex [&>span]:min-w-0 [&>span]:items-center [&>span]:gap-2 [&>span]:wrap-anywhere [&_svg]:size-3.5 [&_svg]:shrink-0">
         <span>
           <Folder aria-hidden="true" />
           {projectName}
@@ -64,32 +74,43 @@ export function ThreadContextCard({
         )}
       </div>
       {source && thread.scope ? (
-        <div className="thread-context-source">
-          <div className="thread-context-source-heading">
-            <SourceIcon id={source.id} />
-            <strong>{source.name}</strong>
-            <span>
+        <div className="mt-3 border-t border-border pt-3">
+          <div className="flex items-center gap-2">
+            <SourceIcon id={source.id} size="sm" />
+            <strong className="font-medium text-accent-foreground">
+              {source.name}
+            </strong>
+            <span className="ml-auto text-secondary-label">
               {recordCountLabel(source, thread.scope.recordIds.length)}
             </span>
           </div>
-          <p className="thread-context-collection">{source.collection}</p>
-          <ul className="thread-context-records">
+          <p className="mt-1 text-2xs text-secondary-label">
+            {source.collection}
+          </p>
+          <ul className="mt-2.5 grid max-h-70 list-none overflow-y-auto overscroll-contain p-0">
             {records.map((record) => (
-              <li key={record.id}>
-                <div>
-                  <span>{record.id}</span>
+              <li
+                key={record.id}
+                className="py-2 not-first:border-t not-first:border-border/60"
+              >
+                <div className="flex justify-between gap-2 text-3xs">
+                  <span className="font-mono text-secondary-label">
+                    {record.id}
+                  </span>
                   <span>{record.status}</span>
                 </div>
-                <p>{record.title}</p>
+                <p className="mt-1 wrap-anywhere text-accent-foreground">
+                  {record.title}
+                </p>
               </li>
             ))}
           </ul>
-          <p className="thread-context-note">
+          <p className="mt-2.5 text-3xs text-muted-foreground/70">
             Selected context · Read-only sample snapshot
           </p>
         </div>
       ) : (
-        <p className="thread-context-note">
+        <p className="mt-2.5 text-3xs text-muted-foreground/70">
           No data source selected for this session.
         </p>
       )}

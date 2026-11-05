@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { IconButton } from "@/components/ui/icon-button";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import { ProjectForm, ProjectIcon, type Project } from "@/modules/projects";
 import { useSkillPreferences } from "@/modules/skills";
 import {
@@ -346,20 +347,24 @@ export function WorkspaceShell({
       <TooltipProvider delay={450}>
         {/* Layout state for descendants: utilities read it as
             group-data-[sidebar=collapsed]/app:… and
-            group-data-[mobile-sidebar=open]/app:…. The classes stay until
-            workspace.css no longer reads them. */}
+            group-data-[mobile-sidebar=open]/app:…. The two widths are
+            variables because the sidebar and the composer size themselves
+            from them. */}
         <div
-          className={`workspace-app group/app ${sidebarOpen ? "" : "sidebar-collapsed"} ${mobileSidebarOpen ? "mobile-sidebar-open" : ""}`}
+          className="group/app flex h-svh min-h-105 overflow-hidden bg-background text-sm leading-normal text-foreground antialiased [--workspace-composer-width:856px] [--workspace-sidebar-width:296px] max-desktop:[--workspace-sidebar-width:256px] max-md:min-h-90"
           data-sidebar={sidebarOpen ? "open" : "collapsed"}
           data-mobile-sidebar={mobileSidebarOpen ? "open" : "closed"}
         >
-          <a className="workspace-skip-link" href="#workspace-main">
+          <a
+            className="fixed -top-15 left-4 z-100 rounded-sm bg-primary px-4 py-2 text-primary-foreground focus:top-3"
+            href="#workspace-main"
+          >
             Skip to workspace
           </a>
           {mobileSidebarOpen && (
             <button
               type="button"
-              className="sidebar-backdrop"
+              className="fixed inset-0 z-30 bg-black/15 backdrop-blur-xs md:hidden"
               aria-label="Close sidebar"
               onClick={() => setMobileSidebarOpen(false)}
             />
@@ -394,35 +399,38 @@ export function WorkspaceShell({
             }
           />
 
-          <div className="workspace-canvas" inert={mobileSidebarOpen}>
-            <header className="workspace-header">
-              <div className="sidebar-reopen">
+          <div
+            className="relative flex min-w-0 flex-1 flex-col"
+            inert={mobileSidebarOpen}
+          >
+            <header className="z-20 flex h-13.5 shrink-0 items-center gap-2.5 pr-5 pl-6 max-md:gap-1.5 max-md:px-2.5">
+              <div className="hidden group-data-[sidebar=collapsed]/app:flex max-md:flex">
                 <IconButton label="Open sidebar" onClick={toggleSidebar}>
                   <PanelLeftOpen />
                 </IconButton>
               </div>
               <div
-                className="workspace-breadcrumb"
+                className="flex min-w-0 flex-1 items-center gap-3.5 text-sm max-md:gap-2 max-md:text-xs"
                 aria-label="Current project"
               >
                 {currentProject && (
                   <>
                     <button
                       type="button"
-                      className="breadcrumb-project"
+                      className="inline-flex min-w-0 max-w-[45%] items-center gap-2 font-medium text-secondary-label max-md:max-w-34 max-md:gap-1"
                       onClick={newThread}
                     >
-                      <ProjectIcon />
-                      <span>{currentProject}</span>
+                      <ProjectIcon className="max-md:size-3.5 max-md:text-5xs" />
+                      <span className="truncate">{currentProject}</span>
                     </button>
-                    <span className="breadcrumb-divider">/</span>
+                    <span className="text-secondary-label">/</span>
                   </>
                 )}
-                <span className="breadcrumb-thread">
+                <span className="truncate font-medium">
                   {activeThread?.title ?? "New thread"}
                 </span>
               </div>
-              <div className="workspace-header-actions">
+              <div className="flex shrink-0 gap-2 max-md:gap-0.5">
                 <IconButton
                   label="Workspace settings"
                   onClick={() => openSettings()}
@@ -431,7 +439,7 @@ export function WorkspaceShell({
                 </IconButton>
                 <IconButton
                   label={panelOpen ? "Hide bottom panel" : "Show bottom panel"}
-                  className={panelOpen ? "is-active" : ""}
+                  className="max-md:hidden"
                   aria-pressed={panelOpen}
                   onClick={() => setPanelOpen((open) => !open)}
                 >
@@ -446,9 +454,6 @@ export function WorkspaceShell({
                       : "Choose data source"
                   }
                   aria-pressed={activeThread?.scope ? sourceOpen : undefined}
-                  className={
-                    activeThread?.scope && sourceOpen ? "is-active" : ""
-                  }
                   onClick={() =>
                     activeThread?.scope
                       ? setSourceOpen((open) => !open)
@@ -462,7 +467,13 @@ export function WorkspaceShell({
 
             <main
               id="workspace-main"
-              className={`workspace-main group/main ${activeThread?.scope ? "source-session" : ""} ${activeThread?.scope && sourceOpen ? "source-session-open" : ""}`}
+              // A source session sets the conversation beside the source panel.
+              className={cn(
+                "group/main relative min-h-0 flex-1 outline-none",
+                activeThread?.scope && "flex",
+                // A short window lets the new-thread draft scroll.
+                !activeThread && "short:overflow-y-auto",
+              )}
               data-session={activeThread?.scope ? "source" : "plain"}
               data-source-panel={
                 activeThread?.scope && sourceOpen ? "open" : "closed"
@@ -470,7 +481,7 @@ export function WorkspaceShell({
               tabIndex={-1}
             >
               {!activeThread ? (
-                <div className="workspace-draft enterprise-draft">
+                <div className="absolute top-[47%] left-1/2 flex w-[min(var(--workspace-composer-width),calc(100%-4rem))] -translate-1/2 flex-col gap-5 max-desktop:w-[calc(100%-3rem)] max-md:top-[46%] max-md:w-[calc(100%-2rem)] max-md:gap-4 short:static short:mx-auto short:mt-7.5 short:mb-15 short:w-[min(var(--workspace-composer-width),calc(100%-2.5rem))] short:translate-none">
                   <NewThreadHeading
                     projectId={projectId}
                     projects={projects}
@@ -489,7 +500,7 @@ export function WorkspaceShell({
                     enabledSkills={enabledSkills}
                     onManageSkills={() => openSettings("skills")}
                   />
-                  <p className="draft-demo-note">
+                  <p className="mt-4 text-center text-2xs text-muted-foreground/70 max-md:text-3xs">
                     Explore with sample data. Live enterprise connections come
                     next.
                   </p>
@@ -541,10 +552,10 @@ export function WorkspaceShell({
 
             {panelOpen && (
               <section
-                className="workspace-bottom-panel"
+                className="z-25 h-47.5 shrink-0 border-t border-border bg-background max-md:h-34"
                 aria-label="Project panel"
               >
-                <div className="bottom-panel-header">
+                <div className="flex h-10.5 items-center justify-between px-5 text-xs text-muted-foreground">
                   <span>Thread context</span>
                   <IconButton
                     label="Close bottom panel"
@@ -553,8 +564,8 @@ export function WorkspaceShell({
                     <X />
                   </IconButton>
                 </div>
-                <div className="bottom-panel-content">
-                  <Cable />
+                <div className="flex items-center justify-center gap-2.5 px-4 py-8 text-sm text-secondary-label max-md:flex-wrap max-md:p-4 max-md:text-xs">
+                  <Cable className="size-4.5" />
                   <p>
                     {activeThread?.scope
                       ? `${describeScope(activeThread.scope)} in this thread’s read-only snapshot.`
@@ -562,8 +573,12 @@ export function WorkspaceShell({
                         ? `${describeScope(draftScope)} selected for your next thread.`
                         : "Choose a source to add context to your thread."}
                   </p>
-                  <button type="button" onClick={() => setDialog("sources")}>
-                    Explore data sources <ChevronDown />
+                  <button
+                    type="button"
+                    onClick={() => setDialog("sources")}
+                    className="inline-flex items-center gap-1 border-b border-input text-accent-foreground"
+                  >
+                    Explore data sources <ChevronDown className="size-3" />
                   </button>
                 </div>
               </section>
@@ -578,7 +593,11 @@ export function WorkspaceShell({
           }}
         >
           <DialogContent
-            className={`workspace-dialog ${dialog === "settings" ? "skills-settings-dialog" : "sm:max-w-md"}`}
+            className={cn(
+              dialog === "settings"
+                ? "max-h-[calc(100dvh-3rem)] w-190 max-w-[calc(100vw-2rem)] overflow-y-auto sm:max-w-190 max-md:p-5"
+                : "sm:max-w-md",
+            )}
           >
             <DialogHeader>
               <DialogTitle>
@@ -629,7 +648,7 @@ export function WorkspaceShell({
                   }
                   onSelect={chooseSource}
                 />
-                <p className="source-catalog-note">
+                <p className="text-xs leading-relaxed text-secondary-label">
                   More enterprise systems can follow the same pattern: choose a
                   source, scope the records, then work with a source-specific
                   view.
@@ -649,11 +668,12 @@ export function WorkspaceShell({
             )}
 
             {dialog === "activity" && (
-              <div className="activity-list">
+              <div className="flex flex-col gap-2">
                 {threads.slice(0, 5).map((thread) => (
                   <button
                     type="button"
                     key={thread.id}
+                    className="flex items-center gap-2.5 rounded-sm py-2 text-left"
                     onClick={() => {
                       setProjectId(thread.projectId);
                       navigate(thread.id);
@@ -661,8 +681,10 @@ export function WorkspaceShell({
                     }}
                   >
                     <ProjectIcon />
-                    <span>{thread.title}</span>
-                    <ChevronDown />
+                    <span className="min-w-0 flex-1 truncate text-xs">
+                      {thread.title}
+                    </span>
+                    <ChevronDown className="size-3 -rotate-90" />
                   </button>
                 ))}
               </div>

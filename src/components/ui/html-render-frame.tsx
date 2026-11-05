@@ -24,19 +24,19 @@ export function HtmlRenderFrame({
   const [expanded, setExpanded] = useState(false);
   return (
     <div
-      className="html-render-frame"
+      className="group/frame relative mt-1 mb-4"
       style={{ height: htmlRenderFrameHeight(height, contentHeight) }}
     >
       <HtmlRenderDocument
         html={html}
         title={title}
-        className="html-render-document"
+        className="block size-full border-0"
         onContentHeight={setContentHeight}
       />
-      <div className="html-render-actions">
+      <div className="absolute top-2 right-2 flex gap-1 opacity-0 transition-opacity duration-150 group-hover/frame:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100">
         <IconButton
           label="Open full screen"
-          className="html-render-action"
+          className="border border-border bg-card/85 backdrop-blur-sm"
           onClick={() => setExpanded(true)}
         >
           <Maximize2 />

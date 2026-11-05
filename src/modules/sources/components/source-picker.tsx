@@ -8,6 +8,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { inlineTriggerClassName } from "@/components/ui/inline-trigger";
+import { cn } from "@/lib/utils";
 import { SourceIcon } from "./source-icon";
 import { useSources } from "./use-sources";
 
@@ -28,7 +30,7 @@ export function SourcePicker({
         render={
           <button
             type="button"
-            className="permission-trigger source-picker-trigger"
+            className={cn(inlineTriggerClassName, "shrink-0 py-1")}
             aria-label={
               selectedSource
                 ? `Choose source, ${selectedSource.name}`
@@ -37,10 +39,14 @@ export function SourcePicker({
           />
         }
       >
-        {selectedSource ? <SourceIcon id={selectedSource.id} /> : <Database />}
+        {selectedSource ? (
+          <SourceIcon id={selectedSource.id} size="plain" />
+        ) : (
+          <Database />
+        )}
         <span>{selectedSource ? selectedSource.name : "Choose a source"}</span>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="source-picker-menu w-72">
+      <DropdownMenuContent align="start" className="w-72">
         <p className="px-2 py-1.5 text-xs text-muted-foreground">
           Choose a data source
         </p>
@@ -48,12 +54,16 @@ export function SourcePicker({
           <DropdownMenuItem
             key={source.id}
             onClick={() => onSelect(source.id)}
-            className="source-picker-menu-item"
+            className="gap-2.5 py-2"
           >
-            <SourceIcon id={source.id} />
+            <SourceIcon id={source.id} size="md" />
             <span>
-              <strong>{source.name}</strong>
-              <small>{source.description}</small>
+              <strong className="block text-xs font-medium">
+                {source.name}
+              </strong>
+              <small className="mt-1 block text-3xs text-secondary-label">
+                {source.description}
+              </small>
             </span>
             {selected === source.id && <Check className="ml-auto" />}
           </DropdownMenuItem>

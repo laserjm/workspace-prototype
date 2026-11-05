@@ -1,9 +1,12 @@
+import { cn } from "@/lib/utils";
 import type { ModelProvider } from "../domain/thread";
+
+const icon = "size-4 shrink-0";
 import { claudePath, openAIPath } from "./provider-paths";
 
 export function ProviderIcon({
   provider = "claude",
-  className = "",
+  className,
 }: {
   provider?: ModelProvider;
   className?: string;
@@ -14,7 +17,7 @@ export function ProviderIcon({
         aria-hidden
         viewBox="100 100 411 411"
         fill="currentColor"
-        className={`provider-icon provider-openai ${className}`}
+        className={cn(icon, "text-icon-muted", className)}
       >
         <path d={openAIPath} fillRule="evenodd" clipRule="evenodd" />
       </svg>
@@ -23,7 +26,7 @@ export function ProviderIcon({
     <svg
       aria-hidden
       viewBox="0 0 256 257"
-      className={`provider-icon provider-claude ${className}`}
+      className={cn(icon, "text-provider-claude", className)}
       fill="currentColor"
     >
       <path d={claudePath} />

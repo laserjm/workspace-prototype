@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -37,7 +38,7 @@ export function CustomSnoozeDialog({
         if (!open) onClose();
       }}
     >
-      <DialogContent className="custom-snooze-dialog">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto wrap-anywhere">
         <DialogHeader>
           <DialogTitle>Custom snooze</DialogTitle>
           <DialogDescription>
@@ -45,7 +46,7 @@ export function CustomSnoozeDialog({
           </DialogDescription>
         </DialogHeader>
         <form
-          className="workspace-dialog-form custom-snooze-form"
+          className="flex flex-col gap-2"
           onSubmit={(event) => {
             event.preventDefault();
             const until = customSnoozeTime(
@@ -70,7 +71,10 @@ export function CustomSnoozeDialog({
             onSnooze(until.value.toISOString());
           }}
         >
-          <div className="snooze-mode-picker" aria-label="Snooze schedule">
+          <div
+            className="flex gap-1 rounded-md bg-accent p-1 [&>button]:flex-1 [&>button]:rounded-sm [&>button]:p-1.5 [&>button]:text-xs [&>button]:text-secondary-label [&>button]:aria-pressed:bg-card [&>button]:aria-pressed:text-secondary-foreground [&>button]:aria-pressed:shadow-xs"
+            aria-label="Snooze schedule"
+          >
             <button
               type="button"
               aria-pressed={mode === "date"}
@@ -94,8 +98,10 @@ export function CustomSnoozeDialog({
           </div>
           {mode === "date" ? (
             <>
-              <label htmlFor="snooze-date">Return at (local time)</label>
-              <input
+              <label htmlFor="snooze-date" className="text-xs font-medium">
+                Return at (local time)
+              </label>
+              <Input
                 id="snooze-date"
                 type="datetime-local"
                 value={date}
@@ -108,8 +114,10 @@ export function CustomSnoozeDialog({
             </>
           ) : (
             <>
-              <label htmlFor="snooze-minutes">Snooze for (minutes)</label>
-              <input
+              <label htmlFor="snooze-minutes" className="text-xs font-medium">
+                Snooze for (minutes)
+              </label>
+              <Input
                 id="snooze-minutes"
                 type="number"
                 min="1"
@@ -125,11 +133,11 @@ export function CustomSnoozeDialog({
             </>
           )}
           {error && (
-            <p role="alert" className="snooze-error">
+            <p role="alert" className="text-xs text-destructive-foreground">
               {error}
             </p>
           )}
-          <div className="snooze-dialog-actions">
+          <div className="mt-1.5 flex justify-end gap-1.5">
             <Button type="button" variant="ghost" onClick={onClose}>
               Cancel
             </Button>
