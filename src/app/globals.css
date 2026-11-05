@@ -32,6 +32,22 @@
   }
 }
 
+/* Content scrolling up under the header fades out over the top 1.5rem, as in
+   T3 Code's topbar-scroll-fade. The right 1rem, where the scrollbar sits,
+   stays unmasked so the bar never fades. */
+@utility scroll-fade-top {
+  mask-image:
+    linear-gradient(to bottom, transparent, black 1.5rem),
+    linear-gradient(black, black);
+  mask-size:
+    calc(100% - 1rem) 100%,
+    1rem 100%;
+  mask-position:
+    left top,
+    right top;
+  mask-repeat: no-repeat;
+}
+
 /*
  * Moving colours out of workspace.css. Each hex value becomes the token of its
  * role; the lightness bands are the default when the role is unclear.

@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useLayoutEffect, useRef } from "react";
+import { Fragment, useLayoutEffect, useRef, type ReactNode } from "react";
 import { FileText } from "lucide-react";
 import { useChat } from "@ai-sdk/react";
 import { cn } from "@/lib/utils";
@@ -24,10 +24,19 @@ export function ThreadMessages({
   thread,
   models,
   onFork,
+  laneClassName,
+  fadeTop,
+  leading,
 }: {
   thread: Thread;
   models: ModelChoice[];
   onFork: (target: ForkTarget) => void;
+  /** The centred column the messages sit in; the list scrolls across the full width. */
+  laneClassName: string;
+  /** Nothing stays put above the list: it starts under the header and fades out there. */
+  fadeTop: boolean;
+  /** The first row of the list, which scrolls away with the messages. */
+  leading?: ReactNode;
 }) {
   const store = useChatStore();
   const load = useConversationLoad(thread.id);
@@ -53,16 +62,32 @@ export function ThreadMessages({
     if (pinned.current) element.scrollTop = element.scrollHeight;
   }, [messages, lastUserId]);
 
+  // The composer floating over the end can grow (attachments, a skill hint),
+  // which grows the space reserved below the messages: stay at the end.
+  const laneRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const scroller = scrollRef.current;
+    const lane = laneRef.current;
+    if (!scroller || !lane) return;
+    const observer = new ResizeObserver(() => {
+      if (pinned.current) scroller.scrollTop = scroller.scrollHeight;
+    });
+    observer.observe(lane, { box: "border-box" });
+    return () => observer.disconnect();
+  }, []);
+
   const inFlight = status === "submitted" || status === "streaming";
   const last = messages.at(-1);
   let responseIndex = 0;
 
   return (
     <div
+      // Full width, so the bar sits at the canvas edge. A stable gutter on
+      // both edges keeps the messages centred when the bar appears.
       className={cn(
-        "flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto py-6",
-        thread.scope &&
-          "gap-5.5 py-6.5 overscroll-contain [scrollbar-width:thin] max-md:pt-5.5",
+        "min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable_both-edges]",
+        thread.scope && "overscroll-contain [scrollbar-width:thin]",
+        fadeTop && "scroll-fade-top",
       )}
       ref={scrollRef}
       onScroll={(event) => {
@@ -72,74 +97,89 @@ export function ThreadMessages({
           PINNED_DISTANCE;
       }}
     >
-      {messages.map((message, index) => {
-        if (message.role === "user") {
-          const reply = messages[index + 1];
-          const awaitingReply = reply?.role !== "assistant";
-          return (
-            <Fragment key={message.id}>
-              <UserMessage
-                inSession={!!thread.scope}
-                text={textOf(message)}
-                attachments={message.metadata?.attachments}
-              />
-              {awaitingReply && inFlight && message === last && (
-                <LiveResponse
-                  requestedAt={requestedAt(message)}
-                  working
-                  continuation={responseIndex > 0}
-                  scope={thread.scope}
-                  models={models}
-                  onFork={() => undefined}
+      <div
+        ref={laneRef}
+        // The end reserves the floating composer's height (--composer-height,
+        // set by ThreadConversation), so the last message stops above it.
+        className={cn(
+          // Under a fading top the first row starts below the fade (1.5rem);
+          // under a fixed row, a short gap is enough.
+          "flex flex-col gap-6 pb-(--composer-height)",
+          fadeTop ? "pt-6" : "pt-4 max-md:pt-3",
+          thread.scope && "gap-5.5",
+          laneClassName,
+        )}
+      >
+        {leading}
+        {messages.map((message, index) => {
+          if (message.role === "user") {
+            const reply = messages[index + 1];
+            const awaitingReply = reply?.role !== "assistant";
+            return (
+              <Fragment key={message.id}>
+                <UserMessage
+                  inSession={!!thread.scope}
+                  text={textOf(message)}
+                  attachments={message.metadata?.attachments}
                 />
-              )}
-            </Fragment>
+                {awaitingReply && inFlight && message === last && (
+                  <LiveResponse
+                    requestedAt={requestedAt(message)}
+                    working
+                    continuation={responseIndex > 0}
+                    scope={thread.scope}
+                    models={models}
+                    onFork={() => undefined}
+                  />
+                )}
+              </Fragment>
+            );
+          }
+          if (message.role !== "assistant") return null;
+          const currentIndex = responseIndex++;
+          const request = messages[index - 1];
+          return (
+            <LiveResponse
+              key={message.id}
+              message={message}
+              requestedAt={
+                request ? requestedAt(request) : new Date().toISOString()
+              }
+              working={inFlight && message === last}
+              continuation={currentIndex > 0}
+              scope={thread.scope}
+              models={models}
+              onFork={() =>
+                onFork({
+                  messageId: message.id,
+                  responseIndex: currentIndex,
+                })
+              }
+            />
           );
-        }
-        if (message.role !== "assistant") return null;
-        const currentIndex = responseIndex++;
-        const request = messages[index - 1];
-        return (
-          <LiveResponse
-            key={message.id}
-            message={message}
-            requestedAt={
-              request ? requestedAt(request) : new Date().toISOString()
-            }
-            working={inFlight && message === last}
-            continuation={currentIndex > 0}
-            scope={thread.scope}
-            models={models}
-            onFork={() =>
-              onFork({
-                messageId: message.id,
-                responseIndex: currentIndex,
-              })
-            }
-          />
-        );
-      })}
-      {load === "loading" && messages.length === 0 && (
-        <p className="text-xs text-secondary-label" role="status">
-          Loading the conversation…
-        </p>
-      )}
-      {load === "failed" && messages.length === 0 && (
-        <div className={errorNotice} role="alert">
-          <span>The conversation could not be loaded.</span>
-          <button type="button" onClick={() => void store.load(thread.id)}>
-            Try again
-          </button>
-        </div>
-      )}
-      {error && !inFlight && (
-        <div className={errorNotice} role="alert">
-          <span>The response did not finish. {error.message}</span>
-          <button type="button" onClick={() => void store.retry(thread.id)}>
-            Try again
-          </button>
-        </div>
-      )}
+        })}
+        {load === "loading" && messages.length === 0 && (
+          <p className="text-xs text-secondary-label" role="status">
+            Loading the conversation…
+          </p>
+        )}
+        {load === "failed" && messages.length === 0 && (
+          <div className={errorNotice} role="alert">
+            <span>The conversation could not be loaded.</span>
+            <button type="button" onClick={() => void store.load(thread.id)}>
+              Try again
+            </button>
+          </div>
+        )}
+        {error && !inFlight && (
+          <div className={errorNotice} role="alert">
+            <span>The response did not finish. {error.message}</span>
+            <button type="button" onClick={() => void store.retry(thread.id)}>
+              Try again
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
