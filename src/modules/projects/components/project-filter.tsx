@@ -6,7 +6,7 @@ import { Check, Folder, ListFilter, Search } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { iconButtonClassName } from "@/components/ui/icon-button";
 import { cn } from "@/lib/utils";
-import { projectInitials, type Project } from "../domain/project";
+import { projectInitials, type Project } from "../contracts";
 
 // `project` is the project's id; null: "All projects".
 type ProjectItem = { value: string; label: string; project: string | null };

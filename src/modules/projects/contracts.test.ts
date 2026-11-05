@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { nameProject, projectInitials } from "./project";
+import { nameProject, projectInitials } from "./contracts";
 
 describe("nameProject", () => {
   it.each([

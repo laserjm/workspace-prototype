@@ -1,10 +1,11 @@
 "use client";
 
-import { useAction } from "next-safe-action/hooks";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useAction } from "@/lib/actions/client";
+import { errorMessage } from "@/lib/actions/messages";
 import { createProjectAction } from "../actions";
-import { PROJECT_NAME_MAX_LENGTH, type Project } from "../domain/project";
+import { PROJECT_NAME_MAX_LENGTH, type Project } from "../contracts";
 
 /** Adds a project; a name the user already uses selects that project. */
 export function ProjectForm({
@@ -17,22 +18,19 @@ export function ProjectForm({
   onNameChange: (name: string) => void;
   onCreated: (project: Project) => void;
 }) {
-  const { execute, result, isPending } = useAction(createProjectAction, {
-    onSuccess: ({ data }) => {
-      if (!data?.ok) return;
+  const create = useAction(createProjectAction, {
+    onSuccess: (project) => {
       onNameChange("");
-      onCreated(data.value);
+      onCreated(project);
     },
   });
-  const refused =
-    result.serverError || result.validationErrors || result.data?.ok === false;
   return (
     <form
       className="flex flex-col gap-2"
       onSubmit={(event) => {
         event.preventDefault();
         if (!name.trim()) return;
-        execute({ name });
+        void create.run({ name });
       }}
     >
       <label htmlFor="project-name" className="text-xs font-medium">
@@ -46,24 +44,27 @@ export function ProjectForm({
         onChange={(event) => onNameChange(event.target.value)}
         maxLength={PROJECT_NAME_MAX_LENGTH}
         required
-        aria-invalid={refused ? true : undefined}
-        aria-describedby={refused ? "project-name-error" : undefined}
+        aria-invalid={create.error ? true : undefined}
+        aria-describedby={create.error ? "project-name-error" : undefined}
       />
-      {refused && (
+      {create.error && (
         <p
           id="project-name-error"
           className="text-xs text-destructive-foreground"
           role="alert"
         >
-          The project could not be created. Try again.
+          {errorMessage(create.error, {
+            ProjectNameMissing: "Give the project a name.",
+            Conflict: "A project with this name was just added. Try again.",
+          })}
         </p>
       )}
       <Button
         type="submit"
-        disabled={!name.trim() || isPending}
+        disabled={!name.trim() || create.pending}
         className="mt-3 self-end"
       >
-        {isPending ? "Creating…" : "Create project"}
+        {create.pending ? "Creating…" : "Create project"}
       </Button>
     </form>
   );

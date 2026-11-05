@@ -4,12 +4,12 @@
 ```yaml
 conventions: 0.3.2
 profile: nextjs
-bindings: [drizzle, zod, next-safe-action]   # plain Postgres: no database-platform binding
+bindings: [drizzle, zod]   # plain Postgres: no database-platform binding; server actions are lib/actions/, not a binding
 app-root: src
 schema-source: code-first        # src/lib/db/schema.ts generates the migrations in drizzle/
 isolation: owner                 # each signed-in user owns their threads, projects and preferences
 # cache: adopted with nothing to check yet (no cache tags; every read is per request).
-rulesets: [structure, layers, naming, types, errors, rich, cross-module, testing, zod, migration, database, drizzle, auth, next-safe-action, cache]
+rulesets: [structure, layers, naming, types, errors, rich, cross-module, testing, zod, migration, database, drizzle, auth, cache]
 legacy: []
 migrations: drizzle/*.sql        # what `conventions check` replays for the inventory (NX-DB-02)
 ```
@@ -144,22 +144,25 @@ name and email from Keycloak.
 - **Who checks what.** `proxy.ts` checks only that a session cookie exists, the optimistic check
   Next.js recommends for Proxy. Without one, a page goes to `/sign-in` and `/api/*` gets 401. The
   real check is `getRequester()` next to the data: `app/(workspace)/page.tsx` redirects a visitor
-  whose session has ended, and `/api/chat` answers 401. `lib/safe-action.ts` builds the action
-  clients on the same `getRequester()`; every action uses `memberActionClient`, so a visitor
-  gets `SignedOut` and the action does not run.
+  whose session has ended, and `/api/chat` and `/api/threads/[id]/messages` answer 401. Every
+  server action is `action(…)` from `lib/actions/server.ts`, which calls the same
+  `getRequester()`: a visitor gets `SignedOut` and the action does not run, and the browser goes
+  to `/sign-in` and back (see "Server actions").
 
 **Enforced by.** The `auth` ruleset (NX-AUTH-01: only `app/`, `lib/` and `queries.ts` import
-the requester); `boundaries/external`. The check constraint `users_id_is_keycloak_sub`. Better
+the requester), narrowed by ACTION-03 (`scripts/check-actions.mjs`: only `lib/actions/server.ts`,
+`lib/auth/` and `app/`); `boundaries/external`. The check constraint `users_id_is_keycloak_sub`. Better
 Auth's startup schema check, which refuses to run when `schema.ts` and its fields disagree.
 **Recorded in.** This entry; `docs/adr/0001-auth-library-for-keycloak-sign-in.md`.
 
 ### Stored projects, threads, conversations and placement
 
 **Decision.** Projects, threads and their conversations are stored per owner (see "Data
-ownership"); creating a project or thread and forking a thread are use cases
-(`projects/application/create-project.ts`, `threads/application/start-thread.ts`,
+ownership"); creating a project is `createProjectAction` in `projects/actions.ts`, which
+writes itself (no command, use case or repository, see "Leaving `@conventions/nextjs`"), and
+creating and forking a thread are use cases (`threads/application/start-thread.ts`,
 `threads/application/fork-thread.ts`) wired in the module's `commands.ts` and called from its
-`actions.ts`, which the module's components call (`ProjectForm`, `useThreads`).
+`actions.ts`. The module's components call the actions (`ProjectForm`, `useThreads`).
 `app/(workspace)/page.tsx` reads the requester once and passes it to `listProjects` and
 `listThreads`. A name the user already uses answers with that project instead of adding it
 twice; the `projects_owner_id_name_key` index catches a race, answered as `Conflict`. The
@@ -225,8 +228,12 @@ fakes plus a repository integration test: each module with stored data has one
 Postgres with a requester the test builds (`tests/factories/requester.ts`), so no session or
 auth mocking is needed. `withOwners()` (`tests/support/owners.ts`) signs the test's users up and
 deletes them afterwards. The same file calls `assertIsolation()` through the commands and
-queries (NX-AUTH-03). Actions are not tested: they only validate and hand the requester to the
-command. A use case with rules worth example tables keeps its unit test (`answer-thread.test.ts`);
+queries (NX-AUTH-03). In a module with `commands.ts` the actions are not tested: they only
+validate and hand the requester to the command. A module whose actions write themselves (`projects`) has `actions.integration.test.ts`
+instead, which calls the actions as the browser does: `vi.mock("@/lib/auth/requester", () =>
+import("@/tests/support/session"))` swaps in a fake session, and `callAs(requester, action,
+input)` calls as that user, or as a visitor with `null`, so the test covers the sign-in check
+and the validation too. A use case with rules worth example tables keeps its unit test (`answer-thread.test.ts`);
 pure domain rules are tested by example in `domain/*.test.ts` (NX-TEST-06). Conventions 0.3.2
 accepts a command test in place of both (laserjm/conventions#29).
 **Enforced by.** `conventions check` (`use-case-test`, `repository-test`, `isolation-test`); the
@@ -292,12 +299,84 @@ files: `lib/html-render/html-render.ts`, whose iframe pages cannot read the app'
 variables, and the VS Code brand colour in `components/ui/vscode-icon.tsx`.
 **Recorded in.** This entry; the colour-mapping comment in `globals.css`.
 
+### Server actions
+
+**Decision.** Server actions are the project's own `lib/actions/`, not next-safe-action. A
+module's `actions.ts` exports `export const <name>Action = action(schema, (input, { requester })
+=> command(requester, input))`, or does the write in the handler itself when the module has no
+`commands.ts` (`projects`). Every export of a `"use server"` file can be called from the browser,
+so `actions.ts` exports nothing but actions; a helper the handlers share stays unexported. `action` (`lib/actions/define.ts`, bound to the session in
+`lib/actions/server.ts`) runs four steps in order: it reads the requester and answers
+`SignedOut` without one, before the input is looked at; it parses the input with the schema and
+answers `ValidationFailed` (`issues: [{ path: "change.until", message }]`); it runs the handler,
+whose `Result` reaches the caller as is; and it turns anything thrown into `Unexpected` with a
+trace id, logged on the server, after `unstable_rethrow` has let `redirect()` and `notFound()`
+through. `publicAction(schema, handler)` is the same without the first step, for visitors; the
+comment above it says why. The caller gets one flat `Result` whose error type is the command's
+errors plus `ValidationFailed | SignedOut | Unexpected`, inferred from the command's whole return
+type.
+
+In the browser, `callAction(action, input)` (`lib/actions/client.ts`) never throws: a call that
+does not reach the server answers `Unreachable`, and `SignedOut` sends the browser to
+`/sign-in?returnTo=<this page>` once, so no component handles an ended session.
+`useAction(action, { onSuccess, onError })` wraps it for components with `run`, `pending` and
+`error`. `errorMessage(error, messages)` (`lib/actions/messages.ts`) has the copy for the standard
+errors; the compiler asks the caller for one for each of the module's own errors, and a caller
+may say a standard one better. FormData and `useActionState` are not supported yet: no form
+needs to work before hydration; that would be a `formAction` beside `action`.
+**Enforced by.** `scripts/check-actions.mjs` (`pnpm lint`, CI): ACTION-01 `"use server"` only
+in `modules/*/actions.ts`, ACTION-02 every export of it is `action(…)` or `publicAction(…)` from
+`@/lib/actions/server` (a public one with a comment saying why), ACTION-03 only
+`lib/actions/server.ts`, `lib/auth/` and `app/` import the requester. The unit tests of
+`define.ts`, `client.ts` and `messages.ts`. Next.js's own Origin check on server actions (CSRF).
+**Recorded in.** This entry.
+
+### Leaving `@conventions/nextjs`
+
+**Decision.** The app is moving off the profile's runtime package one module and one export at a
+time, toward plain TypeScript the project owns. The local replacements have the same shapes as
+the package's, so a migrated module and one still on the package can call each other:
+`lib/result.ts` (`Result`, `ok`, `err`), `lib/errors.ts` (`Conflict`, `ConstraintViolation`) and
+`lib/db/errors.ts` (`violatedConstraint`); the action clients are the project's own
+`lib/actions/` (see "Server actions"). `defineUseCase` and `defineRepository` only return
+their argument: a use case is a typed `async function`, a repository an object that `satisfies`
+its port. A module also stops splitting its types between `domain/` and `contracts.ts`: the
+entity, its errors and its rules live in `contracts.ts`. A module catches the
+`ConstraintViolation` class its own repository throws, so a module moves its repository and
+command together.
+
+A module whose writes hold no rule worth a layer of its own drops `domain/`, `application/`,
+`infra/` and `commands.ts`: `contracts.ts` (types, errors, rules, input schemas), `queries.ts`
+(reads, each taking the requester first) and `actions.ts` (writes: `action(…)` signs the caller
+in and validates, and the handler queries Drizzle) are the whole module. `projects` has this
+shape; `server.ts` re-exports its actions for other modules' tests and its queries for pages.
+Every query names `requester.ownerId`. Without a repository, `conventions check` no longer
+requires the isolation test (NX-AUTH-03 looks at repositories only); the action test keeps its
+`assertIsolation()` call regardless. A handler reads a refused constraint with
+`violatedConstraint` and returns `err(conflict(...))` itself, with no `ConstraintViolation` in
+between. `actions.ts` cannot import `queries.ts` (NX-LAYER-01), so a read only a write needs
+lives in `actions.ts`, unexported.
+
+Order: (1) `projects`, done except `OwnerId`/`OwnerRequester` and the test helpers; (2) `threads`,
+`skills`, `sources`, which also need `NotFound`, `ValidationFailed`, `notFound`, `bug` and `map`;
+(3) `OwnerId`/`OwnerRequester` into `lib/auth/requester.ts`; (4) `@conventions/nextjs/drizzle`
+(`createTransactionRunner`) and `/testing` into `lib/` and `tests/support/`
+(`/next-safe-action` is done: `lib/actions/`); (5) the ESLint config, the CLI and this file's
+header.
+**Enforced by.** `tsc`; the Deviations rows for the rules this breaks, which shrink as the
+migration goes and leave with the profile.
+**Recorded in.** This entry; the Deviations table.
+
 ## Deviations
 
 <!-- Rules this project does not follow yet. Name the files or globs in backticks in the Deviation column: findings of that rule there are warnings, not errors; a row without paths covers the whole project. A disabled rule in source without a row here fails `conventions check`. Review quarterly. -->
 
 | Rule | Deviation | Why | Until |
 | --- | --- | --- | --- |
+| NX-LAYER-03 | `modules/projects/queries.ts` and `modules/projects/actions.ts` import `drizzle-orm` and `lib/db` instead of going through `infra/` | Leaving `@conventions/nextjs`: a module without rules worth a layer queries Drizzle in `queries.ts` and `actions.ts` | The profile is removed (step 5) |
+| NX-AUTH-01 | `lib/actions/server.ts` reads the session (through `getRequester`), where the rule names `lib/safe-action.ts` | Server actions are `lib/actions/`, not next-safe-action ("Server actions"); ACTION-03 keeps the requester's importers to this file, `lib/auth/` and `app/` | The profile is removed (step 5) |
+| NX-NAME-50 | `lib/actions/*.ts`: `action`, `publicAction`, `callAction` and `useAction` end in `Action` outside an `actions.ts` | They are the action API itself; ACTION-02 names the server actions (`<name>Action` in `actions.ts`) | The profile is removed (step 5) |
+| NX-ERR-03 | `lib/errors.ts` defines `Conflict`, `NotFound`, `ValidationFailed`, `SignedOut` and `Unexpected` instead of importing them from `@conventions/nextjs/core` | Leaving `@conventions/nextjs`: the standard errors move into `lib/` | The profile is removed (step 5) |
 
 ## Legacy
 

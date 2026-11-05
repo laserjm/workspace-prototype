@@ -1,13 +1,14 @@
 import { randomUUID } from "node:crypto";
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import { OwnerId } from "@conventions/nextjs/core";
 import {
   assertIsolation,
   describeIntegration,
 } from "@conventions/nextjs/testing";
-import { createProject } from "@/modules/projects/server";
+import { createProjectAction } from "@/modules/projects/server";
 import { composeStack } from "@/tests/support/compose-stack";
 import { withOwners } from "@/tests/support/owners";
+import { callAs } from "@/tests/support/session";
 import { aRequester } from "@/tests/factories/requester";
 import { answerThread, forkThread, placeThread, startThread } from "./commands";
 import type {
@@ -17,6 +18,9 @@ import type {
 } from "./contracts";
 import { threadRepository } from "./infra/thread.repository";
 import { listThreadMessages, listThreads } from "./queries";
+
+// The projects module creates projects only through its action, which reads the session.
+vi.mock("@/lib/auth/requester", () => import("@/tests/support/session"));
 
 function aNewThread(
   overrides: Partial<StartThreadInput> = {},
@@ -84,7 +88,9 @@ function aChatTurn(threadId: string) {
 }
 
 async function aProjectOf(requester: ReturnType<typeof aRequester>) {
-  const project = await createProject(requester, { name: "workspace" });
+  const project = await callAs(requester, createProjectAction, {
+    name: "workspace",
+  });
   if (!project.ok) throw new Error("the project was not created");
   return project.value.id;
 }
