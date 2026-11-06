@@ -3,7 +3,7 @@
 import { describe, expect, it } from "vitest";
 import { providers } from "./providers";
 
-const access = { connectionId: "test" };
+const access = { connectionId: "test", baseUrl: "" };
 
 describe("providers", () => {
   it("have unique ids", () => {
@@ -14,6 +14,16 @@ describe("providers", () => {
   it("offer at least one way to connect", () => {
     for (const provider of providers)
       expect(provider.auth.length, provider.id).toBeGreaterThan(0);
+  });
+
+  it("say where their API lives and verify a credential, when one connects with one", () => {
+    for (const provider of providers) {
+      if (provider.auth.every((method) => method.kind === "none")) continue;
+      expect(provider.baseUrl, provider.id).toBeDefined();
+      expect(provider.verify, provider.id).toBeTypeOf("function");
+      if (provider.baseUrl?.default)
+        expect(provider.baseUrl.default, provider.id).toMatch(/^https:\/\/[^/]+.*[^/]$/);
+    }
   });
 });
 

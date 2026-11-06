@@ -1,15 +1,50 @@
 import { z } from "zod";
-import {
-  RECORD_PRIORITIES,
-  RECORD_STATUSES,
-  type ExternalRecord,
-  type SourceRef,
-} from "@/modules/integrations";
+import type { SourceRef } from "@/modules/integrations";
 
-// The record vocabulary is the integrations module's: its providers produce the records.
-export { RECORD_PRIORITIES, RECORD_STATUSES };
-export type { RecordPriority, RecordStatus } from "@/modules/integrations";
-export type SourceRecord = ExternalRecord;
+export const RECORD_STATUSES = [
+  "To do",
+  "In progress",
+  "In review",
+  "Done",
+] as const;
+export type RecordStatus = (typeof RECORD_STATUSES)[number];
+
+export const RECORD_PRIORITIES = ["High", "Medium", "Low"] as const;
+export type RecordPriority = (typeof RECORD_PRIORITIES)[number];
+
+/**
+ * A record of a source: a ticket, a page, a test case. A provider's reader produces it
+ * (integrations module, which imports this as a type).
+ */
+export type SourceRecord = {
+  /** Unique within its source; the provider reads it back by this id. */
+  id: string;
+  title: string;
+  type: string;
+  /** The system's status mapped onto the workspace's four categories. */
+  status: RecordStatus;
+  priority: RecordPriority;
+  owner: string;
+  description: string;
+  summary: string;
+  risk?: string;
+  nextStep: string;
+  updated: string;
+};
+
+/** What a page of a source's records is asked for. Every field is optional. */
+export const recordQuerySchema = z.object({
+  text: z.string().max(200).optional(),
+  /** The `nextCursor` of the page before. */
+  cursor: z.string().max(500).optional(),
+});
+export type RecordQuery = z.infer<typeof recordQuerySchema>;
+
+export type RecordPage = {
+  records: SourceRecord[];
+  /** Set when there are more records; ask again with it as `cursor`. */
+  nextCursor?: string;
+};
 
 /** A collection of records in one of the user's connections, which a thread can attach. */
 export type Source = {

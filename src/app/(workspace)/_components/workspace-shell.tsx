@@ -671,7 +671,6 @@ export function WorkspaceShell({
                 enabledSkills={enabledSkills}
                 onToggleSkill={toggleSkill}
                 project={currentProject}
-                onSources={() => setDialog("sources")}
               />
             )}
 

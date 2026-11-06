@@ -1,6 +1,6 @@
 import "server-only";
 
-export { listConnections } from "./queries";
+export { listConnections, listProviderChoices } from "./queries";
 export {
   getConnectionRecords,
   listConnectedSources,

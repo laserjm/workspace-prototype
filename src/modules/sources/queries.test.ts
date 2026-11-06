@@ -1,10 +1,15 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { aUser } from "@/tests/factories/user";
 import {
   listScopedRecords,
   listSources,
   searchSourceRecords,
 } from "./queries";
+
+// The sample connection alone, without the compose Postgres.
+vi.mock("@/modules/integrations/queries", () =>
+  import("@/tests/support/connections"),
+);
 
 const user = aUser("ana");
 

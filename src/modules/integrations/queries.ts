@@ -1,20 +1,63 @@
 import "server-only";
+import { and, asc, eq } from "drizzle-orm";
 import type { User } from "@/lib/auth/user";
-import type { Connection } from "./contracts";
+import { db } from "@/lib/db/client";
+import { connectionsTable } from "@/lib/db/schema";
+import type { Connection, ProviderChoice } from "./contracts";
+import { providers } from "./providers";
+import { sampleConnection } from "./providers/sample";
 
-/** The built-in connection to the sample provider, which every user has. Stored nowhere. */
-const sampleConnection: Connection = {
-  id: "sample",
-  providerId: "sample",
-  accountLabel: "Sample data",
+/** The columns a `Connection` is read from; never the secret, which is in another table. */
+export const connectionColumns = {
+  id: connectionsTable.id,
+  providerId: connectionsTable.providerId,
+  accountLabel: connectionsTable.accountLabel,
+  status: connectionsTable.status,
+  baseUrl: connectionsTable.baseUrl,
+  scopes: connectionsTable.scopes,
+  expiresAt: connectionsTable.expiresAt,
+  lastVerifiedAt: connectionsTable.lastVerifiedAt,
 };
 
-/**
- * The user's connections. Until connections are stored (ADR 0002, phase 2) that is the sample
- * connection alone, the same for everyone; the user is already the first argument, as for every
- * query on owned data.
- */
+export const toConnection = (row: Omit<Connection, "builtIn">): Connection => ({
+  ...row,
+  builtIn: false,
+});
+
+/** The user's connections: the sample first, then the stored ones in the order they were made. */
 export async function listConnections(user: User): Promise<Connection[]> {
-  void user;
-  return [sampleConnection];
+  const rows = await db()
+    .select(connectionColumns)
+    .from(connectionsTable)
+    .where(eq(connectionsTable.userId, user.id))
+    .orderBy(asc(connectionsTable.createdAt));
+  return [sampleConnection, ...rows.map(toConnection)];
+}
+
+/** One of the user's stored connections; none for another user's or a missing one. */
+export async function findStoredConnection(
+  user: User,
+  connectionId: string,
+): Promise<Connection | undefined> {
+  const [row] = await db()
+    .select(connectionColumns)
+    .from(connectionsTable)
+    .where(
+      and(
+        eq(connectionsTable.userId, user.id),
+        eq(connectionsTable.id, connectionId),
+      ),
+    );
+  return row && toConnection(row);
+}
+
+/** Every provider, as the connect form sees it: no code. Shared data, no user. */
+export async function listProviderChoices(): Promise<ProviderChoice[]> {
+  return providers.map(({ id, name, description, auth, baseUrl }) => ({
+    id,
+    name,
+    description,
+    auth,
+    ...(baseUrl ? { baseUrl } : {}),
+  }));
 }

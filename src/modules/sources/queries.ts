@@ -1,6 +1,5 @@
 import "server-only";
 import type { User } from "@/lib/auth/user";
-import type { RecordPage, RecordQuery } from "@/modules/integrations";
 import {
   getConnectionRecords,
   listConnectedSources,
@@ -10,6 +9,8 @@ import {
 import {
   sourceIdOf,
   sourceRefOf,
+  type RecordPage,
+  type RecordQuery,
   type RecordScope,
   type Source,
   type SourceRecord,

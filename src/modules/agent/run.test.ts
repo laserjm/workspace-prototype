@@ -32,6 +32,11 @@ const reply = () =>
     finish("stop"),
   ]);
 
+// The sample connection alone, without the compose Postgres.
+vi.mock("@/modules/integrations/queries", () =>
+  import("@/tests/support/connections"),
+);
+
 const { model } = vi.hoisted(() => ({ model: { current: undefined as unknown } }));
 vi.mock("./models", () => ({
   get models() {

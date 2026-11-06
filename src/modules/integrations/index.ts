@@ -1,21 +1,21 @@
 // Browser-safe public API of the integrations module.
 export type {
   AuthMethod,
+  ConnectInput,
   Connection,
-  ExternalRecord,
+  ConnectionStatus,
+  Credential,
+  CredentialKind,
+  CredentialRejected,
+  ProviderChoice,
+  ProviderUnreachable,
   ProductPresentation,
   Provider,
-  RecordPage,
-  RecordPriority,
-  RecordQuery,
   RecordReader,
-  RecordStatus,
   SourceRef,
   SourceSummary,
 } from "./contracts";
-export {
-  RECORD_PRIORITIES,
-  RECORD_STATUSES,
-  defineProvider,
-  recordQuerySchema,
-} from "./contracts";
+export { defineProvider, expiryLabel } from "./contracts";
+export { IntegrationsProvider } from "./components/integrations-provider";
+export { SourcesSettingsPanel } from "./components/sources-settings-panel";
+export { useIntegrations } from "./components/use-integrations";

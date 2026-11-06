@@ -1,7 +1,6 @@
 "use client";
 
-import type { RecordPage } from "@/modules/integrations";
-import type { SourceRecord } from "../contracts";
+import type { RecordPage, SourceRecord } from "../contracts";
 
 export type RecordsLoad =
   | { status: "loading" }

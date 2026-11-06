@@ -1,7 +1,9 @@
 // Browser-safe public API of the sources module.
 export type {
   RecordMatch,
+  RecordPage,
   RecordPriority,
+  RecordQuery,
   RecordScope,
   RecordStatus,
   SearchRecordsInput,
@@ -9,10 +11,10 @@ export type {
   Source,
   SourceRecord,
 } from "./contracts";
-export { recordQuerySchema } from "@/modules/integrations";
 export {
   RECORD_PRIORITIES,
   RECORD_STATUSES,
+  recordQuerySchema,
   recordScopeSchema,
   searchRecordsInputSchema,
   searchRecordsOutputSchema,

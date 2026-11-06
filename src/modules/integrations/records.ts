@@ -1,16 +1,9 @@
 import "server-only";
 import { bug } from "@conventions/nextjs/core";
 import type { User } from "@/lib/auth/user";
-import type {
-  Connection,
-  ConnectionAccess,
-  ExternalRecord,
-  ProductPresentation,
-  RecordPage,
-  RecordQuery,
-  SourceRef,
-  SourceSummary,
-} from "./contracts";
+import { accessFor } from "./access";
+import type { RecordPage, RecordQuery, SourceRecord } from "@/modules/sources";
+import type { ProductPresentation, SourceRef, SourceSummary } from "./contracts";
 import { findProvider } from "./providers";
 import { listConnections } from "./queries";
 
@@ -21,18 +14,14 @@ export type ConnectedSource = {
   presentation: ProductPresentation;
 };
 
-/** What a connection's provider code is given; phase 2 fills it from the vault. */
-const accessFor = (connection: Connection): ConnectionAccess => ({
-  connectionId: connection.id,
-});
-
 /** The records capability of one of the user's connections, or nothing. */
 async function recordsOf(user: User, connectionId: string) {
   const connection = (await listConnections(user)).find(
     (item) => item.id === connectionId,
   );
   const records = connection && findProvider(connection.providerId)?.records;
-  return records && { access: accessFor(connection), ...records };
+  const access = records && (await accessFor(user, connection));
+  return access && { access, ...records };
 }
 
 /** Every source of the user's connections whose provider has records, connection by connection. */
@@ -42,8 +31,9 @@ export async function listConnectedSources(
   const perConnection = await Promise.all(
     (await listConnections(user)).map(async (connection) => {
       const records = findProvider(connection.providerId)?.records;
-      if (!records) return [];
-      const summaries = await records.reader.listSources(accessFor(connection));
+      const access = records && (await accessFor(user, connection));
+      if (!records || !access) return [];
+      const summaries = await records.reader.listSources(access);
       return summaries.map((summary) => ({
         connectionId: connection.id,
         summary,
@@ -71,7 +61,7 @@ export async function getConnectionRecords(
   user: User,
   { connectionId, sourceKey }: SourceRef,
   ids: readonly string[],
-): Promise<ExternalRecord[]> {
+): Promise<SourceRecord[]> {
   const records = await recordsOf(user, connectionId);
   return records ? records.reader.getRecords(records.access, sourceKey, ids) : [];
 }

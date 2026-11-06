@@ -58,7 +58,8 @@ threads or source connections configured once per organisation, would add an
 organisation to every owned row, recorded here when it comes.
 The owner is the signed-in Keycloak user, so the code says user: `User.id` (a `UserId`) is their
 `sub`, which is also `users.id` (see the sign-in). The four sign-in tables are Better Auth's,
-not owned data the app reads. The owned tables are `projects`, `threads` and `thread_messages`:
+not owned data the app reads. The owned tables are `projects`, `threads`, `thread_messages`, `connections` and
+`connection_secrets`:
 each row has a `user_id` referencing `users.id`, like `sessions` and `accounts` (deleting a user
 deletes what they own); a message's reference `(thread_id, user_id)` → `threads(id, user_id)`
 lets it belong only to a thread of the same user. Every query and repository method on owned
@@ -94,8 +95,9 @@ thread refers to its source, records and skill by id (`ThreadScope = { sourceId,
 `skillId`; a source id is `<connectionId>:<sourceKey>`, `sourceIdOf` in `sources/contracts.ts`). Components resolve the ids through the other module's public API
 (`useSources().sourceById`, `useSkills().skillById`). Source-specific presentation (overview
 title, breadcrumb, board view, list label, the icon `SourceIcon` draws) is data on the source,
-from its provider's product, not a branch on its id. `sources` re-exports the record vocabulary
-(`RECORD_STATUSES`, `SourceRecord`) from `integrations`, whose providers produce the records.
+from its provider's product, not a branch on its id. The record vocabulary (`RECORD_STATUSES`,
+`SourceRecord`, `RecordQuery`, `RecordPage`) is `sources`'; `integrations` imports it as types
+only, so loading `sources` never loads the `integrations` components and actions.
 **Enforced by.** Review.
 **Recorded in.** This entry.
 
@@ -320,23 +322,60 @@ model, the call offers the tools and `execute` sees the thread's scope); `tsc`
 ### Integrations are provider folders
 
 **Decision.** `docs/adr/0002` chose one leaf module, `integrations`, with one folder per
-provider: a system the workspace connects to (`providers/sample/` today; GitHub, Atlassian,
-codebeamer, PostHog, Stripe and Supabase are planned). A provider is
-`defineProvider({ id, name, description, auth, records? })` (`contracts.ts`), registered by one
-line in `providers.ts`. Its `records` capability declares each product's presentation and a
-`RecordReader` (`listSources`, `searchRecords`, `getRecords`), which is handed a
-`ConnectionAccess` per request and never reads a secret, an env var or the database. A
-connection is one user's link to a provider account; until connections are stored (ADR 0002,
-phase 2), `listConnections(user)` answers with the built-in sample connection, which every user
-has. `integrations/records.ts` runs a connection's reader for `sources`
+provider: a system the workspace connects to (`providers/sample/` and `providers/github/` today;
+Atlassian, codebeamer, PostHog, Stripe and Supabase are planned). A provider is
+`defineProvider({ id, name, description, auth, baseUrl?, verify?, records? })` (`contracts.ts`),
+registered by one line in `providers.ts`, and written in at most three files: `index.ts` (the
+manifest), `api.ts` (its HTTP calls, every response parsed with zod) and `records.ts` (its
+`RecordReader`, only with records). A provider's code is handed a `ProviderAccess` (the API
+address and the `Authorization` header value) and never reads a secret, an env var or the
+database. `auth` lists how a user connects: `none` (the sample), `token` (sent as `Bearer`) or
+`basic` (username and password, or an email and API token, sent as HTTP Basic); `verify` checks a
+credential and names the account.
+
+A connection is one user's link to one account of a provider at one address (`connections`,
+unique per user, provider, `base_url` and `account_ref`). `listConnections(user)` answers with
+the built-in sample connection, which every user has and nothing stores, then the stored ones.
+`connectAction` verifies the credential with the provider before anything is stored, then
+writes the connection and its credential in one transaction; connecting the same account again
+updates both. `testConnectionAction` asks the provider again (a refused credential is
+`needs_reconnect`; an unreachable provider changes nothing), and `disconnectAction` deletes the
+connection and, by cascade, its credential. The base URL must be HTTPS. Settings → Sources
+(`SourcesSettingsPanel`, the connect form built from the provider's `auth` and `baseUrl`) lists
+every provider and the user's connections; `IntegrationsProvider` holds them, and an action's
+answer goes into its state. `integrations/records.ts` runs a connection's reader for `sources`
 (`listConnectedSources`, `searchConnectionRecords`, `getConnectionRecords`); `sources` turns that
 into `Source`s, the scope's records and the records route. The sample records are the
 provider's `data.ts`; the stored threads' sample ids moved to `sample:<product>` in
-`drizzle/0006_rename-sample-source-ids.sql`.
+`drizzle/0006_rename-sample-source-ids.sql`. Unit tests that read sources swap the connection
+query for `tests/support/connections.ts` (the sample connection alone), so they need no Postgres.
 **Enforced by.** `integrations/providers.test.ts` (every provider in the registry: unique ids, a
-way to connect, sources in a declared product, records read back by id in order, nothing for an
-unknown key); `sources/queries.test.ts`; `tsc` (`defineProvider`).
+way to connect, a base URL and `verify` when it takes a credential, sources in a declared
+product, records read back by id in order, nothing for an unknown key);
+`integrations/actions.integration.test.ts` (connect, reconnect, refusals, test, disconnect, a
+visitor, `assertIsolation()`); `providers/github/api.test.ts`; `sources/queries.test.ts`; `tsc`.
 **Recorded in.** This entry; `docs/adr/0002-integrations.md`.
+
+### Connection credentials live in the vault
+
+**Decision.** A credential is stored only in `connection_secrets`, one row per connection, as
+AES-256-GCM ciphertext (`integrations/cipher.ts`, pure) whose authenticated data binds it to its
+connection and user, so a copy in another row does not decrypt. The keys are `INTEGRATION_KEYS`
+(`lib/env.ts`): `<version>:<32-byte base64 key>`, the newest first; new secrets use the first,
+and `key_version` names the one a row used, so a key is rotated by adding a version in front and
+re-encrypting. It is separate from `BETTER_AUTH_SECRET`. `integrations/vault.ts` is the only
+reader and writer of the table, and reads the key ring on first use. `access.ts` turns a
+connection into a `ConnectionAccess` per request, the only form in which a credential leaves the
+vault. Nothing returns, logs or renders a credential: `Connection` has no secret field, and the
+connect form never shows a stored token. Better Auth's `accounts` stays the sign-in identity; it
+holds no integration tokens.
+**Enforced by.** ESLint `no-restricted-imports` (`eslint.config.mjs`: only `vault.ts` and the
+module's integration tests import `connectionSecretsTable`); other modules reach `integrations`
+only through `index.ts` and `server.ts`, which export neither the vault nor `accessFor`;
+`integrations/cipher.test.ts` (round trip, a fresh iv, the wrong binding, a changed ciphertext,
+an older key version); `integrations/actions.integration.test.ts` (the stored row holds no
+token; another user's read is no credential).
+**Recorded in.** This entry; `docs/adr/0002-integrations.md`; `.env.example`.
 
 ### Skills are SKILL.md files
 

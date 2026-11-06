@@ -1,14 +1,11 @@
 // Fictional enterprise records bundled with the prototype, one sample source per product.
 // Nothing here calls an external system.
-import type {
-  ExternalRecord,
-  ProductPresentation,
-  SourceSummary,
-} from "../../contracts";
+import type { SourceRecord } from "@/modules/sources";
+import type { ProductPresentation, SourceSummary } from "../../contracts";
 
 /** A sample source: its summary and presentation in one, keyed by its product's id. */
 export type SampleSource = Omit<SourceSummary, "key" | "product"> &
-  Omit<ProductPresentation, "icon"> & { id: string; records: ExternalRecord[] };
+  Omit<ProductPresentation, "icon"> & { id: string; records: SourceRecord[] };
 
 export const sampleSources: SampleSource[] = [
   {

@@ -1,4 +1,8 @@
-import { defineProvider, type SourceSummary } from "../../contracts";
+import {
+  defineProvider,
+  type Connection,
+  type SourceSummary,
+} from "../../contracts";
 import { sampleSources, type SampleSource } from "./data";
 
 const summaryOf = ({
@@ -77,3 +81,17 @@ export const sample = defineProvider({
     },
   },
 });
+
+
+/** The built-in connection to the sample provider, which every user has. Stored nowhere. */
+export const sampleConnection: Connection = {
+  id: "sample",
+  providerId: sample.id,
+  accountLabel: "Sample data",
+  builtIn: true,
+  status: "active",
+  baseUrl: "",
+  scopes: [],
+  expiresAt: null,
+  lastVerifiedAt: null,
+};

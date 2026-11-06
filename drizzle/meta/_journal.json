@@ -50,6 +50,13 @@
       "when": 1793952209870,
       "tag": "0006_rename-sample-source-ids",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793953200209,
+      "tag": "0007_create-connections",
+      "breakpoints": true
     }
   ]
 }

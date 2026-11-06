@@ -1,9 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { User } from "@/lib/auth/user";
 import { aUser } from "@/tests/factories/user";
 import type { RecordScope } from "./contracts";
 import { searchSourceRecords } from "./queries";
 import { sourceTools } from "./tools";
+
+// The sample connection alone, without the compose Postgres.
+vi.mock("@/modules/integrations/queries", () =>
+  import("@/tests/support/connections"),
+);
 
 const user = aUser("ana");
 

@@ -1,34 +1,9 @@
-// The provider contract (docs/adr/0002): what a provider folder in ./providers/ declares, and the
-// record vocabulary its reader produces. Browser-safe: types, constants and schemas only.
+// The provider contract (docs/adr/0002): what a provider folder in ./providers/ declares.
+// Browser-safe: types, constants and schemas only. The records a reader produces are the sources
+// module's vocabulary, imported as types only, so nothing here loads that module.
 import { z } from "zod";
-
-export const RECORD_STATUSES = [
-  "To do",
-  "In progress",
-  "In review",
-  "Done",
-] as const;
-export type RecordStatus = (typeof RECORD_STATUSES)[number];
-
-export const RECORD_PRIORITIES = ["High", "Medium", "Low"] as const;
-export type RecordPriority = (typeof RECORD_PRIORITIES)[number];
-
-/** A record as a provider reads it: a ticket, a page, a test case. */
-export type ExternalRecord = {
-  /** Unique within its source; the provider reads it back by this id. */
-  id: string;
-  title: string;
-  type: string;
-  /** The system's status mapped onto the workspace's four categories. */
-  status: RecordStatus;
-  priority: RecordPriority;
-  owner: string;
-  description: string;
-  summary: string;
-  risk?: string;
-  nextStep: string;
-  updated: string;
-};
+import type { Result } from "@/lib/result";
+import type { RecordPage, RecordQuery, SourceRecord } from "@/modules/sources";
 
 /** How a product's sources look in the workspace: data, never a branch on an id. */
 export type ProductPresentation = {
@@ -63,26 +38,15 @@ export type SourceSummary = {
 /** Names one source of one connection. */
 export type SourceRef = { connectionId: string; sourceKey: string };
 
-/** What a page of a source's records is asked for. Every field is optional. */
-export const recordQuerySchema = z.object({
-  text: z.string().max(200).optional(),
-  /** The `nextCursor` of the page before. */
-  cursor: z.string().max(500).optional(),
-});
-export type RecordQuery = z.infer<typeof recordQuerySchema>;
-
-export type RecordPage = {
-  records: ExternalRecord[];
-  /** Set when there are more records; ask again with it as `cursor`. */
-  nextCursor?: string;
-};
-
 /**
- * What a provider's code gets to reach its system for one connection, built per request on the
- * server. Phase 2 adds the API base URL and the `Authorization` header value from the vault; a
- * provider never reads a secret, an env var or the database itself.
+ * What a provider's code gets to reach its system: the API address and the `Authorization` header
+ * value, built per request on the server from the vault. A provider never reads a secret, an env
+ * var or the database itself.
  */
-export type ConnectionAccess = { connectionId: string };
+export type ProviderAccess = { baseUrl: string; authorization?: string };
+
+/** `ProviderAccess` for one stored connection. */
+export type ConnectionAccess = ProviderAccess & { connectionId: string };
 
 /** Reads a provider's sources and records for one connection. */
 export type RecordReader = {
@@ -98,11 +62,90 @@ export type RecordReader = {
     access: ConnectionAccess,
     sourceKey: string,
     ids: readonly string[],
-  ): Promise<ExternalRecord[]>;
+  ): Promise<SourceRecord[]>;
 };
 
-/** How a user connects. Phase 2 adds `token` and `basic`, phase 5 `oauth`. */
-export type AuthMethod = { kind: "none" };
+/** How a user connects. Phase 5 adds `oauth`. */
+export type AuthMethod =
+  /** Nothing to enter: the built-in sample. */
+  | { kind: "none" }
+  /** An API key or personal access token, sent as `Bearer <token>`. */
+  | { kind: "token"; label: string; help: string; placeholder?: string }
+  /**
+   * A username and password (or an email and API token), sent as HTTP Basic: legacy systems,
+   * Atlassian API tokens.
+   */
+  | {
+      kind: "basic";
+      label: string;
+      help: string;
+      usernameLabel: string;
+      passwordLabel: string;
+    };
+
+/** The kinds a user enters something for, and so the kinds a stored connection has. */
+export type CredentialKind = Exclude<AuthMethod["kind"], "none">;
+
+/** What a user enters to connect. Only the vault stores it, encrypted; nobody else keeps it. */
+export const credentialSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("token"),
+    token: z.string().trim().min(1).max(2000),
+  }),
+  z.object({
+    kind: z.literal("basic"),
+    username: z.string().trim().min(1).max(320),
+    password: z.string().min(1).max(2000),
+  }),
+]);
+export type Credential = z.infer<typeof credentialSchema>;
+
+/** The `Authorization` header value a credential is sent as. */
+export function authorizationOf(credential: Credential): string {
+  if (credential.kind === "token") return `Bearer ${credential.token}`;
+  const pair = `${credential.username}:${credential.password}`;
+  const bytes = new TextEncoder().encode(pair);
+  return `Basic ${btoa(String.fromCharCode(...bytes))}`;
+}
+
+/** Where a provider's API lives, when a user may say: GitHub Enterprise, a codebeamer instance. */
+export type BaseUrlSetting = {
+  label: string;
+  /** The public service's address, prefilled; none for a system that is always self-hosted. */
+  default?: string;
+  placeholder?: string;
+};
+
+/** Who a credential belongs to, as its provider answered. */
+export type VerifiedAccount = {
+  /** The provider's stable id for the account, e.g. GitHub's numeric user id. */
+  accountRef: string;
+  /** "@micha", "ana@acme.com". */
+  accountLabel: string;
+  scopes: string[];
+  /** When the credential stops working, if the provider says. */
+  expiresAt?: Date;
+};
+
+/** The provider answered that the credential is not valid. `message` is for the user. */
+export type CredentialRejected = {
+  readonly _tag: "CredentialRejected";
+  readonly message: string;
+};
+export const credentialRejected = (message: string): CredentialRejected => ({
+  _tag: "CredentialRejected",
+  message,
+});
+
+/** The provider could not be reached, or answered with something unexpected. */
+export type ProviderUnreachable = {
+  readonly _tag: "ProviderUnreachable";
+  readonly message: string;
+};
+export const providerUnreachable = (message: string): ProviderUnreachable => ({
+  _tag: "ProviderUnreachable",
+  message,
+});
 
 /**
  * A system the workspace can connect to. Code, not rows: one folder in ./providers/ and one line
@@ -113,6 +156,12 @@ export type Provider = {
   name: string;
   description: string;
   auth: readonly AuthMethod[];
+  /** Where its API lives; asked for when connecting. Required for a provider one connects to. */
+  baseUrl?: BaseUrlSetting;
+  /** Checks a credential and says whose it is. Required for a provider one connects to. */
+  verify?: (
+    access: ProviderAccess,
+  ) => Promise<Result<VerifiedAccount, CredentialRejected | ProviderUnreachable>>;
   /** Sources and records a thread can browse and attach. */
   records?: {
     /** Each product's presentation, by the `product` its sources name. */
@@ -126,10 +175,47 @@ export function defineProvider<const P extends Provider>(provider: P): P {
   return provider;
 }
 
+/** What a provider offers the connect form: the provider without its code. */
+export type ProviderChoice = Pick<
+  Provider,
+  "id" | "name" | "description" | "auth" | "baseUrl"
+>;
+
+export type ConnectionStatus = "active" | "needs_reconnect";
+
 /** One user's link to one provider account or site. Never holds a secret. */
 export type Connection = {
   id: string;
   providerId: string;
   /** Who or what it is connected as: "@micha", "acme.atlassian.net", "Sample data". */
   accountLabel: string;
+  /** Part of the workspace (the sample): every user has it, nothing to test or disconnect. */
+  builtIn: boolean;
+  status: ConnectionStatus;
+  baseUrl: string;
+  scopes: string[];
+  expiresAt: Date | null;
+  lastVerifiedAt: Date | null;
 };
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** "Expires in 23 days", "Expires today", "Expired": what the Sources view says of a credential. */
+export function expiryLabel(expiresAt: Date, now: Date): string {
+  const days = Math.ceil((expiresAt.getTime() - now.getTime()) / DAY_MS);
+  if (expiresAt.getTime() <= now.getTime()) return "Expired";
+  if (days <= 1) return "Expires today";
+  return `Expires in ${days} days`;
+}
+
+/** Connects to a provider with a credential; connecting the same account again updates it. */
+export const connectInputSchema = z.object({
+  providerId: z.string().min(1).max(100),
+  /** The provider's default when left out. HTTPS only. */
+  baseUrl: z.url({ protocol: /^https$/ }).max(500).optional(),
+  credential: credentialSchema,
+});
+export type ConnectInput = z.infer<typeof connectInputSchema>;
+
+/** Names one of the user's stored connections. */
+export const connectionInputSchema = z.object({ connectionId: z.uuid() });

@@ -122,10 +122,11 @@ means adding `providers/atlassian/` and one line in `providers.ts`.
 readers in `sources/infra/` and toolkits in `threads/infra/`, so a new vendor touched three
 modules. Since then the project decided that "a tool lives in the module it acts on". A GitHub
 tool acts on the GitHub connection, so it belongs next to the GitHub credential and reader. The
-skills catalogue set the precedent that adding a thing is adding a folder. The cost is that the
-record shape (`ExternalRecord`) is declared in `integrations/contracts.ts`, and
-`sources/contracts.ts` re-exports it as `SourceRecord`. The record shape is defined by the
-readers that produce it, and the graph stays a DAG:
+skills catalogue set the precedent that adding a thing is adding a folder. The record shape
+(`SourceRecord`, `RecordQuery`, `RecordPage`) is the `sources` module's, and `integrations`
+imports it as types only. (Phase 1 had it the other way round; phase 2 turned it, because the
+`integrations` index now exports components that load server actions, and `sources` must load
+without them.) At runtime the graph stays a DAG:
 
 ```
 threads ──► agent ──► skills
@@ -414,9 +415,9 @@ the design, not the provider.
 
 ## Enforcement (for the ARCHITECTURE.md entries)
 
-- **CRED-01** (in `scripts/check-actions.mjs`, or a sibling script): only
-  `integrations/vault.ts` imports `connectionSecretsTable`, and only `integrations/` imports
-  `vault.ts` or `access.ts`.
+- **Only the vault touches secrets** (ESLint `no-restricted-imports`): only
+  `integrations/vault.ts` and the module's integration tests import `connectionSecretsTable`;
+  `vault.ts` and `access.ts` are not exported, so only `integrations/` reaches them.
 - `ConnectionAccess` is not exported from `integrations/index.ts` (`tsc`, review).
 - `integrations/actions.integration.test.ts`: connect, list, test and disconnect as the browser
   does, and `assertIsolation()`. Another user can neither list a connection, get access to it,
@@ -435,7 +436,7 @@ the design, not the provider.
 | --- | --- | --- |
 | **0. User in the agent** ✓ | nothing | `AgentRequest.user` and `AgentContext.user`; `toolsFor` hands the user to `search_records` |
 | **1. Reshape sources** ✓ | nothing | `integrations` with the provider contract, the registry and the `sample` provider; `Source` without records, named `<connectionId>:<sourceKey>`; the scope's records read for the user before `resolveContext`; the records route and `SourceRecordsStore`; `SourceIcon` on presentation data; the contract test over every provider. **No visible change.** Moved to phase 3, where GitHub shows what is needed: the generalised `ExternalRecord` (URL, status label, optional fields), the explorer reading scoped records by id, the "Sample data" labels as data, and records out of the system prompt. |
-| **2. Connections and the Sources view** | 0 | Tables and migration, `vault.ts`, `access.ts`, token connect, test and disconnect, Settings → Sources |
+| **2. Connections and the Sources view** ✓ | 0 | `connections` and `connection_secrets` (`drizzle/0007`), `cipher.ts`, `vault.ts` on `INTEGRATION_KEYS`, `access.ts`; `token` and `basic` auth; `connectAction`, `testConnectionAction`, `disconnectAction`; Settings → Sources; a GitHub provider that verifies a fine-grained PAT (`GET /user`) without records yet. Stored differently from the sketch above: `base_url` is a column (no `settings` jsonb), `expires_at` is on `connections` (not secret, the Sources view shows it), and `iv`/`ciphertext` are base64 `text`, as Drizzle has no `bytea` column. Open: the base URL is HTTPS-only, but private addresses are not refused yet; phase 3 must show a thread whose source's connection is gone instead of failing. |
 | **3. GitHub records** | 1, 2 | `providers/github/`: a fine-grained PAT, repos in the picker, issues and PRs in the explorer, attached records fetched live, `search_records` live, `get_record` |
 | **4. Vendor tools** | 3 | `openToolkits` over `@ai-sdk/mcp`, the GitHub read-only allowlist, grants and their toggles, the generic tool card, the untrusted-output instructions |
 | **5. OAuth** | 2 | The authorization table and routes on `oauth4webapi` (PKCE, state in the database), a GitHub App (8 h user tokens, 6-month rotating refresh tokens, locked refresh). Then Atlassian 3LO with the Jira and Confluence readers and Atlassian MCP |
