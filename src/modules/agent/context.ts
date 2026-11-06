@@ -29,7 +29,10 @@ export type AgentContext = {
 export type Catalogs = {
   models: readonly AgentModel[];
   skills: readonly Skill[];
+  /** The user's sources. */
   sources: readonly Source[];
+  /** The records of the scope's source that the scope names, read for the user. */
+  scopedRecords: readonly SourceRecord[];
 };
 
 /**
@@ -39,7 +42,7 @@ export type Catalogs = {
 export function resolveContext(
   user: User,
   options: ChatOptions,
-  { models, skills, sources }: Catalogs,
+  { models, skills, sources, scopedRecords }: Catalogs,
 ): Result<AgentContext, NotFound> {
   const model = models.find((item) => item.id === options.modelId);
   if (!model) return err(notFound("Model", options.modelId));
@@ -59,7 +62,7 @@ export function resolveContext(
   const { sourceId, recordIds } = options.scope;
   const source = sources.find((item) => item.id === sourceId);
   if (!source) return err(notFound("Source", sourceId));
-  const records = source.records.filter((record) =>
+  const records = scopedRecords.filter((record) =>
     recordIds.includes(record.id),
   );
   // A scope whose records are all gone adds no context, as if none was attached.

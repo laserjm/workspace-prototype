@@ -42,22 +42,23 @@ const ICON_SIZES = {
   plain: "size-3.5",
 } as const;
 
+/** A source's mark, by its product's `icon` (presentation data, not the source's id). */
 export function SourceIcon({
-  id,
+  icon,
   size = "lg",
   className,
   iconClassName,
 }: {
-  id: string;
+  icon: string;
   className?: string;
   iconClassName?: string;
 } & VariantProps<typeof mark>) {
-  const Icon = ICONS[id] ?? Database;
+  const Icon = ICONS[icon] ?? Database;
   return (
     <span
       className={cn(
         mark({ size }),
-        size !== "plain" && (TONES[id] ?? TONES.jira),
+        size !== "plain" && (TONES[icon] ?? TONES.jira),
         className,
       )}
       aria-hidden

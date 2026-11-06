@@ -26,7 +26,7 @@ export function SourceChoiceList({
           onClick={() => onSelect(source.id)}
         >
           <SourceIcon
-            id={source.id}
+            icon={source.icon}
             className="max-md:size-7"
             iconClassName="max-md:size-4"
           />

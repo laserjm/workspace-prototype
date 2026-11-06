@@ -40,7 +40,7 @@ export function SourcePicker({
         }
       >
         {selectedSource ? (
-          <SourceIcon id={selectedSource.id} size="plain" />
+          <SourceIcon icon={selectedSource.icon} size="plain" />
         ) : (
           <Database />
         )}
@@ -56,7 +56,7 @@ export function SourcePicker({
             onClick={() => onSelect(source.id)}
             className="gap-2.5 py-2"
           >
-            <SourceIcon id={source.id} size="md" />
+            <SourceIcon icon={source.icon} size="md" />
             <span>
               <strong className="block text-xs font-medium">
                 {source.name}

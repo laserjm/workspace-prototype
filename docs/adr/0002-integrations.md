@@ -433,8 +433,8 @@ the design, not the provider.
 
 | Phase | Depends on | Delivers |
 | --- | --- | --- |
-| **0. User in the agent** | the parallel branch | `AgentRequest.user` and `AgentContext.user`; `toolsFor` can hand a user to tools |
-| **1. Reshape sources** | nothing | `integrations` with the provider contract and the `sample` provider; the generalised `ExternalRecord`; `Source` without records; async `resolveContext`; the explorer route; records out of the system prompt. **No visible change.** It can start now, in parallel with phase 0. |
+| **0. User in the agent** ✓ | nothing | `AgentRequest.user` and `AgentContext.user`; `toolsFor` hands the user to `search_records` |
+| **1. Reshape sources** ✓ | nothing | `integrations` with the provider contract, the registry and the `sample` provider; `Source` without records, named `<connectionId>:<sourceKey>`; the scope's records read for the user before `resolveContext`; the records route and `SourceRecordsStore`; `SourceIcon` on presentation data; the contract test over every provider. **No visible change.** Moved to phase 3, where GitHub shows what is needed: the generalised `ExternalRecord` (URL, status label, optional fields), the explorer reading scoped records by id, the "Sample data" labels as data, and records out of the system prompt. |
 | **2. Connections and the Sources view** | 0 | Tables and migration, `vault.ts`, `access.ts`, token connect, test and disconnect, Settings → Sources |
 | **3. GitHub records** | 1, 2 | `providers/github/`: a fine-grained PAT, repos in the picker, issues and PRs in the explorer, attached records fetched live, `search_records` live, `get_record` |
 | **4. Vendor tools** | 3 | `openToolkits` over `@ai-sdk/mcp`, the GitHub read-only allowlist, grants and their toggles, the generic tool card, the untrusted-output instructions |

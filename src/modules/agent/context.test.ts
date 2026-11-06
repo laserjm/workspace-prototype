@@ -15,18 +15,16 @@ const opus: AgentModel = {
 };
 const riskReview = aSkill({ id: "risk-review", name: "Risk review" });
 const summary = aSkill({ id: "summary", name: "Summary" });
-const jira = aSource({
-  id: "jira",
-  records: [
-    aSourceRecord({ id: "PLAT-124" }),
-    aSourceRecord({ id: "PLAT-125" }),
-    aSourceRecord({ id: "PLAT-126" }),
-  ],
-});
+const jira = aSource({ id: "sample:jira" });
 const catalogs = {
   models: [opus],
   skills: [summary, riskReview],
   sources: [jira],
+  // As listScopedRecords reads them: the named ones that exist, in the source's order.
+  scopedRecords: [
+    aSourceRecord({ id: "PLAT-124" }),
+    aSourceRecord({ id: "PLAT-126" }),
+  ],
 };
 const options: ChatOptions = { modelId: "opus" };
 const ana = aUser("ana");
@@ -39,13 +37,13 @@ describe("resolveContext", () => {
     });
   });
 
-  it("resolves the skill and only the records the thread named, in the source's order", () => {
+  it("resolves the skill and the records the thread named", () => {
     const result = resolveContext(
       ana,
       {
         ...options,
         skillId: "risk-review",
-        scope: { sourceId: "jira", recordIds: ["PLAT-126", "PLAT-124"] },
+        scope: { sourceId: "sample:jira", recordIds: ["PLAT-126", "PLAT-124"] },
       },
       catalogs,
     );
@@ -60,8 +58,8 @@ describe("resolveContext", () => {
   it("attaches nothing when none of the named records exist", () => {
     const result = resolveContext(
       ana,
-      { ...options, scope: { sourceId: "jira", recordIds: ["GONE-1"] } },
-      catalogs,
+      { ...options, scope: { sourceId: "sample:jira", recordIds: ["GONE-1"] } },
+      { ...catalogs, scopedRecords: [] },
     );
     expect(result.ok && result.value.attached).toBeUndefined();
   });

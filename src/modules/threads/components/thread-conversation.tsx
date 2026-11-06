@@ -115,7 +115,7 @@ export function ThreadConversation({
             )}
             {source && thread.scope && (
               <div className="flex shrink-0 items-center gap-2.5 border-b border-border/60 py-4 max-md:py-3">
-                <SourceIcon id={source.id} size="md" iconClassName="size-4" />
+                <SourceIcon icon={source.icon} size="md" iconClassName="size-4" />
                 <div className="min-w-0">
                   <strong className="block truncate text-xs font-medium text-accent-foreground max-md:max-w-47.5 max-md:text-2xs">
                     {source.collection}

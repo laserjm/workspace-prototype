@@ -12,7 +12,7 @@ import type { User } from "@/lib/auth/user";
 import type { NotFound, ValidationFailed } from "@/lib/errors";
 import { err, ok, type Result } from "@/lib/result";
 import { listSkills } from "@/modules/skills/server";
-import { listSources } from "@/modules/sources/server";
+import { listScopedRecords, listSources } from "@/modules/sources/server";
 import { resolveContext, type AgentContext } from "./context";
 import type {
   ChatOptions,
@@ -97,8 +97,17 @@ export async function runAgent({
   signal,
   onEnd,
 }: AgentRequest): Promise<Result<AgentRun, NotFound | ValidationFailed>> {
-  const [skills, sources] = await Promise.all([listSkills(), listSources()]);
-  const context = resolveContext(user, options, { models, skills, sources });
+  const [skills, sources, scopedRecords] = await Promise.all([
+    listSkills(),
+    listSources(user),
+    options.scope ? listScopedRecords(user, options.scope) : [],
+  ]);
+  const context = resolveContext(user, options, {
+    models,
+    skills,
+    sources,
+    scopedRecords,
+  });
   if (!context.ok) return context;
   const { model, skill } = context.value;
 

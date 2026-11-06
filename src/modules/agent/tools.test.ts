@@ -31,7 +31,7 @@ describe("toolsFor", () => {
     expect(toolsFor({ user, model: opus, offeredSkills: [] })).toEqual({
       activeTools: ["html_render"],
       toolsContext: {
-        search_records: { scope: undefined },
+        search_records: { user, scope: undefined },
         load_skill: { skillIds: [] },
       },
     });
@@ -47,7 +47,7 @@ describe("toolsFor", () => {
 
   it("offers search_records over the attached records", () => {
     const records = [aSourceRecord({ id: "PLAT-124" }), aSourceRecord({ id: "PLAT-126" })];
-    const source = aSource({ id: "jira", records });
+    const source = aSource({ id: "sample:jira" });
     expect(
       toolsFor({
         user,
@@ -58,7 +58,10 @@ describe("toolsFor", () => {
     ).toMatchObject({
       activeTools: ["html_render", "search_records"],
       toolsContext: {
-        search_records: { scope: { sourceId: "jira", recordIds: ["PLAT-124", "PLAT-126"] } },
+        search_records: {
+          user,
+          scope: { sourceId: "sample:jira", recordIds: ["PLAT-124", "PLAT-126"] },
+        },
       },
     });
   });

@@ -34,7 +34,7 @@ describe("instructionsFor", () => {
   it("adds the skill, then the attached records", () => {
     const skill = aSkill({ name: "Risk review", instructions: "List risks." });
     const record = aSourceRecord({ id: "PLAT-124" });
-    const source = aSource({ records: [record] });
+    const source = aSource();
     const prompt = instructionsFor({
       user,
       model: opus,

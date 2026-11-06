@@ -94,8 +94,8 @@ export function ThreadRow({
               roomForActions,
             )}
           >
-            {thread.scope ? (
-              <SourceIcon id={thread.scope.sourceId} size="xs" />
+            {source ? (
+              <SourceIcon icon={source.icon} size="xs" />
             ) : (
               <ProjectIcon />
             )}

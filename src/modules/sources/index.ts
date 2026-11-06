@@ -9,6 +9,7 @@ export type {
   Source,
   SourceRecord,
 } from "./contracts";
+export { recordQuerySchema } from "@/modules/integrations";
 export {
   RECORD_PRIORITIES,
   RECORD_STATUSES,
@@ -21,6 +22,8 @@ export {
   hasRisk,
   recordCountLabel,
   recordsIn,
+  sourceIdOf,
+  sourceRefOf,
 } from "./contracts";
 export { RecordSearchCall } from "./components/record-search-call";
 export { RecordStatusBadge } from "./components/record-status-badge";
@@ -31,4 +34,4 @@ export { SourcePicker } from "./components/source-picker";
 export { SourceScopeDialog } from "./components/source-scope-dialog";
 export { SourceScopeSummary } from "./components/source-scope-summary";
 export { SourcesProvider } from "./components/sources-provider";
-export { useSources } from "./components/use-sources";
+export { useSourceRecords, useSources } from "./components/use-sources";

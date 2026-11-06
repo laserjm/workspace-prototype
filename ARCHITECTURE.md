@@ -52,8 +52,8 @@ unchanged).
 ### Data ownership
 
 **Decision.** Each signed-in user owns their threads, projects and skill
-preferences; there are no shared workspaces. The enterprise source catalogue and the skill
-catalogue are shared data. Shared workspaces, such as a team seeing each other's
+preferences; there are no shared workspaces. A user's sources come from their connections
+(see "Integrations are provider folders"); the provider and skill catalogues are shared data. Shared workspaces, such as a team seeing each other's
 threads or source connections configured once per organisation, would add an
 organisation to every owned row, recorded here when it comes.
 The owner is the signed-in Keycloak user, so the code says user: `User.id` (a `UserId`) is their
@@ -70,9 +70,12 @@ test (see "Command tests").
 
 ### Modules
 
-**Decision.** Five modules. `agent` (the runtime AI: the model allowlist, instructions, tools
+**Decision.** Six modules. `agent` (the runtime AI: the model allowlist, instructions, tools
 and the agent loop; see "Answers come from the Vercel AI Gateway"), `threads` (rich:
-conversations, settle, snooze, wake, fork, the live chat), `sources` (the enterprise systems and their records; a read-only domain),
+conversations, settle, snooze, wake, fork, the live chat), `integrations` (the providers the
+workspace connects to, the user's connections and what they read; a leaf that imports no other
+module), `sources` (the sources and records of the user's connections, the thread scope and the
+explorer; a read-only domain),
 `skills` (the skill catalogue and its activation in this browser) and `projects` (the project
 list, the add-project rule and the sidebar filter). `app/(workspace)/` composes them; its
 `_components/` hold the shell, sidebar, settings and new-thread heading, which only that route
@@ -88,9 +91,11 @@ by anything but `index` or `server` is an error); the `server-only` import in ev
 **Decision.** A module's `domain/` imports no value from another module, only a type such as
 `ModelProvider` from `agent`, so a
 thread refers to its source, records and skill by id (`ThreadScope = { sourceId, recordIds }`,
-`skillId`). Components resolve the ids through the other module's public API
+`skillId`; a source id is `<connectionId>:<sourceKey>`, `sourceIdOf` in `sources/contracts.ts`). Components resolve the ids through the other module's public API
 (`useSources().sourceById`, `useSkills().skillById`). Source-specific presentation (overview
-title, breadcrumb, board view, list label) is data on the source, not a branch on its id.
+title, breadcrumb, board view, list label, the icon `SourceIcon` draws) is data on the source,
+from its provider's product, not a branch on its id. `sources` re-exports the record vocabulary
+(`RECORD_STATUSES`, `SourceRecord`) from `integrations`, whose providers produce the records.
 **Enforced by.** Review.
 **Recorded in.** This entry.
 
@@ -180,10 +185,13 @@ action fails (`useThreads`). Nothing runs at a snooze's deadline: a due snooze r
 at its deadline (`wakeIfDue`, in `listThreads` and before each change), and the browser wakes
 an open page's threads live (`useSnoozeWake`). Asking again returns a parked thread to active
 and stores the provider it now talks to (`answerThread`). Whether a response is in flight only
-the browser knows, so it refuses a snooze while one is. The source catalogue is read-only
-sample data in `sources/catalog.ts`; the skill catalogue is one
-`skills/catalog/<id>/SKILL.md` per skill (see "Skills are SKILL.md files"). Both are read through
-`queries.ts` and `server.ts`, and reach the browser through `SourcesProvider` and `SkillsProvider`. Skill activation and the source panel
+the browser knows, so it refuses a snooze while one is. A user's sources
+are read from their connections (see "Integrations are provider folders"); the skill catalogue
+is one `skills/catalog/<id>/SKILL.md` per skill (see "Skills are SKILL.md files"). Both are read
+through `queries.ts` and `server.ts`, and reach the browser through `SourcesProvider` and
+`SkillsProvider`. A source's records are not part of the page: the browser loads them from
+`GET /api/sources/[sourceId]/records` the first time a view needs them (`SourceRecordsStore`,
+`useSourceRecords`), and a new thread starts with all of them. Skill activation and the source panel
 width persist in `localStorage`; the stored skill ids are parsed with `storedSkillIdsSchema`. There are no cache tags: every read is per request, and an action returns what it
 stored, which the browser adds to its state.
 **Enforced by.** The `server-only` import in every `queries.ts`, `commands.ts` and `server.ts`
@@ -239,7 +247,8 @@ The `agent` module is the runtime AI, flat by file:
 - `run.ts`: `runAgent(request)` resolves the context, validates the conversation against the
   tools and streams the reply with an AI SDK `ToolLoopAgent` on the gateway (at most 5 steps),
   then hands the conversation to `onEnd`. It returns the response and the model.
-- `context.ts`: `resolveContext` turns the browser's ids into the model, skill and records
+- `context.ts`: `resolveContext` turns the browser's ids into the model, skill and records (the
+  scope's records are read for the user by `runAgent` first, through `listScopedRecords`)
   (unknown ids are `NotFound`, answered with a 400), so the prompt only ever holds what the
   server offers. The `AgentContext` it returns carries the signed-in user, so a tool reads only
   what is theirs. It also turns `skillIds`, the skills switched on in this browser, into
@@ -294,8 +303,9 @@ it.
 - **Context, not trust.** What a tool may see comes from the server, never from the model: the
   tool declares it with `contextSchema` (`{ scope?: RecordScope }`, ids as everywhere between
   modules), and `toolsFor` in `agent/tools.ts` fills it from the resolved `AgentContext`.
-  `search_records` reads through `listScopedRecords(scope)`, so a record outside the thread's
-  scope is never read, whatever the model asks. A tool whose context the thread lacks is not
+  `search_records` (context `{ user?, scope? }`) reads through `listScopedRecords(user, scope)`,
+  so a record outside the thread's scope or the user's connections is never read, whatever the
+  model asks. A tool whose context the thread lacks is not
   offered (`activeTools`), and its `execute` refuses anyway.
 - **Registration.** `agent/tools.ts` spreads the module's tools into `tools`, adds the tool's
   context to `toolsFor`, and `WorkspaceUITools` in `agent/contracts.ts` gets its types.
@@ -306,6 +316,27 @@ it.
 model, the call offers the tools and `execute` sees the thread's scope); `tsc`
 (`WorkspaceUITools`, `toolsContext`).
 **Recorded in.** This entry.
+
+### Integrations are provider folders
+
+**Decision.** `docs/adr/0002` chose one leaf module, `integrations`, with one folder per
+provider: a system the workspace connects to (`providers/sample/` today; GitHub, Atlassian,
+codebeamer, PostHog, Stripe and Supabase are planned). A provider is
+`defineProvider({ id, name, description, auth, records? })` (`contracts.ts`), registered by one
+line in `providers.ts`. Its `records` capability declares each product's presentation and a
+`RecordReader` (`listSources`, `searchRecords`, `getRecords`), which is handed a
+`ConnectionAccess` per request and never reads a secret, an env var or the database. A
+connection is one user's link to a provider account; until connections are stored (ADR 0002,
+phase 2), `listConnections(user)` answers with the built-in sample connection, which every user
+has. `integrations/records.ts` runs a connection's reader for `sources`
+(`listConnectedSources`, `searchConnectionRecords`, `getConnectionRecords`); `sources` turns that
+into `Source`s, the scope's records and the records route. The sample records are the
+provider's `data.ts`; the stored threads' sample ids moved to `sample:<product>` in
+`drizzle/0006_rename-sample-source-ids.sql`.
+**Enforced by.** `integrations/providers.test.ts` (every provider in the registry: unique ids, a
+way to connect, sources in a declared product, records read back by id in order, nothing for an
+unknown key); `sources/queries.test.ts`; `tsc` (`defineProvider`).
+**Recorded in.** This entry; `docs/adr/0002-integrations.md`.
 
 ### Skills are SKILL.md files
 

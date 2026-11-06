@@ -26,7 +26,7 @@ async function Workspace() {
   const user = await getUser();
   if (!user) redirect("/api/sign-in");
   const [sources, skills, threads, projects, models] = await Promise.all([
-    listSources(),
+    listSources(user),
     listSkills(),
     listThreads(user),
     listProjects(user),

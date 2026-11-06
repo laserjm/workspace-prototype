@@ -14,7 +14,7 @@ import { allRecordIds, recordCountLabel } from "../contracts";
 import { RecordStatusBadge } from "./record-status-badge";
 import { noResultsClassName } from "./source-explorer";
 import { SourceIcon } from "./source-icon";
-import { useSources } from "./use-sources";
+import { useSourceRecords, useSources } from "./use-sources";
 
 /** Chooses which of a source's records a thread may use; at least one. */
 export function SourceScopeDialog({
@@ -29,9 +29,11 @@ export function SourceScopeDialog({
   onClose: () => void;
 }) {
   const source = useSources().sourceById(sourceId);
+  const load = useSourceRecords(sourceId);
+  const all = load.status === "ready" ? load.records : [];
   const [selected, setSelected] = useState(recordIds);
   const [query, setQuery] = useState("");
-  const records = source.records.filter((record) =>
+  const records = all.filter((record) =>
     `${record.id} ${record.title}`.toLowerCase().includes(query.toLowerCase()),
   );
   return (
@@ -52,7 +54,7 @@ export function SourceScopeDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="flex items-center gap-2.5">
-          <SourceIcon id={source.id} />
+          <SourceIcon icon={source.icon} />
           <div>
             <strong className="block text-xs font-medium">
               {source.collection}
@@ -75,20 +77,19 @@ export function SourceScopeDialog({
         </label>
         <div className="flex justify-between text-2xs text-secondary-label">
           <span>
-            {selected.length} of {source.records.length} selected
+            {selected.length} of {all.length} selected
           </span>
           <button
             type="button"
-            className="text-blue-600 dark:text-blue-300"
+            className="text-blue-600 disabled:opacity-50 dark:text-blue-300"
+            disabled={load.status !== "ready"}
             onClick={() =>
               setSelected(
-                selected.length === source.records.length
-                  ? []
-                  : allRecordIds(source),
+                selected.length === all.length ? [] : allRecordIds(all),
               )
             }
           >
-            {selected.length === source.records.length
+            {all.length > 0 && selected.length === all.length
               ? "Clear selection"
               : "Select all"}
           </button>
@@ -121,8 +122,17 @@ export function SourceScopeDialog({
               </span>
             </label>
           ))}
-          {!records.length && (
+          {load.status === "ready" && !records.length && (
             <p className={noResultsClassName}>No matching {source.plural}.</p>
+          )}
+          {load.status === "loading" && (
+            <p className={noResultsClassName}>Loading {source.plural}…</p>
+          )}
+          {load.status === "failed" && (
+            <p className={noResultsClassName}>
+              The {source.plural} could not be loaded. Close and open this
+              dialog to try again.
+            </p>
           )}
         </div>
         <div className="flex items-center justify-between gap-3 max-md:items-end">

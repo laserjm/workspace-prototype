@@ -78,7 +78,7 @@ describe("runAgent", () => {
   });
 
   it("lets the model search the attached records, and only those", async () => {
-    const scope = { sourceId: "jira", recordIds: ["PLAT-124", "PLAT-125", "PLAT-127"] };
+    const scope = { sourceId: "sample:jira", recordIds: ["PLAT-124", "PLAT-125", "PLAT-127"] };
     const mock = new MockLanguageModelV4({
       doStream: [
         step([

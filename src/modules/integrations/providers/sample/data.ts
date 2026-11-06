@@ -1,8 +1,16 @@
-// Fictional enterprise records bundled with the prototype. A live connector (for example
-// `jira.record-reader.ts`) replaces this adapter; nothing here calls an external system.
-import type { Source } from "./contracts";
+// Fictional enterprise records bundled with the prototype, one sample source per product.
+// Nothing here calls an external system.
+import type {
+  ExternalRecord,
+  ProductPresentation,
+  SourceSummary,
+} from "../../contracts";
 
-export const sampleSourceCatalog: Source[] = [
+/** A sample source: its summary and presentation in one, keyed by its product's id. */
+export type SampleSource = Omit<SourceSummary, "key" | "product"> &
+  Omit<ProductPresentation, "icon"> & { id: string; records: ExternalRecord[] };
+
+export const sampleSources: SampleSource[] = [
   {
     id: "jira",
     name: "Jira",

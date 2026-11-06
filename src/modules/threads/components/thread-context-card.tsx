@@ -5,6 +5,7 @@ import {
   recordCountLabel,
   recordsIn,
   SourceIcon,
+  useSourceRecords,
   useSources,
 } from "@/modules/sources";
 import { cn } from "@/lib/utils";
@@ -24,8 +25,6 @@ export function ThreadContextCard({
 }) {
   const { sourceById } = useSources();
   const source = thread.scope ? sourceById(thread.scope.sourceId) : undefined;
-  const records =
-    source && thread.scope ? recordsIn(source, thread.scope.recordIds) : [];
   const shelf = shelfOf(thread);
   // Read on render: the card only renders while its tooltip is open.
   const userMessages = useChatStore()
@@ -76,7 +75,7 @@ export function ThreadContextCard({
       {source && thread.scope ? (
         <div className="mt-3 border-t border-border pt-3">
           <div className="flex items-center gap-2">
-            <SourceIcon id={source.id} size="sm" />
+            <SourceIcon icon={source.icon} size="sm" />
             <strong className="font-medium text-accent-foreground">
               {source.name}
             </strong>
@@ -87,24 +86,12 @@ export function ThreadContextCard({
           <p className="mt-1 text-2xs text-secondary-label">
             {source.collection}
           </p>
-          <ul className="mt-2.5 grid max-h-70 list-none overflow-y-auto overscroll-contain p-0">
-            {records.map((record) => (
-              <li
-                key={record.id}
-                className="py-2 not-first:border-t not-first:border-border/60"
-              >
-                <div className="flex justify-between gap-2 text-3xs">
-                  <span className="font-mono text-secondary-label">
-                    {record.id}
-                  </span>
-                  <span>{record.status}</span>
-                </div>
-                <p className="mt-1 wrap-anywhere text-accent-foreground">
-                  {record.title}
-                </p>
-              </li>
-            ))}
-          </ul>
+          {thread.scope && (
+            <ScopedRecords
+              sourceId={thread.scope.sourceId}
+              recordIds={thread.scope.recordIds}
+            />
+          )}
           <p className="mt-2.5 text-3xs text-muted-foreground/70">
             Selected context · Read-only sample snapshot
           </p>
@@ -115,5 +102,43 @@ export function ThreadContextCard({
         </p>
       )}
     </div>
+  );
+}
+
+/** The thread's records, loaded with the source's when the card first opens. */
+function ScopedRecords({
+  sourceId,
+  recordIds,
+}: {
+  sourceId: string;
+  recordIds: string[];
+}) {
+  const load = useSourceRecords(sourceId);
+  if (load.status !== "ready")
+    return (
+      <p className="mt-2.5 text-3xs text-muted-foreground/70">
+        {load.status === "loading" ? "Loading records…" : "Records not loaded."}
+      </p>
+    );
+  const records = recordsIn(load.records, recordIds);
+  return (
+    <ul className="mt-2.5 grid max-h-70 list-none overflow-y-auto overscroll-contain p-0">
+      {records.map((record) => (
+        <li
+          key={record.id}
+          className="py-2 not-first:border-t not-first:border-border/60"
+        >
+          <div className="flex justify-between gap-2 text-3xs">
+            <span className="font-mono text-secondary-label">
+              {record.id}
+            </span>
+            <span>{record.status}</span>
+          </div>
+          <p className="mt-1 wrap-anywhere text-accent-foreground">
+            {record.title}
+          </p>
+        </li>
+      ))}
+    </ul>
   );
 }
