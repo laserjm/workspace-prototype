@@ -44,7 +44,7 @@ const request: AnswerThreadInput = {
 };
 
 describe("answerThread", () => {
-  it("asks the agent with the browser's options and the conversation", async () => {
+  it("asks the agent for the user, with the browser's options and the conversation", async () => {
     const { deps, requests } = await setup();
     const scope = { sourceId: "jira", recordIds: ["PLAT-124"] };
     const result = await answerThread(
@@ -54,6 +54,7 @@ describe("answerThread", () => {
     expect(result.ok).toBe(true);
     expect(requests).toEqual([
       {
+        user: ana,
         options: { modelId: "opus", skillId: "risk-review", scope },
         messages: [request.message],
         signal: undefined,

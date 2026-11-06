@@ -2,6 +2,7 @@
 // offered and to what a tool's execute sees. No gateway, no network.
 import { MockLanguageModelV4 } from "ai/test";
 import { describe, expect, it, vi } from "vitest";
+import { aUser } from "@/tests/factories/user";
 import type { WorkspaceUIMessage } from "./contracts";
 import { runAgent } from "./run";
 
@@ -50,6 +51,7 @@ vi.mock("./models", () => ({
 async function run(options: Parameters<typeof runAgent>[0]["options"]) {
   let stored: WorkspaceUIMessage[] = [];
   const result = await runAgent({
+    user: aUser("ana"),
     options,
     messages: [
       { id: "u1", role: "user", parts: [{ type: "text", text: "Which are in review?" }] },

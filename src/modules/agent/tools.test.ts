@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { aSkill } from "@/tests/factories/skill";
 import { aSource, aSourceRecord } from "@/tests/factories/source";
+import { aUser } from "@/tests/factories/user";
 import type { AgentModel } from "./models";
 import { tools, toolsFor } from "./tools";
 
@@ -11,6 +12,7 @@ const opus: AgentModel = {
   provider: "claude",
   gateway: "anthropic/claude-opus-5.5",
 };
+const user = aUser("ana");
 
 describe("tools", () => {
   // Stored conversations hold these names and every send validates against them. Adding a
@@ -26,7 +28,7 @@ describe("tools", () => {
 
 describe("toolsFor", () => {
   it("offers only html_render without attached records or skills to load", () => {
-    expect(toolsFor({ model: opus, offeredSkills: [] })).toEqual({
+    expect(toolsFor({ user, model: opus, offeredSkills: [] })).toEqual({
       activeTools: ["html_render"],
       toolsContext: {
         search_records: { scope: undefined },
@@ -37,7 +39,7 @@ describe("toolsFor", () => {
 
   it("offers load_skill over the skills to load", () => {
     const offeredSkills = [aSkill({ id: "risk-review" }), aSkill({ id: "action-plan" })];
-    expect(toolsFor({ model: opus, offeredSkills })).toMatchObject({
+    expect(toolsFor({ user, model: opus, offeredSkills })).toMatchObject({
       activeTools: ["html_render", "load_skill"],
       toolsContext: { load_skill: { skillIds: ["risk-review", "action-plan"] } },
     });
@@ -48,6 +50,7 @@ describe("toolsFor", () => {
     const source = aSource({ id: "jira", records });
     expect(
       toolsFor({
+        user,
         model: opus,
         offeredSkills: [],
         attached: { source, records, recordCount: 3 },

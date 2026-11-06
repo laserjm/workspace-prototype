@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { aSkill } from "@/tests/factories/skill";
 import { aSource, aSourceRecord } from "@/tests/factories/source";
+import { aUser } from "@/tests/factories/user";
 import { baseInstructions, instructionsFor } from "./instructions";
 import type { AgentModel } from "./models";
 
@@ -11,6 +12,7 @@ const opus: AgentModel = {
   provider: "claude",
   gateway: "anthropic/claude-opus-5.5",
 };
+const user = aUser("ana");
 
 describe("baseInstructions", () => {
   it("is the workspace instructions, then the formatting ones, from the .md files", () => {
@@ -24,7 +26,7 @@ describe("baseInstructions", () => {
 
 describe("instructionsFor", () => {
   it("is the base instructions alone without a skill or records", () => {
-    expect(instructionsFor({ model: opus, offeredSkills: [] })).toBe(
+    expect(instructionsFor({ user, model: opus, offeredSkills: [] })).toBe(
       baseInstructions,
     );
   });
@@ -34,6 +36,7 @@ describe("instructionsFor", () => {
     const record = aSourceRecord({ id: "PLAT-124" });
     const source = aSource({ records: [record] });
     const prompt = instructionsFor({
+      user,
       model: opus,
       skill,
       offeredSkills: [],
@@ -49,6 +52,7 @@ describe("instructionsFor", () => {
 
   it("lists the skills to load by id, name and description, after the picked one", () => {
     const prompt = instructionsFor({
+      user,
       model: opus,
       skill: aSkill({ id: "summary", name: "Summary" }),
       offeredSkills: [

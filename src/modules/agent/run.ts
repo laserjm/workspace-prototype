@@ -8,6 +8,7 @@ import {
   ToolLoopAgent,
 } from "ai";
 import { z } from "zod";
+import type { User } from "@/lib/auth/user";
 import type { NotFound, ValidationFailed } from "@/lib/errors";
 import { err, ok, type Result } from "@/lib/result";
 import { listSkills } from "@/modules/skills/server";
@@ -23,6 +24,8 @@ import { models, type AgentModel } from "./models";
 import { tools, toolsFor } from "./tools";
 
 export type AgentRequest = {
+  /** The signed-in user the answer is for. */
+  user: User;
   /** The model, skill and records, as the ids the browser sent. */
   options: ChatOptions;
   /** The conversation to answer, ending with the user's message; validated here. */
@@ -88,13 +91,14 @@ function withCompletedReply(
  * too (`consumeSseStream`), so `onEnd` gets the reply even when the browser goes away.
  */
 export async function runAgent({
+  user,
   options,
   messages,
   signal,
   onEnd,
 }: AgentRequest): Promise<Result<AgentRun, NotFound | ValidationFailed>> {
   const [skills, sources] = await Promise.all([listSkills(), listSources()]);
-  const context = resolveContext(options, { models, skills, sources });
+  const context = resolveContext(user, options, { models, skills, sources });
   if (!context.ok) return context;
   const { model, skill } = context.value;
 

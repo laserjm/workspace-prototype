@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { aSkill } from "@/tests/factories/skill";
 import { aSource, aSourceRecord } from "@/tests/factories/source";
+import { aUser } from "@/tests/factories/user";
 import type { ChatOptions } from "./contracts";
 import { resolveContext } from "./context";
 import type { AgentModel } from "./models";
@@ -28,17 +29,19 @@ const catalogs = {
   sources: [jira],
 };
 const options: ChatOptions = { modelId: "opus" };
+const ana = aUser("ana");
 
 describe("resolveContext", () => {
-  it("resolves the model, with no skill or records when none are named", () => {
-    expect(resolveContext(options, catalogs)).toEqual({
+  it("resolves the user and the model, with no skill or records when none are named", () => {
+    expect(resolveContext(ana, options, catalogs)).toEqual({
       ok: true,
-      value: { model: opus, skill: undefined, offeredSkills: [] },
+      value: { user: ana, model: opus, skill: undefined, offeredSkills: [] },
     });
   });
 
   it("resolves the skill and only the records the thread named, in the source's order", () => {
     const result = resolveContext(
+      ana,
       {
         ...options,
         skillId: "risk-review",
@@ -56,6 +59,7 @@ describe("resolveContext", () => {
 
   it("attaches nothing when none of the named records exist", () => {
     const result = resolveContext(
+      ana,
       { ...options, scope: { sourceId: "jira", recordIds: ["GONE-1"] } },
       catalogs,
     );
@@ -72,7 +76,7 @@ describe("resolveContext", () => {
       id: "sharepoint",
     },
   ])("refuses an unknown $name", ({ change, entity, id }) => {
-    expect(resolveContext({ ...options, ...change }, catalogs)).toEqual({
+    expect(resolveContext(ana, { ...options, ...change }, catalogs)).toEqual({
       ok: false,
       error: { _tag: "NotFound", entity, id },
     });
@@ -80,6 +84,7 @@ describe("resolveContext", () => {
 
   it("offers the switched-on skills but the picked one, in the catalogue's order, without stale ids", () => {
     const result = resolveContext(
+      ana,
       {
         ...options,
         skillId: "summary",

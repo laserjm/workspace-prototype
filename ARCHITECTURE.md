@@ -231,7 +231,7 @@ reads the user and hands them, the thread id and the body to `answerThread` from
 `threadIdSchema` (an id that is not a uuid is a 404) and the body with `chatTurnDtoSchema`, and
 runs the use case `application/answer-thread.ts`. The use case finds the thread among the
 user's (another user's thread is a `NotFound` like a missing one, answered with a 404), puts
-the new message after the stored conversation and hands both to `runAgent` from
+the new message after the stored conversation and hands both, with the user, to `runAgent` from
 `modules/agent/server.ts`. Once the agent answers, the thread returns to active and records the
 provider of the model that answered.
 
@@ -241,7 +241,8 @@ The `agent` module is the runtime AI, flat by file:
   then hands the conversation to `onEnd`. It returns the response and the model.
 - `context.ts`: `resolveContext` turns the browser's ids into the model, skill and records
   (unknown ids are `NotFound`, answered with a 400), so the prompt only ever holds what the
-  server offers. It also turns `skillIds`, the skills switched on in this browser, into
+  server offers. The `AgentContext` it returns carries the signed-in user, so a tool reads only
+  what is theirs. It also turns `skillIds`, the skills switched on in this browser, into
   `offeredSkills`: known ones only (a stale id is left out, not refused), without the picked
   skill.
 - `models.ts`: the model allowlist with gateway ids, and `listModelChoices` for the composer.

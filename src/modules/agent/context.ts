@@ -1,3 +1,4 @@
+import type { User } from "@/lib/auth/user";
 import { notFound, type NotFound } from "@/lib/errors";
 import { err, ok, type Result } from "@/lib/result";
 import type { Skill } from "@/modules/skills";
@@ -13,8 +14,10 @@ export type AttachedRecords = {
   recordCount: number;
 };
 
-/** What one answer runs with: the model, and the skill and records it is grounded in. */
+/** What one answer runs with: who asks, the model, and the skill and records it is grounded in. */
 export type AgentContext = {
+  /** The signed-in user the answer is for; tools read only what is theirs. */
+  user: User;
   model: AgentModel;
   /** The skill the user picked for this message: its instructions are in the prompt. */
   skill?: Skill;
@@ -34,6 +37,7 @@ export type Catalogs = {
  * holds what the server offers. An unknown id is a `NotFound`.
  */
 export function resolveContext(
+  user: User,
   options: ChatOptions,
   { models, skills, sources }: Catalogs,
 ): Result<AgentContext, NotFound> {
@@ -51,7 +55,7 @@ export function resolveContext(
     (item) => switchedOn.includes(item.id) && item.id !== skill?.id,
   );
 
-  if (!options.scope) return ok({ model, skill, offeredSkills });
+  if (!options.scope) return ok({ user, model, skill, offeredSkills });
   const { sourceId, recordIds } = options.scope;
   const source = sources.find((item) => item.id === sourceId);
   if (!source) return err(notFound("Source", sourceId));
@@ -59,8 +63,9 @@ export function resolveContext(
     recordIds.includes(record.id),
   );
   // A scope whose records are all gone adds no context, as if none was attached.
-  if (records.length === 0) return ok({ model, skill, offeredSkills });
+  if (records.length === 0) return ok({ user, model, skill, offeredSkills });
   return ok({
+    user,
     model,
     skill,
     offeredSkills,
