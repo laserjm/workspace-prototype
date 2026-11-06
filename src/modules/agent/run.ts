@@ -12,14 +12,14 @@ import type { User } from "@/lib/auth/user";
 import type { NotFound, ValidationFailed } from "@/lib/errors";
 import { err, ok, type Result } from "@/lib/result";
 import { listSkills } from "@/modules/skills/server";
-import { listScopedRecords, listSources } from "@/modules/sources/server";
+import { findSource, listScopedRecords } from "@/modules/sources/server";
 import { resolveContext, type AgentContext } from "./context";
 import type {
   ChatOptions,
   WorkspaceMessageMetadata,
   WorkspaceUIMessage,
 } from "./contracts";
-import { baseInstructions, instructionsFor } from "./instructions";
+import { baseInstructions, instructionsFor, promptFor } from "./instructions";
 import { models, type AgentModel } from "./models";
 import { tools, toolsFor } from "./tools";
 
@@ -53,18 +53,32 @@ const workspaceAgent = new ToolLoopAgent({
   instructions: baseInstructions,
   tools,
   // Replaced on every call by toolsFor; no thread, no attached records.
-  toolsContext: { search_records: {}, load_skill: { skillIds: [] } },
+  toolsContext: {
+    search_records: {},
+    get_record: {},
+    load_skill: { skillIds: [] },
+  },
   // Lets the model call a tool or two and then write its reply.
   stopWhen: stepCountIs(5),
   // Built on the server by resolveContext, never from the request, so it is not parsed again.
   callOptionsSchema: z.object({ context: z.custom<AgentContext>() }),
-  prepareCall: ({ options: { context }, ...settings }) => ({
+  prepareCall: ({ options: { context }, prompt, messages, ...settings }) => ({
     ...settings,
     model: context.model.gateway,
     instructions: instructionsFor(context),
+    // The attached records, as data in a message of their own (instructions.ts).
+    prompt: promptFor(prompt ?? messages, context),
     ...toolsFor(context),
   }),
 });
+
+/** What was read, or nothing when the source's system failed; the answer goes on without it. */
+function orNothing<T>(read: Promise<T>, sourceId: string) {
+  return read.catch((error: unknown) => {
+    console.error(`[runAgent] the records of ${sourceId} were not read`, error);
+    return undefined;
+  });
+}
 
 /** The server names the replies; the browser names its own messages. */
 const generateMessageId = createIdGenerator({ prefix: "msg", size: 16 });
@@ -97,15 +111,16 @@ export async function runAgent({
   signal,
   onEnd,
 }: AgentRequest): Promise<Result<AgentRun, NotFound | ValidationFailed>> {
-  const [skills, sources, scopedRecords] = await Promise.all([
+  const { scope } = options;
+  const [skills, scopeSource, scopedRecords] = await Promise.all([
     listSkills(),
-    listSources(user),
-    options.scope ? listScopedRecords(user, options.scope) : [],
+    scope && orNothing(findSource(user, scope.sourceId), scope.sourceId),
+    scope && orNothing(listScopedRecords(user, scope), scope.sourceId),
   ]);
   const context = resolveContext(user, options, {
     models,
     skills,
-    sources,
+    scopeSource,
     scopedRecords,
   });
   if (!context.ok) return context;

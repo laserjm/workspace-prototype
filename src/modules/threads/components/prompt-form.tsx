@@ -372,7 +372,7 @@ export function PromptForm({
           <span className="text-muted-foreground">{skill.name}</span> ·{" "}
           {scope
             ? skill.output
-            : "Choose a source to try this skill with sample data"}
+            : "Choose a source to try this skill on its records"}
         </p>
       )}
     </div>

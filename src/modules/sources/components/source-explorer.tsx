@@ -6,6 +6,7 @@ import {
   Check,
   ChevronRight,
   Columns3,
+  ExternalLink,
   List,
   Search,
   ShieldCheck,
@@ -22,14 +23,16 @@ import { cn } from "@/lib/utils";
 import {
   RECORD_STATUSES,
   recordCountLabel,
-  recordsIn,
+  sourceAccessLabel,
+  sourceOriginLabel,
+  updatedLabel,
   type RecordPriority,
   type SourceRecord,
 } from "../contracts";
 import { RecordStatusBadge } from "./record-status-badge";
 import { ResizableSourcePanel } from "./resizable-source-panel";
 import { SourceIcon } from "./source-icon";
-import { useSourceRecords, useSources } from "./use-sources";
+import { useScopedRecords, useSources } from "./use-sources";
 
 const PRIORITY_DOTS: Record<RecordPriority, string> = {
   High: "bg-red-300 dark:bg-red-400",
@@ -37,10 +40,11 @@ const PRIORITY_DOTS: Record<RecordPriority, string> = {
   Low: "bg-emerald-300 dark:bg-emerald-400",
 };
 
-// Bugs are red, tasks and test cases blue, everything else green.
+// Bugs are red, tasks and test cases blue, pull requests violet, everything else green.
 function issueTypeTone(type: string) {
   if (type === "Bug") return "bg-red-400";
   if (type === "Task" || type === "Test case") return "bg-blue-400";
+  if (type === "Pull request") return "bg-violet-400";
   return "bg-emerald-500/80";
 }
 
@@ -86,16 +90,17 @@ export function SourceExplorer({
     () => false,
   );
   const source = useSources().sourceById(sourceId);
-  const load = useSourceRecords(sourceId);
-  const records =
-    load.status === "ready" ? recordsIn(load.records, recordIds) : [];
+  const unavailable = source.availability === "unavailable";
+  // The thread's records by id, wherever they are in the source.
+  const load = useScopedRecords(sourceId, recordIds);
+  const records = load.status === "ready" ? load.records : [];
   const selected = records.find((record) => record.id === selectedId);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("All statuses");
   const [view, setView] = useState("list");
   const filtered = records.filter(
     (record) =>
-      `${record.id} ${record.title} ${record.owner}`
+      `${record.id} ${record.title} ${record.owner ?? ""}`
         .toLowerCase()
         .includes(query.toLowerCase()) &&
       (status === "All statuses" || record.status === status),
@@ -119,8 +124,8 @@ export function SourceExplorer({
             {source.workspace}
           </small>
         </div>
-        <span className="ml-auto shrink-0 rounded-sm border border-border bg-muted px-1.5 py-0.5 text-3xs whitespace-nowrap text-muted-foreground">
-          Sample data
+        <span className="ml-auto max-w-40 shrink-0 truncate rounded-sm border border-border bg-muted px-1.5 py-0.5 text-3xs whitespace-nowrap text-muted-foreground">
+          {sourceOriginLabel(source)}
         </span>
         <IconButton
           label="Close source explorer"
@@ -156,36 +161,70 @@ export function SourceExplorer({
           <h2 className="mt-2 mb-3 text-xl leading-snug font-medium tracking-tight text-secondary-foreground">
             {selected.title}
           </h2>
-          <RecordStatusBadge
-            status={selected.status}
-            className="px-2 py-0.75 text-3xs"
-          />
+          <div className="flex flex-wrap items-center gap-2">
+            <RecordStatusBadge
+              status={selected.status}
+              className="px-2 py-0.75 text-3xs"
+            />
+            {selected.statusLabel && (
+              <span className="text-3xs text-muted-foreground">
+                {selected.statusLabel}
+              </span>
+            )}
+            {selected.url && (
+              <a
+                href={selected.url}
+                target="_blank"
+                rel="noreferrer"
+                className="ml-auto inline-flex items-center gap-1 text-3xs text-muted-foreground hover:text-secondary-foreground"
+              >
+                Open in {source.system}
+                <ExternalLink size={12} />
+              </a>
+            )}
+          </div>
           <dl className="my-6 flex flex-col gap-3 border-y border-border/60 py-5 [&>div]:flex [&>div]:items-center [&>div]:gap-2.5 [&_dd]:flex [&_dd]:items-center [&_dd]:gap-1.5 [&_dd]:text-2xs [&_dd]:text-accent-foreground [&_dt]:w-19 [&_dt]:shrink-0 [&_dt]:text-3xs [&_dt]:text-muted-foreground/70">
             <div>
               <dt>Assignee</dt>
               <dd>
-                <OwnerAvatar owner={selected.owner} />
-                {selected.owner}
+                {selected.owner ? (
+                  <>
+                    <OwnerAvatar owner={selected.owner} />
+                    {selected.owner}
+                  </>
+                ) : (
+                  "Unassigned"
+                )}
               </dd>
             </div>
-            <div>
-              <dt>Priority</dt>
-              <dd>
-                <PriorityDot priority={selected.priority} />
-                {selected.priority}
-              </dd>
-            </div>
+            {selected.priority && (
+              <div>
+                <dt>Priority</dt>
+                <dd>
+                  <PriorityDot priority={selected.priority} />
+                  {selected.priority}
+                </dd>
+              </div>
+            )}
             <div>
               <dt>Updated</dt>
-              <dd>{selected.updated}</dd>
+              <dd>{updatedLabel(selected.updated)}</dd>
             </div>
+            {Object.entries(selected.fields ?? {}).map(([label, value]) => (
+              <div key={label}>
+                <dt>{label}</dt>
+                <dd className="min-w-0 wrap-anywhere">{updatedLabel(value)}</dd>
+              </div>
+            ))}
             <div>
               <dt>Collection</dt>
-              <dd>{source.collection}</dd>
+              <dd className="min-w-0 wrap-anywhere">{source.collection}</dd>
             </div>
           </dl>
           <h3 className={detailHeading}>Description</h3>
-          <p className={detailText}>{selected.description}</p>
+          <p className={cn(detailText, "whitespace-pre-wrap wrap-anywhere")}>
+            {selected.description || "No description."}
+          </p>
           {selected.risk && (
             <div className="my-5 rounded-md border border-warning/25 bg-warning/5 p-3">
               <strong className="text-3xs font-medium text-warning-foreground/80">
@@ -196,11 +235,15 @@ export function SourceExplorer({
               </p>
             </div>
           )}
-          <h3 className={detailHeading}>Next step</h3>
-          <p className={detailText}>{selected.nextStep}</p>
+          {selected.nextStep && (
+            <>
+              <h3 className={detailHeading}>Next step</h3>
+              <p className={detailText}>{selected.nextStep}</p>
+            </>
+          )}
           <div className="mt-7 flex items-center gap-1.5 text-3xs text-muted-foreground/70">
             <ShieldCheck size={14} />
-            Included in this thread’s source snapshot
+            Included in this thread’s context
           </div>
         </div>
       ) : (
@@ -267,7 +310,7 @@ export function SourceExplorer({
             {filtered.length} of {records.length} {source.plural}
             <span className="ml-auto inline-flex items-center gap-1 text-muted-foreground">
               {load.status === "ready" && <Check size={12} />}
-              {LOAD_LABELS[load.status]}
+              {unavailable ? "Not connected" : LOAD_LABELS[load.status]}
             </span>
           </div>
           <div
@@ -311,21 +354,34 @@ export function SourceExplorer({
                 ))}
             {load.status === "ready" && !filtered.length && (
               <p className={noResultsClassName}>
-                No matching {source.plural}. Try another search or status.
+                {records.length
+                  ? `No matching ${source.plural}. Try another search or status.`
+                  : `None of this thread’s ${source.plural} exist any more.`}
               </p>
             )}
-            {load.status === "failed" && (
+            {unavailable ? (
               <p className={noResultsClassName}>
-                The {source.plural} could not be loaded. Close and open the
-                explorer to try again.
+                This thread’s source is no longer connected. Connect it again
+                under Settings → Sources to read its records.
               </p>
+            ) : (
+              load.status === "failed" && (
+                <p className={noResultsClassName}>
+                  The {source.plural} could not be loaded. Close and open the
+                  explorer to try again.
+                </p>
+              )
             )}
           </div>
         </>
       )}
       <div className="flex shrink-0 items-center justify-center gap-1.5 border-t border-border/60 px-2 py-3 text-3xs text-muted-foreground/70">
         <ShieldCheck size={13} />
-        <span>Read-only sample snapshot · No live connection</span>
+        <span>
+          {source.availability === "snapshot"
+            ? `${sourceAccessLabel(source)} · No live connection`
+            : sourceAccessLabel(source)}
+        </span>
       </div>
     </aside>
   );
@@ -346,7 +402,7 @@ export function SourceExplorer({
             {source.name} source explorer
           </DialogTitle>
           <DialogDescription className="sr-only">
-            Inspect the selected sample records for this conversation.
+            Inspect the records this conversation uses.
           </DialogDescription>
           {content}
         </DialogContent>
@@ -408,10 +464,20 @@ function RecordCard({
         {record.title}
       </strong>
       <div className="mt-3 flex items-center gap-1 text-3xs text-muted-foreground/70">
-        <PriorityDot priority={record.priority} />
-        {record.priority}
-        <span className="ml-auto">{record.owner}</span>
-        <OwnerAvatar owner={record.owner} />
+        {record.priority ? (
+          <>
+            <PriorityDot priority={record.priority} />
+            {record.priority}
+          </>
+        ) : (
+          <span>{record.statusLabel ?? record.type}</span>
+        )}
+        {record.owner && (
+          <>
+            <span className="ml-auto">{record.owner}</span>
+            <OwnerAvatar owner={record.owner} />
+          </>
+        )}
       </div>
     </button>
   );

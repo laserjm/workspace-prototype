@@ -19,7 +19,7 @@ const jira = aSource({ id: "sample:jira" });
 const catalogs = {
   models: [opus],
   skills: [summary, riskReview],
-  sources: [jira],
+  scopeSource: jira,
   // As listScopedRecords reads them: the named ones that exist, in the source's order.
   scopedRecords: [
     aSourceRecord({ id: "PLAT-124" }),
@@ -49,10 +49,15 @@ describe("resolveContext", () => {
     );
     if (!result.ok) throw new Error("expected a context");
     expect(result.value.skill).toBe(riskReview);
-    expect(result.value.attached?.records.map((record) => record.id)).toEqual(
-      ["PLAT-124", "PLAT-126"],
-    );
-    expect(result.value.attached?.recordCount).toBe(2);
+    expect(result.value.attached).toEqual({
+      readable: true,
+      source: jira,
+      records: [
+        expect.objectContaining({ id: "PLAT-124" }),
+        expect.objectContaining({ id: "PLAT-126" }),
+      ],
+      recordCount: 2,
+    });
   });
 
   it("attaches nothing when none of the named records exist", () => {
@@ -65,14 +70,23 @@ describe("resolveContext", () => {
   });
 
   it.each([
+    { name: "source the user no longer has", change: { scopeSource: undefined } },
+    { name: "source whose system did not answer", change: { scopedRecords: undefined } },
+  ])("answers with a scope it cannot read, for a $name", ({ change }) => {
+    const result = resolveContext(
+      ana,
+      { ...options, scope: { sourceId: "gone:repo", recordIds: ["#1", "#2"] } },
+      { ...catalogs, ...change },
+    );
+    expect(result.ok && result.value.attached).toEqual({
+      readable: false,
+      recordCount: 2,
+    });
+  });
+
+  it.each([
     { name: "model", change: { modelId: "gpt-0" }, entity: "Model", id: "gpt-0" },
     { name: "skill", change: { skillId: "poetry" }, entity: "Skill", id: "poetry" },
-    {
-      name: "source",
-      change: { scope: { sourceId: "sharepoint", recordIds: ["X-1"] } },
-      entity: "Source",
-      id: "sharepoint",
-    },
   ])("refuses an unknown $name", ({ change, entity, id }) => {
     expect(resolveContext(ana, { ...options, ...change }, catalogs)).toEqual({
       ok: false,

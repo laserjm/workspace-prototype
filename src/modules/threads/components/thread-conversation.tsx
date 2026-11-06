@@ -3,7 +3,12 @@
 import { useLayoutEffect, useRef, type ReactNode } from "react";
 import { ChevronDown, GitFork } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { recordCountLabel, SourceIcon, useSources } from "@/modules/sources";
+import {
+  recordCountLabel,
+  sourceAccessLabel,
+  SourceIcon,
+  useSources,
+} from "@/modules/sources";
 import type { ModelChoice } from "@/modules/agent";
 import { shelfOf, type Thread } from "../domain/thread";
 import { ThreadMessages, type ForkTarget } from "./thread-messages";
@@ -121,8 +126,8 @@ export function ThreadConversation({
                     {source.collection}
                   </strong>
                   <span className="mt-0.5 block text-3xs text-secondary-label">
-                    {recordCountLabel(source, thread.scope.recordIds.length)} ·
-                    Read-only sample snapshot
+                    {recordCountLabel(source, thread.scope.recordIds.length)} ·{" "}
+                    {sourceAccessLabel(source)}
                   </span>
                 </div>
                 <button

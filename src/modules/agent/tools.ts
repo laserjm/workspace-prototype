@@ -22,8 +22,8 @@ export type ToolName = keyof typeof tools;
 
 /**
  * The tools one answer may call, and what each one knows of the thread. A tool that needs
- * context the thread does not have is left out: `search_records` only with attached records,
- * `load_skill` only with skills to load.
+ * context the thread does not have is left out: `search_records` and `get_record` only with
+ * attached records that could be read, `load_skill` only with skills to load.
  */
 export function toolsFor({
   user,
@@ -33,22 +33,26 @@ export function toolsFor({
   activeTools: ToolName[];
   toolsContext: {
     search_records: { user: User; scope?: RecordScope };
+    get_record: { user: User; scope?: RecordScope };
     load_skill: { skillIds: string[] };
   };
 } {
-  const scope = attached && {
-    sourceId: attached.source.id,
-    recordIds: attached.records.map((record) => record.id),
-  };
+  const scope = attached?.readable
+    ? {
+        sourceId: attached.source.id,
+        recordIds: attached.records.map((record) => record.id),
+      }
+    : undefined;
   const skillIds = offeredSkills.map((skill) => skill.id);
   return {
     activeTools: [
       "html_render",
-      ...(scope ? (["search_records"] as const) : []),
+      ...(scope ? (["search_records", "get_record"] as const) : []),
       ...(skillIds.length > 0 ? (["load_skill"] as const) : []),
     ],
     toolsContext: {
       search_records: { user, scope },
+      get_record: { user, scope },
       load_skill: { skillIds },
     },
   };

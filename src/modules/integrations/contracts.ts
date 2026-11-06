@@ -3,7 +3,12 @@
 // module's vocabulary, imported as types only, so nothing here loads that module.
 import { z } from "zod";
 import type { Result } from "@/lib/result";
-import type { RecordPage, RecordQuery, SourceRecord } from "@/modules/sources";
+import type {
+  RecordComment,
+  RecordPage,
+  RecordQuery,
+  SourceRecord,
+} from "@/modules/sources";
 
 /** How a product's sources look in the workspace: data, never a branch on an id. */
 export type ProductPresentation = {
@@ -31,8 +36,6 @@ export type SourceSummary = {
   collection: string;
   /** Breadcrumb above the collection in the explorer, e.g. "SPACE / PLATFORM". */
   collectionPath: string;
-  /** Heading of an overview built from this source's records. */
-  overviewTitle: string;
 };
 
 /** Names one source of one connection. */
@@ -48,7 +51,10 @@ export type ProviderAccess = { baseUrl: string; authorization?: string };
 /** `ProviderAccess` for one stored connection. */
 export type ConnectionAccess = ProviderAccess & { connectionId: string };
 
-/** Reads a provider's sources and records for one connection. */
+/**
+ * Reads a provider's sources and records for one connection. A key or id comes from the browser:
+ * check its shape before it goes into a URL. Throw when the system fails; the caller degrades.
+ */
 export type RecordReader = {
   listSources(access: ConnectionAccess): Promise<SourceSummary[]>;
   /** A page of the source's records; `undefined` when the connection has no such source. */
@@ -63,6 +69,12 @@ export type RecordReader = {
     sourceKey: string,
     ids: readonly string[],
   ): Promise<SourceRecord[]>;
+  /** A record's latest comments, oldest first; leave it out when the system has none. */
+  getComments?(
+    access: ConnectionAccess,
+    sourceKey: string,
+    id: string,
+  ): Promise<RecordComment[]>;
 };
 
 /** How a user connects. Phase 5 adds `oauth`. */
@@ -167,6 +179,8 @@ export type Provider = {
     /** Each product's presentation, by the `product` its sources name. */
     products: Readonly<Record<string, ProductPresentation>>;
     reader: RecordReader;
+    /** Records bundled with the workspace rather than read live: the sample. */
+    snapshot?: boolean;
   };
 };
 

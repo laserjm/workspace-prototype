@@ -102,7 +102,11 @@ describe("runAgent", () => {
     model.current = mock;
     const conversation = await run({ modelId: "mock", scope });
 
-    expect(toolNames(mock, 0).sort()).toEqual(["html_render", "search_records"]);
+    expect(toolNames(mock, 0).sort()).toEqual([
+      "get_record",
+      "html_render",
+      "search_records",
+    ]);
     const search = conversation[1]?.parts.find(
       (part) => part.type === "tool-search_records",
     );
@@ -111,6 +115,82 @@ describe("runAgent", () => {
     expect(found && found.matches.map((match) => match.id)).toEqual(scope.recordIds);
     expect(conversation[1]?.parts).toContainEqual(
       expect.objectContaining({ type: "text", text: "Two are in review." }),
+    );
+  });
+
+  it("hands the attached records over as data before the user's message, not as instructions", async () => {
+    const mock = new MockLanguageModelV4({ doStream: [reply()] });
+    model.current = mock;
+    await run({
+      modelId: "mock",
+      scope: { sourceId: "sample:jira", recordIds: ["PLAT-124"] },
+    });
+    const prompt = mock.doStreamCalls[0]!.prompt;
+    expect(prompt[0]).toMatchObject({ role: "system" });
+    expect(JSON.stringify(prompt[0])).not.toContain("### PLAT-124");
+    const records = prompt.at(-2);
+    expect(records?.role).toBe("user");
+    expect(JSON.stringify(records)).toContain("<source_records>");
+    expect(JSON.stringify(records)).toContain("### PLAT-124: ");
+    expect(JSON.stringify(prompt.at(-1))).toContain("Which are in review?");
+  });
+
+  it("lets the model read an attached record in full, and only an attached one", async () => {
+    const scope = { sourceId: "sample:jira", recordIds: ["PLAT-124"] };
+    const mock = new MockLanguageModelV4({
+      doStream: [
+        step([
+          { type: "stream-start", warnings: [] },
+          {
+            type: "tool-call",
+            toolCallId: "call-1",
+            toolName: "get_record",
+            input: JSON.stringify({ id: "PLAT-124" }),
+          },
+          {
+            type: "tool-call",
+            toolCallId: "call-2",
+            toolName: "get_record",
+            input: JSON.stringify({ id: "PLAT-125" }),
+          },
+          finish("tool-calls"),
+        ]),
+        reply(),
+      ],
+    });
+    model.current = mock;
+    const conversation = await run({ modelId: "mock", scope });
+    const reads = conversation[1]?.parts.filter(
+      (part) => part.type === "tool-get_record",
+    );
+    expect(reads).toEqual([
+      expect.objectContaining({
+        state: "output-available",
+        output: expect.objectContaining({
+          id: "PLAT-124",
+          description: expect.stringContaining("SAML"),
+          fields: expect.objectContaining({ "Next step": expect.any(String) }),
+          comments: [],
+        }),
+      }),
+      expect.objectContaining({ state: "output-error" }),
+    ]);
+    // The browser sees a generic failure; the model is told why.
+    expect(JSON.stringify(mock.doStreamCalls[1]?.prompt)).toContain(
+      "PLAT-125 is not one of this thread's records",
+    );
+  });
+
+  it("still answers a thread whose source is gone, and says the records could not be read", async () => {
+    const mock = new MockLanguageModelV4({ doStream: [reply()] });
+    model.current = mock;
+    await run({
+      modelId: "mock",
+      scope: { sourceId: "3f0c7c1e-0000-4000-8000-000000000000:acme/app", recordIds: ["#1"] },
+    });
+    expect(toolNames(mock, 0)).toEqual(["html_render"]);
+    expect(JSON.stringify(mock.doStreamCalls[0]?.prompt)).toContain(
+      "they could not be read",
     );
   });
 

@@ -19,6 +19,7 @@ describe("tools", () => {
   // tool adds a name here; renaming or removing one would break the threads that called it.
   it("keeps every tool name a stored conversation may hold", () => {
     expect(Object.keys(tools).sort()).toEqual([
+      "get_record",
       "html_render",
       "load_skill",
       "search_records",
@@ -32,6 +33,7 @@ describe("toolsFor", () => {
       activeTools: ["html_render"],
       toolsContext: {
         search_records: { user, scope: undefined },
+        get_record: { user, scope: undefined },
         load_skill: { skillIds: [] },
       },
     });
@@ -45,7 +47,7 @@ describe("toolsFor", () => {
     });
   });
 
-  it("offers search_records over the attached records", () => {
+  it("offers search_records and get_record over the attached records", () => {
     const records = [aSourceRecord({ id: "PLAT-124" }), aSourceRecord({ id: "PLAT-126" })];
     const source = aSource({ id: "sample:jira" });
     expect(
@@ -53,16 +55,34 @@ describe("toolsFor", () => {
         user,
         model: opus,
         offeredSkills: [],
-        attached: { source, records, recordCount: 3 },
+        attached: { readable: true, source, records, recordCount: 3 },
       }),
     ).toMatchObject({
-      activeTools: ["html_render", "search_records"],
+      activeTools: ["html_render", "search_records", "get_record"],
       toolsContext: {
         search_records: {
           user,
           scope: { sourceId: "sample:jira", recordIds: ["PLAT-124", "PLAT-126"] },
         },
+        get_record: {
+          user,
+          scope: { sourceId: "sample:jira", recordIds: ["PLAT-124", "PLAT-126"] },
+        },
       },
+    });
+  });
+
+  it("offers no record tools for attached records that could not be read", () => {
+    expect(
+      toolsFor({
+        user,
+        model: opus,
+        offeredSkills: [],
+        attached: { readable: false, recordCount: 3 },
+      }),
+    ).toMatchObject({
+      activeTools: ["html_render"],
+      toolsContext: { search_records: { scope: undefined } },
     });
   });
 });

@@ -3,9 +3,9 @@
 import { Clock, Folder, MessageSquare, Paperclip } from "lucide-react";
 import {
   recordCountLabel,
-  recordsIn,
+  sourceAccessLabel,
   SourceIcon,
-  useSourceRecords,
+  useScopedRecords,
   useSources,
 } from "@/modules/sources";
 import { cn } from "@/lib/utils";
@@ -93,7 +93,7 @@ export function ThreadContextCard({
             />
           )}
           <p className="mt-2.5 text-3xs text-muted-foreground/70">
-            Selected context · Read-only sample snapshot
+            Selected context · {sourceAccessLabel(source)}
           </p>
         </div>
       ) : (
@@ -105,7 +105,7 @@ export function ThreadContextCard({
   );
 }
 
-/** The thread's records, loaded with the source's when the card first opens. */
+/** The thread's records by id, read when the card first opens. */
 function ScopedRecords({
   sourceId,
   recordIds,
@@ -113,14 +113,14 @@ function ScopedRecords({
   sourceId: string;
   recordIds: string[];
 }) {
-  const load = useSourceRecords(sourceId);
+  const load = useScopedRecords(sourceId, recordIds);
   if (load.status !== "ready")
     return (
       <p className="mt-2.5 text-3xs text-muted-foreground/70">
         {load.status === "loading" ? "Loading records…" : "Records not loaded."}
       </p>
     );
-  const records = recordsIn(load.records, recordIds);
+  const records = load.records;
   return (
     <ul className="mt-2.5 grid max-h-70 list-none overflow-y-auto overscroll-contain p-0">
       {records.map((record) => (

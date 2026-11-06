@@ -1,4 +1,10 @@
 import "server-only";
 
-export { listScopedRecords, listSources, searchSourceRecords } from "./queries";
+export {
+  findSource,
+  listScopedRecords,
+  listSources,
+  readScopedRecord,
+  searchSourceRecords,
+} from "./queries";
 export { sourceTools } from "./tools";

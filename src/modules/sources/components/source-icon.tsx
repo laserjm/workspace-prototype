@@ -1,4 +1,11 @@
-import { BookOpen, Database, Layers, Workflow } from "lucide-react";
+import {
+  BookOpen,
+  Database,
+  FolderGit2,
+  Layers,
+  Unplug,
+  Workflow,
+} from "lucide-react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
@@ -6,6 +13,8 @@ const ICONS: Record<string, typeof Layers> = {
   jira: Layers,
   confluence: BookOpen,
   codebeamer: Workflow,
+  github: FolderGit2,
+  unavailable: Unplug,
 };
 
 // Each source keeps its own tint; unknown sources look like Jira.
@@ -15,6 +24,9 @@ const TONES: Record<string, string> = {
     "border-sky-100 bg-sky-50 text-blue-700 dark:border-sky-400/20 dark:bg-sky-400/10 dark:text-sky-300",
   codebeamer:
     "border-violet-100 bg-violet-50 text-violet-600 dark:border-violet-400/20 dark:bg-violet-400/10 dark:text-violet-300",
+  github:
+    "border-zinc-200 bg-zinc-50 text-zinc-700 dark:border-zinc-400/20 dark:bg-zinc-400/10 dark:text-zinc-300",
+  unavailable: "border-border bg-muted text-muted-foreground",
 };
 
 const mark = cva(

@@ -24,6 +24,7 @@ import { ProjectForm, ProjectIcon, type Project } from "@/modules/projects";
 import { useSkillPreferences } from "@/modules/skills";
 import {
   allRecordIds,
+  MAX_SCOPE_RECORDS,
   recordCountLabel,
   SourceChoiceList,
   SourceExplorer,
@@ -72,7 +73,8 @@ export function WorkspaceShell({
   models: ModelChoice[];
   user: { name: string; email: string };
 }) {
-  const { sourceById, loadRecords } = useSources();
+  const { sources, sourceById, loadRecords } = useSources();
+  const readsLive = sources.some((source) => source.availability === "live");
   const [threadNotice, setThreadNotice] = useState<{
     message: string;
     undo?: {
@@ -225,7 +227,10 @@ export function WorkspaceShell({
     // A new thread starts with all of the source's records; the scope dialog narrows them.
     loadRecords(sourceId).then(
       (records) => {
-        const scope = createScope(sourceId, allRecordIds(records));
+        const scope = createScope(
+          sourceId,
+          allRecordIds(records).slice(0, MAX_SCOPE_RECORDS),
+        );
         setDraftScope(scope.ok ? scope.value : undefined);
       },
       () => setDraftScope(undefined),
@@ -509,8 +514,21 @@ export function WorkspaceShell({
                     onManageSkills={() => openSettings("skills")}
                   />
                   <p className="mt-4 text-center text-2xs text-muted-foreground/70 max-md:text-3xs">
-                    Explore with sample data. Live enterprise connections come
-                    next.
+                    {readsLive ? (
+                      "Connected sources are read live, with your own access."
+                    ) : (
+                      <>
+                        Explore with sample data, or{" "}
+                        <button
+                          type="button"
+                          className="underline underline-offset-2 hover:text-secondary-foreground"
+                          onClick={() => openSettings("sources")}
+                        >
+                          connect your own systems
+                        </button>
+                        .
+                      </>
+                    )}
                   </p>
                 </div>
               ) : (
@@ -624,8 +642,8 @@ export function WorkspaceShell({
                     ? "Make this workspace work the way you do."
                     : dialog === "sources"
                       ? activeThread
-                        ? "Choose a source to start a new thread. Each thread keeps its own selected records. All sources use sample data."
-                        : "Pick a sample enterprise source. You can choose which records to include before sending your first message."
+                        ? "Choose a source to start a new thread. Each thread keeps its own selected records."
+                        : "Pick a source. You can choose which records to include before sending your first message."
                       : "Recent conversations in this workspace."}
               </DialogDescription>
             </DialogHeader>

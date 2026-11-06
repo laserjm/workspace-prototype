@@ -1,6 +1,9 @@
 // The provider contract, checked for every provider in the registry: what a new provider folder
 // must satisfy before it ships (docs/adr/0002, "The pattern a provider author follows").
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { describeRecordReader } from "@/tests/support/record-reader";
 import { providers } from "./providers";
 
 const access = { connectionId: "test", baseUrl: "" };
@@ -27,40 +30,26 @@ describe("providers", () => {
   });
 });
 
+// A bundled reader runs the contract here; a live one runs it in its own records.test.ts, against
+// a fake of its system, which this checks is there.
 describe.each(
   providers.flatMap((provider) =>
-    provider.records ? [{ id: provider.id, records: provider.records }] : [],
+    provider.records?.snapshot ? [{ id: provider.id, records: provider.records }] : [],
   ),
 )("the $id record reader", ({ records }) => {
-  it("lists sources with unique keys, each in a declared product", async () => {
-    const sources = await records.reader.listSources(access);
-    expect(sources.length).toBeGreaterThan(0);
-    expect(new Set(sources.map((source) => source.key)).size).toBe(
-      sources.length,
-    );
-    for (const source of sources)
-      expect(Object.keys(records.products)).toContain(source.product);
+  describeRecordReader({
+    reader: records.reader,
+    products: Object.keys(records.products),
+    access,
   });
+});
 
-  it("reads back each source's records by id, in the source's order", async () => {
-    for (const source of await records.reader.listSources(access)) {
-      const page = await records.reader.searchRecords(access, source.key, {});
-      const ids = page!.records.map((record) => record.id);
-      const reversed = [...ids].reverse();
-      const read = await records.reader.getRecords(access, source.key, [
-        ...reversed,
-        "no-such-record",
-      ]);
-      expect(read.map((record) => record.id)).toEqual(ids);
-    }
-  });
-
-  it("has no source for an unknown key", async () => {
-    expect(
-      await records.reader.searchRecords(access, "no-such-source", {}),
-    ).toBeUndefined();
-    expect(
-      await records.reader.getRecords(access, "no-such-source", ["1"]),
-    ).toEqual([]);
+describe("live record readers", () => {
+  it.each(
+    providers.filter((provider) => provider.records && !provider.records.snapshot),
+  )("$id runs the reader contract in its records.test.ts", ({ id }) => {
+    const test = join(import.meta.dirname, "providers", id, "records.test.ts");
+    expect(existsSync(test), test).toBe(true);
+    expect(readFileSync(test, "utf8")).toContain("describeRecordReader(");
   });
 });

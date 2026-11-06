@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { aUser } from "@/tests/factories/user";
 import {
+  findSource,
   listScopedRecords,
   listSources,
+  readScopedRecord,
   searchSourceRecords,
 } from "./queries";
 
@@ -23,6 +25,9 @@ describe("listSources", () => {
     ]);
     expect(sources[0]).toMatchObject({
       connectionId: "sample",
+      system: "Sample data",
+      account: "Sample data",
+      availability: "snapshot",
       icon: "jira",
       name: "Jira",
       singular: "ticket",
@@ -73,5 +78,51 @@ describe("listScopedRecords", () => {
         recordIds: ["1"],
       }),
     ).toEqual([]);
+  });
+});
+
+describe("findSource", () => {
+  it("finds one of the user's sources by its id", async () => {
+    expect(await findSource(user, "sample:confluence")).toMatchObject({
+      id: "sample:confluence",
+      name: "Confluence",
+    });
+  });
+
+  it.each(["sample:sharepoint", "github:acme/web", "jira"])(
+    "finds nothing for %s",
+    async (sourceId) => {
+      expect(await findSource(user, sourceId)).toBeUndefined();
+    },
+  );
+});
+
+describe("readScopedRecord", () => {
+  const scope = { sourceId: "sample:jira", recordIds: ["PLAT-124", "PLAT-125"] };
+
+  it("reads a scoped record in full, its sample notes as fields", async () => {
+    const record = await readScopedRecord(user, scope, "PLAT-124");
+    expect(record).toMatchObject({
+      id: "PLAT-124",
+      description: expect.stringContaining("SAML"),
+      fields: {
+        Summary: expect.any(String),
+        Risk: expect.any(String),
+        "Next step": expect.any(String),
+      },
+      comments: [],
+    });
+    expect(record).not.toHaveProperty("summary");
+  });
+
+  it.each([
+    { name: "a record outside the scope", id: "PLAT-126", where: scope },
+    {
+      name: "a record of a source the user does not have",
+      id: "#1",
+      where: { sourceId: "github:acme/web", recordIds: ["#1"] },
+    },
+  ])("reads nothing for $name", async ({ id, where }) => {
+    expect(await readScopedRecord(user, where, id)).toBeUndefined();
   });
 });

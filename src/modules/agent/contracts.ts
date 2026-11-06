@@ -7,7 +7,13 @@ import {
   HTML_RENDER_MIN_HEIGHT,
 } from "@/lib/html-render/html-render";
 import type { LoadSkillInput, LoadSkillOutput } from "@/modules/skills";
-import type { SearchRecordsInput, SearchRecordsOutput } from "@/modules/sources";
+import {
+  MAX_SCOPE_RECORDS,
+  type GetRecordInput,
+  type GetRecordOutput,
+  type SearchRecordsInput,
+  type SearchRecordsOutput,
+} from "@/modules/sources";
 
 export const MODEL_PROVIDERS = ["claude", "openai"] as const;
 export type ModelProvider = (typeof MODEL_PROVIDERS)[number];
@@ -32,8 +38,9 @@ export const chatOptionsSchema = z.object({
   skillIds: z.array(z.string().min(1).max(100)).max(50).optional(),
   scope: z
     .object({
-      sourceId: z.string().min(1).max(100),
-      recordIds: z.array(z.string().min(1).max(100)).max(100),
+      // `<connection uuid>:<owner>/<repository>` is up to 177 characters.
+      sourceId: z.string().min(1).max(300),
+      recordIds: z.array(z.string().min(1).max(100)).max(MAX_SCOPE_RECORDS),
     })
     .optional(),
 });
@@ -82,6 +89,7 @@ export type WorkspaceMessageMetadata = {
 export type WorkspaceUITools = {
   html_render: { input: HtmlRenderInput; output: HtmlRenderOutput };
   search_records: { input: SearchRecordsInput; output: SearchRecordsOutput };
+  get_record: { input: GetRecordInput; output: GetRecordOutput };
   load_skill: { input: LoadSkillInput; output: LoadSkillOutput };
 };
 

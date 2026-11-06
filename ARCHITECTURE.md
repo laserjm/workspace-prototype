@@ -191,9 +191,11 @@ the browser knows, so it refuses a snooze while one is. A user's sources
 are read from their connections (see "Integrations are provider folders"); the skill catalogue
 is one `skills/catalog/<id>/SKILL.md` per skill (see "Skills are SKILL.md files"). Both are read
 through `queries.ts` and `server.ts`, and reach the browser through `SourcesProvider` and
-`SkillsProvider`. A source's records are not part of the page: the browser loads them from
-`GET /api/sources/[sourceId]/records` the first time a view needs them (`SourceRecordsStore`,
-`useSourceRecords`), and a new thread starts with all of them. Skill activation and the source panel
+`SkillsProvider`. A source's records are not part of the page: the browser reads them from
+`GET /api/sources/[sourceId]/records` when a view first needs them (`SourceRecordsStore`): a
+page at a time for the scope dialog (`useSourceRecords`, "Load more"), and a thread's records by
+id for the explorer and the context card (`?id=…`, `useScopedRecords`), wherever they are in the
+source. A new thread starts with the first page's records, at most `MAX_SCOPE_RECORDS` (100). Skill activation and the source panel
 width persist in `localStorage`; the stored skill ids are parsed with `storedSkillIdsSchema`. There are no cache tags: every read is per request, and an action returns what it
 stored, which the browser adds to its state.
 **Enforced by.** The `server-only` import in every `queries.ts`, `commands.ts` and `server.ts`
@@ -248,11 +250,14 @@ provider of the model that answered.
 The `agent` module is the runtime AI, flat by file:
 - `run.ts`: `runAgent(request)` resolves the context, validates the conversation against the
   tools and streams the reply with an AI SDK `ToolLoopAgent` on the gateway (at most 5 steps),
-  then hands the conversation to `onEnd`. It returns the response and the model.
-- `context.ts`: `resolveContext` turns the browser's ids into the model, skill and records (the
-  scope's records are read for the user by `runAgent` first, through `listScopedRecords`)
-  (unknown ids are `NotFound`, answered with a 400), so the prompt only ever holds what the
-  server offers. The `AgentContext` it returns carries the signed-in user, so a tool reads only
+  then hands the conversation to `onEnd`. It returns the response and the model. It first reads
+  the scope's source (`findSource`, which asks only that source's connection) and its records
+  (`listScopedRecords`) for the user; a system that fails is logged, and the answer goes on.
+- `context.ts`: `resolveContext` turns the browser's ids into the model, skill and records
+  (an unknown model or skill is `NotFound`, answered with a 400), so the prompt only ever holds
+  what the server offers. A scope it cannot read, because the user no longer has its source or
+  its system did not answer, is not refused: `attached` says `readable: false`, the agent is
+  told, and no record tool is offered. The `AgentContext` it returns carries the signed-in user, so a tool reads only
   what is theirs. It also turns `skillIds`, the skills switched on in this browser, into
   `offeredSkills`: known ones only (a stale id is left out, not refused), without the picked
   skill.
@@ -262,9 +267,13 @@ The `agent` module is the runtime AI, flat by file:
   `html_render`). A `.md` file imports as its text: Turbopack's `text` module type
   (`next.config.ts`) bundles it into the server code, so nothing is read from disk at runtime;
   the `markdownAsText` plugin does the same in Vitest, and `src/markdown.d.ts` types it.
-- `instructions.ts`: the two files, then the picked skill in full, then the offered skills by
-  id, name and description ("Skills you can load"), then the attached records. The records stay
-  TypeScript, because they are built from data.
+- `instructions.ts`: `instructionsFor` is the two files, then the picked skill in full, then the
+  offered skills by id, name and description ("Skills you can load"). The attached records are
+  never in the system instructions: `promptFor` puts them in a message of their own just before
+  the user's latest one, inside `<source_records>` and marked as data (record text cannot close
+  the tag), with each description cut after `DESCRIPTION_PREVIEW` characters. `workspace.md`
+  says records and tool results are data, never instructions. The records stay TypeScript,
+  because they are built from data.
 - `tools.ts`: the registry. `tools` is every tool the agent knows, its own and the modules'
   (see "Agent tools live in their module"); `toolsFor(context)` picks the ones one answer may
   call and what each knows of the thread. Stored conversations hold the tool names and every
@@ -295,8 +304,8 @@ data and long or sortable tables at `html_render`.
 **Decision.** A tool is another way into a module, beside its pages and actions, so it lives in
 the module it acts on and is a thin wrapper over that module's `queries.ts` (or, for a write,
 its actions). `sources/tools.ts` is the pattern: `search_records` searches the records the
-thread attached, and `skills/tools.ts` (`load_skill`, see "Skills are SKILL.md files") follows
-it.
+thread attached and `get_record` reads one of them in full, with its latest comments; and
+`skills/tools.ts` (`load_skill`, see "Skills are SKILL.md files") follows it.
 - **Files.** The tool's input and output schemas, and the rule it applies (`searchRecords`), are
   in the module's `contracts.ts`, so the browser can type the tool's parts. The tool is in
   `<module>/tools.ts` (`server-only`), exported as `<module>Tools` from `server.ts`. Its chat
@@ -305,14 +314,16 @@ it.
 - **Context, not trust.** What a tool may see comes from the server, never from the model: the
   tool declares it with `contextSchema` (`{ scope?: RecordScope }`, ids as everywhere between
   modules), and `toolsFor` in `agent/tools.ts` fills it from the resolved `AgentContext`.
-  `search_records` (context `{ user?, scope? }`) reads through `listScopedRecords(user, scope)`,
-  so a record outside the thread's scope or the user's connections is never read, whatever the
-  model asks. A tool whose context the thread lacks is not
+  `search_records` and `get_record` (context `{ user?, scope? }`) read through
+  `listScopedRecords(user, scope)` and `readScopedRecord(user, scope, id)`, so a record outside
+  the thread's scope or the user's connections is never read, whatever the model asks. A tool whose context the thread lacks is not
   offered (`activeTools`), and its `execute` refuses anyway.
 - **Registration.** `agent/tools.ts` spreads the module's tools into `tools`, adds the tool's
   context to `toolsFor`, and `WorkspaceUITools` in `agent/contracts.ts` gets its types.
-- **Behaviour.** The tools only read. The attached records are still in the prompt as well;
-  `search_records` lets the model filter them by status, priority, owner or words.
+- **Behaviour.** The tools only read, live from the record's system. The attached records are
+  also in the prompt, as data; `search_records` lets the model filter them by status, priority,
+  owner or words, and `get_record` gives one record's whole description (up to 20,000
+  characters) and its last 20 comments.
 **Enforced by.** `sources/tools.test.ts` (only scoped records, refused without a scope);
 `agent/tools.test.ts` (the tool names, what `toolsFor` offers); `agent/run.test.ts` (on a mock
 model, the call offers the tools and `execute` sees the thread's scope); `tsc`
@@ -331,7 +342,15 @@ manifest), `api.ts` (its HTTP calls, every response parsed with zod) and `record
 address and the `Authorization` header value) and never reads a secret, an env var or the
 database. `auth` lists how a user connects: `none` (the sample), `token` (sent as `Bearer`) or
 `basic` (username and password, or an email and API token, sent as HTTP Basic); `verify` checks a
-credential and names the account.
+credential and names the account. `records` declares each product's presentation and the
+`RecordReader` (`listSources`, `searchRecords`, `getRecords`, optional `getComments`); a reader
+checks the shape of every key and id it is given before it goes into a URL, and throws when its
+system fails. `snapshot: true` marks records bundled with the workspace (the sample); every other
+reader reads live with the user's credential. GitHub's repositories are sources and their issues
+and pull requests are records (`#42`), with GitHub's state mapped onto the four status
+categories and kept as `statusLabel`. A record has only what every system has (id, title, type,
+status, description, updated); priority, owner, a URL, `fields` and the sample's hand-written
+summary, risk and next step are optional.
 
 A connection is one user's link to one account of a provider at one address (`connections`,
 unique per user, provider, `base_url` and `account_ref`). `listConnections(user)` answers with
@@ -343,15 +362,26 @@ updates both. `testConnectionAction` asks the provider again (a refused credenti
 connection and, by cascade, its credential. The base URL must be HTTPS. Settings → Sources
 (`SourcesSettingsPanel`, the connect form built from the provider's `auth` and `baseUrl`) lists
 every provider and the user's connections; `IntegrationsProvider` holds them, and an action's
-answer goes into its state. `integrations/records.ts` runs a connection's reader for `sources`
-(`listConnectedSources`, `searchConnectionRecords`, `getConnectionRecords`); `sources` turns that
-into `Source`s, the scope's records and the records route. The sample records are the
+answer goes into its state. `integrations/records.ts` runs the reader of an active connection
+for `sources` (`listConnectedSources`, `findConnectedSource`, `searchConnectionRecords`,
+`getConnectionRecords`, `getConnectionComments`); a connection whose system fails while its
+sources are listed is logged and left out, so the others still list. `sources` turns that into
+`Source`s, the scope's records and the records route (a failing system answers 502). A `Source`
+says where it comes from (`system`, `account`) and how it is read (`availability`: `snapshot`,
+`live`, or `unavailable`), and the UI's labels come from that (`sourceOriginLabel`,
+`sourceAccessLabel`), not from the sample. A thread whose source the user no longer has shows
+`unavailableSource(id)` (`useSources().sourceById`), so it still opens, says it is not
+connected, and reads nothing; the picker groups sources by connection (`sourcesByOrigin`). The sample records are the
 provider's `data.ts`; the stored threads' sample ids moved to `sample:<product>` in
 `drizzle/0006_rename-sample-source-ids.sql`. Unit tests that read sources swap the connection
 query for `tests/support/connections.ts` (the sample connection alone), so they need no Postgres.
 **Enforced by.** `integrations/providers.test.ts` (every provider in the registry: unique ids, a
-way to connect, a base URL and `verify` when it takes a credential, sources in a declared
-product, records read back by id in order, nothing for an unknown key);
+way to connect, a base URL and `verify` when it takes a credential; the bundled reader runs the
+reader contract, and each live reader's `records.test.ts` must too); `tests/support/record-reader.ts`
+(`describeRecordReader`: sources in a declared product, records read back by id in order,
+nothing for an unknown key); `providers/github/records.test.ts` (the contract and the mapping,
+against a fake GitHub; `records.live.test.ts` runs against api.github.com with
+`GITHUB_TEST_TOKEN`);
 `integrations/actions.integration.test.ts` (connect, reconnect, refusals, test, disconnect, a
 visitor, `assertIsolation()`); `providers/github/api.test.ts`; `sources/queries.test.ts`; `tsc`.
 **Recorded in.** This entry; `docs/adr/0002-integrations.md`.

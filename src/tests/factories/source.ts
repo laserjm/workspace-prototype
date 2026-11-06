@@ -22,6 +22,9 @@ export function aSource(overrides: Partial<Source> = {}): Source {
   return {
     id: "sample:jira",
     connectionId: "sample",
+    system: "Sample data",
+    account: "Sample data",
+    availability: "snapshot",
     icon: "jira",
     name: "Jira",
     description: "Tickets",
@@ -29,7 +32,6 @@ export function aSource(overrides: Partial<Source> = {}): Source {
     location: "acme.example",
     collection: "Sprint 1",
     collectionPath: "PROJECT / SAMPLE",
-    overviewTitle: "Sprint 1 at a glance",
     listLabel: "List",
     hasBoard: false,
     singular: "ticket",

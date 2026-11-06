@@ -10,13 +10,19 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { allRecordIds, recordCountLabel } from "../contracts";
+import {
+  MAX_SCOPE_RECORDS,
+  allRecordIds,
+  recordCountLabel,
+  sourceAccessLabel,
+  sourceOriginLabel,
+} from "../contracts";
 import { RecordStatusBadge } from "./record-status-badge";
 import { noResultsClassName } from "./source-explorer";
 import { SourceIcon } from "./source-icon";
 import { useSourceRecords, useSources } from "./use-sources";
 
-/** Chooses which of a source's records a thread may use; at least one. */
+/** Chooses which of a source's records a thread may use; at least one, at most a hundred. */
 export function SourceScopeDialog({
   sourceId,
   recordIds,
@@ -28,7 +34,8 @@ export function SourceScopeDialog({
   onApply: (recordIds: string[]) => void;
   onClose: () => void;
 }) {
-  const source = useSources().sourceById(sourceId);
+  const { sourceById, loadMoreRecords } = useSources();
+  const source = sourceById(sourceId);
   const load = useSourceRecords(sourceId);
   const all = load.status === "ready" ? load.records : [];
   const [selected, setSelected] = useState(recordIds);
@@ -49,8 +56,7 @@ export function SourceScopeDialog({
             Choose {source.name} {source.plural}
           </DialogTitle>
           <DialogDescription>
-            Select the records this thread can use. Sample data from{" "}
-            {source.workspace}.
+            {`Select the records this thread can use. ${sourceAccessLabel(source)}, ${source.workspace}.`}
           </DialogDescription>
         </DialogHeader>
         <div className="flex items-center gap-2.5">
@@ -60,7 +66,7 @@ export function SourceScopeDialog({
               {source.collection}
             </strong>
             <small className="mt-1 block text-3xs text-secondary-label">
-              {source.location} · Demo workspace
+              {source.location} · {sourceOriginLabel(source)}
             </small>
           </div>
         </div>
@@ -85,7 +91,9 @@ export function SourceScopeDialog({
             disabled={load.status !== "ready"}
             onClick={() =>
               setSelected(
-                selected.length === all.length ? [] : allRecordIds(all),
+                selected.length === all.length
+                  ? []
+                  : allRecordIds(all).slice(0, MAX_SCOPE_RECORDS),
               )
             }
           >
@@ -104,6 +112,10 @@ export function SourceScopeDialog({
                 type="checkbox"
                 className="size-3.75 shrink-0 accent-blue-600"
                 checked={selected.includes(record.id)}
+                disabled={
+                  !selected.includes(record.id) &&
+                  selected.length >= MAX_SCOPE_RECORDS
+                }
                 onChange={(event) =>
                   setSelected((previous) =>
                     event.target.checked
@@ -134,10 +146,24 @@ export function SourceScopeDialog({
               dialog to try again.
             </p>
           )}
+          {load.status === "ready" && load.nextCursor && (
+            <div className="flex justify-center py-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={load.loadingMore}
+                onClick={() => void loadMoreRecords(sourceId)}
+              >
+                {load.loadingMore ? "Loading…" : `Load more ${source.plural}`}
+              </Button>
+            </div>
+          )}
         </div>
         <div className="flex items-center justify-between gap-3 max-md:items-end">
           <span className="max-w-45 text-3xs leading-normal text-secondary-label max-md:max-w-32.5">
-            Only selected records enter this thread.
+            {selected.length >= MAX_SCOPE_RECORDS
+              ? `A thread uses at most ${MAX_SCOPE_RECORDS} records.`
+              : "Only selected records enter this thread."}
           </span>
           <Button disabled={!selected.length} onClick={() => onApply(selected)}>
             Use {recordCountLabel(source, selected.length)}

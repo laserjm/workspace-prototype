@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { inlineTriggerClassName } from "@/components/ui/inline-trigger";
 import { cn } from "@/lib/utils";
+import { sourcesByOrigin } from "../contracts";
 import { SourceIcon } from "./source-icon";
 import { useSources } from "./use-sources";
 
@@ -50,24 +51,33 @@ export function SourcePicker({
         <p className="px-2 py-1.5 text-xs text-muted-foreground">
           Choose a data source
         </p>
-        {sources.map((source) => (
-          <DropdownMenuItem
-            key={source.id}
-            onClick={() => onSelect(source.id)}
-            className="gap-2.5 py-2"
-          >
-            <SourceIcon icon={source.icon} size="md" />
-            <span>
-              <strong className="block text-xs font-medium">
-                {source.name}
-              </strong>
-              <small className="mt-1 block text-3xs text-secondary-label">
-                {source.description}
-              </small>
-            </span>
-            {selected === source.id && <Check className="ml-auto" />}
-          </DropdownMenuItem>
-        ))}
+        <div className="max-h-[min(60svh,28rem)] overflow-y-auto">
+          {sourcesByOrigin(sources).map((group) => (
+            <div key={group.origin} role="group" aria-label={group.origin}>
+              <p className="px-2 pt-2 pb-1 text-3xs font-medium tracking-wider text-muted-foreground/70 uppercase">
+                {group.origin}
+              </p>
+              {group.sources.map((source) => (
+                <DropdownMenuItem
+                  key={source.id}
+                  onClick={() => onSelect(source.id)}
+                  className="gap-2.5 py-2"
+                >
+                  <SourceIcon icon={source.icon} size="md" />
+                  <span className="min-w-0">
+                    <strong className="block truncate text-xs font-medium">
+                      {source.name}
+                    </strong>
+                    <small className="mt-1 block truncate text-3xs text-secondary-label">
+                      {source.description}
+                    </small>
+                  </span>
+                  {selected === source.id && <Check className="ml-auto" />}
+                </DropdownMenuItem>
+              ))}
+            </div>
+          ))}
+        </div>
         {selected && (
           <>
             <DropdownMenuSeparator />
@@ -79,7 +89,8 @@ export function SourcePicker({
         )}
         <DropdownMenuSeparator />
         <p className="px-2 py-1.5 text-xs leading-relaxed text-muted-foreground">
-          Sample workspaces. Choose records after selecting a source.
+          Choose records after selecting a source. Connect more systems
+          under Settings → Sources.
         </p>
       </DropdownMenuContent>
     </DropdownMenu>

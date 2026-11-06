@@ -79,3 +79,30 @@ export async function verifyGithubToken(
     ...(expiresAt ? { expiresAt } : {}),
   });
 }
+
+/** GitHub failed in a way a reader cannot work around. Names the path, never the token. */
+export class GithubError extends Error {
+  override name = "GithubError";
+}
+
+/**
+ * GET a path and parse its JSON; `undefined` when GitHub has no such thing (404, 410). Throws a
+ * `GithubError` on a refused token, any other failure or an answer of another shape.
+ */
+export async function githubJson<T>(
+  path: string,
+  access: ProviderAccess,
+  schema: z.ZodType<T>,
+): Promise<{ data: T; hasNext: boolean } | undefined> {
+  const response = await githubGet(path, access);
+  if (response.status === 404 || response.status === 410) return undefined;
+  if (!response.ok)
+    throw new GithubError(`GET ${path.split("?")[0]} answered HTTP ${response.status}`);
+  const data = schema.safeParse(await response.json().catch(() => undefined));
+  if (!data.success)
+    throw new GithubError(`GET ${path.split("?")[0]} answered something unexpected`);
+  return {
+    data: data.data,
+    hasNext: /<[^>]*>;\s*rel="next"/.test(response.headers.get("link") ?? ""),
+  };
+}

@@ -13,7 +13,6 @@ const summaryOf = ({
   location,
   collection,
   collectionPath,
-  overviewTitle,
 }: SampleSource): SourceSummary => ({
   key: id,
   product: id,
@@ -23,7 +22,6 @@ const summaryOf = ({
   location,
   collection,
   collectionPath,
-  overviewTitle,
 });
 
 const sourceByKey = (key: string) =>
@@ -40,6 +38,7 @@ export const sample = defineProvider({
   description: "Fictional enterprise records to try the workspace with",
   auth: [{ kind: "none" }],
   records: {
+    snapshot: true,
     products: Object.fromEntries(
       sampleSources.map((source) => [
         source.id,
@@ -81,7 +80,6 @@ export const sample = defineProvider({
     },
   },
 });
-
 
 /** The built-in connection to the sample provider, which every user has. Stored nowhere. */
 export const sampleConnection: Connection = {
