@@ -72,6 +72,7 @@ export class ChatStore {
           metadata: {
             createdAt: new Date().toISOString(),
             attachments: message.attachments,
+            modelId: options.modelId,
             skillId: options.skillId,
           },
         },
