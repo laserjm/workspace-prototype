@@ -22,7 +22,7 @@ export type PublicActionResult<T, E> = Result<
   E | ValidationFailed | Unexpected
 >;
 
-// The value and error a handler answers with, read off its whole return type, so a command
+// The value and error a handler answers with, read off its whole return type, so a handler
 // typed `Result<Thread, NotFound> | Err<Conflict>` keeps every error.
 type AnyResult = Result<unknown, unknown>;
 type ValueOf<R> = R extends Ok<infer T> ? T : never;

@@ -1,10 +1,7 @@
-import {
-  err,
-  notFound,
-  ok,
-  type NotFound,
-  type Result,
-} from "@conventions/nextjs/core";
+// How a thread's conversation grows and forks. The rules read only a message's id and role, so
+// they hold for the chat's messages as they are stored.
+import { notFound, type NotFound } from "@/lib/errors";
+import { err, ok, type Result } from "@/lib/result";
 
 /** What the conversation rules need of a message; the chat's messages carry more. */
 export type ConversationMessage = {

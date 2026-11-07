@@ -5,7 +5,8 @@ import { ChevronDown, GitFork } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { recordCountLabel, SourceIcon, useSources } from "@/modules/sources";
 import type { ModelChoice } from "@/modules/agent";
-import { shelfOf, type Thread } from "../domain/thread";
+import { type Thread } from "../contracts";
+import { shelfOf } from "../placement";
 import { ThreadMessages, type ForkTarget } from "./thread-messages";
 import { formatWakeTime } from "./time-format";
 

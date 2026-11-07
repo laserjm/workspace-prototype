@@ -1,0 +1,218 @@
+import { randomUUID } from "node:crypto";
+import { beforeEach, expect, it, vi } from "vitest";
+import {
+  assertIsolation,
+  describeIntegration,
+} from "@conventions/nextjs/testing";
+import { err, ok } from "@/lib/result";
+import type { WorkspaceUIMessage } from "@/modules/agent";
+import {
+  runAgent,
+  type AgentModel,
+  type AgentRequest,
+} from "@/modules/agent/server";
+import { composeStack } from "@/tests/support/compose-stack";
+import { callAs } from "@/tests/support/session";
+import { withUsers } from "@/tests/support/users";
+import { aConversation, aNewThread } from "@/tests/factories/thread";
+import { aUser } from "@/tests/factories/user";
+import { placeThreadAction, startThreadAction } from "./actions";
+import { answerThread, saveConversation } from "./answer";
+import type { StartThreadInput, ThreadPlacement } from "./contracts";
+import { placementOf } from "./placement";
+import { listThreadMessages, listThreads } from "./queries";
+
+// The actions that arrange a thread read the session; callAs signs a test's user in.
+vi.mock("@/lib/auth/session", () => import("@/tests/support/session"));
+// The agent is faked: it records what it was asked and answers with an empty 200 stream from
+// `opus`, so no model is called. A test may make it refuse instead.
+vi.mock("@/modules/agent/server", () => ({ runAgent: vi.fn() }));
+
+const opus: AgentModel = {
+  id: "opus",
+  label: "Opus 5.5",
+  effort: "High",
+  provider: "claude",
+  gateway: "anthropic/claude-opus-5.5",
+};
+
+const requests: AgentRequest[] = [];
+
+beforeEach(() => {
+  requests.length = 0;
+  vi.mocked(runAgent).mockImplementation(async (request) => {
+    requests.push(request);
+    return ok({ model: opus, response: new Response(null, { status: 200 }) });
+  });
+});
+
+const ask = (id: string, text = "And now?") => ({
+  id,
+  role: "user" as const,
+  parts: [{ type: "text" as const, text }],
+});
+
+/** The POST body the chat sends: the latest message and the options. */
+const aChatTurn = (message = ask("u3")) => ({ modelId: "opus", message });
+
+/** A thread of `user`'s, stored with `messages` and put where `placement` says. */
+async function aThreadOf(
+  user: ReturnType<typeof aUser>,
+  {
+    messages = aConversation,
+    placement,
+    ...input
+  }: Partial<StartThreadInput> & {
+    messages?: WorkspaceUIMessage[];
+    placement?: ThreadPlacement;
+  } = {},
+) {
+  const thread = await callAs(user, startThreadAction, aNewThread(input));
+  if (!thread.ok) throw new Error("the thread was not started");
+  await saveConversation(user, thread.value.id, messages);
+  if (placement)
+    await callAs(user, placeThreadAction, {
+      threadId: thread.value.id,
+      change: { kind: "return", placement },
+    });
+  return thread.value;
+}
+
+async function listed(user: ReturnType<typeof aUser>, id: string) {
+  return (await listThreads(user)).find((thread) => thread.id === id);
+}
+
+// The chat route's answer against the compose Postgres, with the agent faked
+// (ARCHITECTURE.md, "Integration tests").
+describeIntegration(
+  "threads answer",
+  () => {
+    const ana = aUser("test-threads-answer-ana");
+    const ben = aUser("test-threads-answer-ben");
+    withUsers(ana.id, ben.id);
+
+    it("asks the agent for the user, with the browser's options and the stored conversation", async () => {
+      const thread = await aThreadOf(ana);
+      const scope = { sourceId: "jira", recordIds: ["PLAT-124"] };
+      const response = await answerThread(ana, thread.id, {
+        ...aChatTurn(),
+        skillId: "risk-review",
+        scope,
+      });
+      expect(response.status).toBe(200);
+      expect(requests).toEqual([
+        {
+          user: ana,
+          options: { modelId: "opus", skillId: "risk-review", scope },
+          messages: [...aConversation, ask("u3")],
+          signal: undefined,
+          onEnd: expect.any(Function),
+        },
+      ]);
+    });
+
+    it.each([
+      {
+        name: "a new question after the stored conversation",
+        message: ask("u3"),
+        ids: ["u1", "a1", "u2", "a2", "u3"],
+      },
+      {
+        name: "a question sent again without what came after it, as a regenerate does",
+        message: ask("u2", "Which ones?"),
+        ids: ["u1", "a1", "u2"],
+      },
+    ])("asks with $name", async ({ message, ids }) => {
+      const thread = await aThreadOf(ana);
+      await answerThread(ana, thread.id, aChatTurn(message));
+      expect(
+        (requests[0]?.messages as WorkspaceUIMessage[]).map((item) => item.id),
+      ).toEqual(ids);
+    });
+
+    it("stores the conversation the reply ends with in place of the old one", async () => {
+      const thread = await aThreadOf(ana);
+      await answerThread(ana, thread.id, aChatTurn(ask("u2", "Which ones?")));
+      const regenerated = [
+        ...aConversation.slice(0, 3),
+        { ...aConversation[3]!, id: "a2b" },
+      ];
+      await requests[0]!.onEnd(regenerated);
+      expect(await listThreadMessages(ana, thread.id)).toEqual(regenerated);
+    });
+
+    it.each<{ name: string; placement: ThreadPlacement }>([
+      { name: "settled", placement: { settledAt: "2026-11-04T09:00:00.000Z" } },
+      {
+        name: "snoozed",
+        placement: { snoozedUntil: "2099-11-09T09:00:00.000Z" },
+      },
+      { name: "woken", placement: { wokeAt: "2026-11-04T09:00:00.000Z" } },
+    ])(
+      "returns a $name thread to active, talking to the answering model's provider",
+      async ({ placement }) => {
+        const thread = await aThreadOf(ana, { provider: "openai", placement });
+        await answerThread(ana, thread.id, aChatTurn());
+        const answered = await listed(ana, thread.id);
+        expect(answered && placementOf(answered)).toEqual({
+          settledAt: undefined,
+          snoozedUntil: undefined,
+          wokeAt: undefined,
+        });
+        expect(answered?.provider).toBe("claude");
+      },
+    );
+
+    it("passes on the agent's refusal as a 400 and leaves the thread where it was", async () => {
+      const placement = { settledAt: "2026-11-04T09:00:00.000Z" };
+      const thread = await aThreadOf(ana, { placement });
+      vi.mocked(runAgent).mockResolvedValueOnce(
+        err({ _tag: "NotFound", entity: "Model", id: "gpt-0" }),
+      );
+      const response = await answerThread(ana, thread.id, aChatTurn());
+      expect(response.status).toBe(400);
+      expect(await listed(ana, thread.id)).toMatchObject(placement);
+    });
+
+    it.each([
+      { name: "a missing thread", threadId: randomUUID() },
+      { name: "a thread id that is not a uuid", threadId: "thread-1" },
+    ])(
+      "answers $name with a 404 before asking the agent",
+      async ({ threadId }) => {
+        const response = await answerThread(ana, threadId, aChatTurn());
+        expect(response.status).toBe(404);
+        expect(requests).toEqual([]);
+      },
+    );
+
+    it("answers a body that is not a chat turn with a 400", async () => {
+      const thread = await aThreadOf(ana);
+      const response = await answerThread(ana, thread.id, { modelId: "opus" });
+      expect(response.status).toBe(400);
+      expect(requests).toEqual([]);
+    });
+
+    // Ben cannot read Ana's conversation, and a chat turn on her thread is a 404 that asks the
+    // agent nothing and stores nothing.
+    let threadId = "";
+    assertIsolation({
+      name: "answerThread, listThreadMessages",
+      ownerA: ana.id,
+      ownerB: ben.id,
+      arrange: async (owner) => {
+        threadId = (await aThreadOf(aUser(owner))).id;
+      },
+      read: (owner) => listThreadMessages(aUser(owner), threadId),
+      change: async (owner) => {
+        const response = await answerThread(
+          aUser(owner),
+          threadId,
+          aChatTurn(),
+        );
+        expect(response.status).toBe(404);
+      },
+    });
+  },
+  { when: composeStack },
+);

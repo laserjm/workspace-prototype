@@ -6,7 +6,7 @@ import { useChat } from "@ai-sdk/react";
 import { Markdown } from "@/components/ui/markdown";
 import { cn } from "@/lib/utils";
 import type { ModelChoice, WorkspaceUIMessage } from "@/modules/agent";
-import type { Thread } from "../domain/thread";
+import type { Thread } from "../contracts";
 import { attachmentChipClassName } from "./attachment-chip";
 import { LiveResponse } from "./live-response";
 import { useChatStore, useConversationLoad } from "./use-chat-store";

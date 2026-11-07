@@ -1,27 +1,31 @@
 "use client";
 
 import { useState } from "react";
-import type { Result } from "@conventions/nextjs/core";
 import { callAction } from "@/lib/actions/client";
-import type { SnoozeTimeInPast, ThreadStillWorking } from "../domain/errors";
+import type { Result } from "@/lib/result";
+import type { ModelProvider } from "@/modules/agent";
 import {
   forkThreadAction,
   placeThreadAction,
   startThreadAction,
 } from "../actions";
-import type { ModelProvider } from "@/modules/agent";
-import type { StartThreadInput, ThreadChange } from "../contracts";
+import {
+  continueThread,
+  type SnoozeTimeInPast,
+  type StartThreadInput,
+  type Thread,
+  type ThreadChange,
+  type ThreadPlacement,
+  type ThreadStillWorking,
+} from "../contracts";
 import {
   acknowledgeWake,
-  continueThread,
   placementOf,
   restore,
   settle,
   snooze,
   withPlacement,
-  type Thread,
-  type ThreadPlacement,
-} from "../domain/thread";
+} from "../placement";
 import { useSnoozeWake } from "./use-snooze-wake";
 
 /**

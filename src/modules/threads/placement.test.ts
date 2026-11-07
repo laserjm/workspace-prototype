@@ -2,20 +2,18 @@ import { describe, expect, it } from "vitest";
 import { aThread } from "@/tests/factories/thread";
 import {
   acknowledgeWake,
-  continueThread,
-  createScope,
-  forkThread,
+  customSnoozeTime,
   isWakeDue,
   placementOf,
   restore,
   settle,
   shelfOf,
   snooze,
-  startThread,
+  snoozePresets,
   wake,
   wakeIfDue,
   withPlacement,
-} from "./thread";
+} from "./placement";
 
 const now = new Date("2026-11-04T10:00:00.000Z");
 const later = new Date("2026-11-04T11:00:00.000Z");
@@ -39,21 +37,6 @@ describe("shelfOf", () => {
   });
 });
 
-describe("createScope", () => {
-  it("keeps the records it was given", () => {
-    expect(createScope("jira", ["PLAT-124"])).toEqual({
-      ok: true,
-      value: { sourceId: "jira", recordIds: ["PLAT-124"] },
-    });
-  });
-
-  it("refuses a scope without records", () => {
-    expect(createScope("jira", [])).toEqual({
-      ok: false,
-      error: { _tag: "ScopeHasNoRecords" },
-    });
-  });
-});
 
 describe("settle, snooze, restore and wake", () => {
   it("settles a snoozed thread and clears its snooze", () => {
@@ -130,6 +113,7 @@ describe("settle, snooze, restore and wake", () => {
   });
 });
 
+
 describe("wakeIfDue", () => {
   it("reads a snooze whose time has come as woken at its deadline", () => {
     expect(
@@ -153,71 +137,66 @@ describe("wakeIfDue", () => {
   });
 });
 
-describe("startThread", () => {
-  it("titles the thread with its first message and copies the scope", () => {
-    const scope = { sourceId: "jira", recordIds: ["PLAT-124"] };
-    const thread = startThread(
-      {
-        id: "new",
-        projectId: null,
-        prompt: "Summarize",
-        provider: "openai",
-        scope,
-      },
-      now,
+
+describe("snoozePresets", () => {
+  // Wednesday 4 November 2026, 14:30 local time
+  const now = new Date(2026, 10, 4, 14, 30);
+
+  it("offers a minute, an hour, tomorrow at 09:00 and next Monday at 09:00", () => {
+    expect(
+      snoozePresets(now).map((preset) => [preset.id, preset.until]),
+    ).toEqual([
+      ["minute", new Date(2026, 10, 4, 14, 31)],
+      ["hour", new Date(2026, 10, 4, 15, 30)],
+      ["tomorrow", new Date(2026, 10, 5, 9, 0)],
+      ["monday", new Date(2026, 10, 9, 9, 0)],
+    ]);
+  });
+
+  it("chooses the Monday after next when today is Monday", () => {
+    const monday = new Date(2026, 10, 9, 8, 0);
+    expect(snoozePresets(monday).at(-1)?.until).toEqual(
+      new Date(2026, 10, 16, 9, 0),
     );
-    expect(thread).toEqual({
-      id: "new",
-      projectId: null,
-      title: "Summarize",
-      branch: "main",
-      createdAt: now.toISOString(),
-      provider: "openai",
-      scope,
-    });
-    expect(thread.scope?.recordIds).not.toBe(scope.recordIds);
   });
 });
 
-describe("continueThread", () => {
-  it("returns a settled thread to active and records the provider", () => {
-    const result = continueThread(
-      aThread({ settledAt: earlier.toISOString(), provider: "claude" }),
-      "openai",
-      false,
-    );
-    expect(result.ok && shelfOf(result.value)).toBe("active");
-    expect(result.ok && result.value.provider).toBe("openai");
+describe("customSnoozeTime", () => {
+  const now = new Date(2026, 10, 4, 14, 30);
+
+  it.each([
+    {
+      request: { mode: "duration", minutes: "30" },
+      until: new Date(2026, 10, 4, 15, 0),
+    },
+    {
+      request: { mode: "date", localDateTime: "2026-11-05T09:15" },
+      until: new Date(2026, 10, 5, 9, 15),
+    },
+  ] as const)("reads $request", ({ request, until }) => {
+    expect(customSnoozeTime(request, now)).toEqual({ ok: true, value: until });
   });
 
-  it("refuses while the last response is in flight", () => {
-    expect(continueThread(aThread(), "claude", true)).toEqual({
+  it.each([
+    { request: { mode: "duration", minutes: "0" }, tag: "SnoozeTimeInPast" },
+    { request: { mode: "duration", minutes: "-5" }, tag: "SnoozeTimeInPast" },
+    {
+      request: { mode: "date", localDateTime: "2026-11-04T14:00" },
+      tag: "SnoozeTimeInPast",
+    },
+    { request: { mode: "duration", minutes: "" }, tag: "SnoozeTimeUnreadable" },
+    {
+      request: { mode: "duration", minutes: "soon" },
+      tag: "SnoozeTimeUnreadable",
+    },
+    {
+      request: { mode: "date", localDateTime: "" },
+      tag: "SnoozeTimeUnreadable",
+    },
+  ] as const)("refuses $request with $tag", ({ request, tag }) => {
+    expect(customSnoozeTime(request, now)).toEqual({
       ok: false,
-      error: { _tag: "ThreadStillWorking", threadId: "thread-1" },
+      error: { _tag: tag },
     });
-  });
-});
-
-describe("forkThread", () => {
-  it("copies the thread as active, keeps its project and scope, and names its origin", () => {
-    const thread = aThread({
-      title: "Fork: Sprint 24 summary",
-      settledAt: now.toISOString(),
-    });
-    const fork = forkThread(thread, 2, "fork-1", now);
-    expect(fork).toMatchObject({
-      id: "fork-1",
-      title: "Fork: Sprint 24 summary",
-      createdAt: now.toISOString(),
-      settledAt: undefined,
-      projectId: thread.projectId,
-      scope: thread.scope,
-      forkedFrom: {
-        threadId: "thread-1",
-        title: "Fork: Sprint 24 summary",
-        responseIndex: 2,
-      },
-    });
-    expect(fork.scope?.recordIds).not.toBe(thread.scope?.recordIds);
   });
 });

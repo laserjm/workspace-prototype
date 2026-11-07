@@ -62,11 +62,10 @@ not owned data the app reads. The owned tables are `projects`, `threads`, `threa
 `connection_secrets`:
 each row has a `user_id` referencing `users.id`, like `sessions` and `accounts` (deleting a user
 deletes what they own); a message's reference `(thread_id, user_id)` → `threads(id, user_id)`
-lets it belong only to a thread of the same user. Every query and repository method on owned
-data takes the user (or their `UserId`) first and names it in its query.
+lets it belong only to a thread of the same user. Every query and write on owned data takes
+the user first and names their id in its query.
 **Enforced by.** The `UserId` brand from `lib/auth/user.ts` (a zod brand) and `tsc`;
-`assertIsolation()` in each module's command or action
-test (see "Command tests").
+`assertIsolation()` in each module's integration tests (see "Integration tests").
 **Recorded in.** This entry; `lib/auth/user.ts`; `drizzle/0005_rename-owner-to-user.sql`.
 
 ### Modules
@@ -89,8 +88,9 @@ by anything but `index` or `server` is an error); the `server-only` import in ev
 
 ### Cross-module references are ids
 
-**Decision.** A module's `domain/` imports no value from another module, only a type such as
-`ModelProvider` from `agent`, so a
+**Decision.** A module's types and rules hold another module's data by id, never as a value:
+they import only a type such as `ModelProvider` from `agent` (an input schema may build on the
+other module's schema, as `startThreadInputSchema` does on `chatOptionsSchema`). A
 thread refers to its source, records and skill by id (`ThreadScope = { sourceId, recordIds }`,
 `skillId`; a source id is `<connectionId>:<sourceKey>`, `sourceIdOf` in `sources/contracts.ts`). Components resolve the ids through the other module's public API
 (`useSources().sourceById`, `useSkills().skillById`). Source-specific presentation (overview
@@ -150,11 +150,10 @@ Auth's startup schema check, which refuses to run when `schema.ts` and its field
 ### Stored projects, threads, conversations and placement
 
 **Decision.** Projects, threads and their conversations are stored per user (see "Data
-ownership"); creating a project is `createProjectAction` in `projects/actions.ts`, which
-writes itself (no command, use case or repository, see "Module shape"), and
-creating and forking a thread are use cases (`threads/application/start-thread.ts`,
-`threads/application/fork-thread.ts`) wired in the module's `commands.ts` and called from its
-`actions.ts`. The module's components call the actions (`ProjectForm`, `useThreads`).
+ownership"). Each write is an action whose handler writes itself (see "Module shape"):
+`createProjectAction` in `projects/actions.ts`, and `startThreadAction`, `forkThreadAction` and
+`placeThreadAction` in `threads/actions.ts`. The module's components call the actions
+(`ProjectForm`, `useThreads`).
 `app/(workspace)/page.tsx` reads the user once and passes them to `listProjects` and
 `listThreads`. A name the user already uses answers with that project instead of adding it
 twice; the `projects_user_id_name_key` index catches a race, answered as `Conflict`. The
@@ -167,9 +166,10 @@ The conversation follows the AI SDK's message persistence: one `thread_messages`
 `(thread_id, id)` so a fork copies messages under their ids. The chat sends only its latest
 message (`prepareSendMessagesRequest` in `ChatStore`); the server puts it after the stored
 conversation, or in its old place when it is sent again, dropping what came after it, which is
-how a regenerate replaces a reply (`withLatestMessage`, `domain/conversation.ts`). When the
+how a regenerate replaces a reply (`withLatestMessage`, `threads/conversation.ts`). When the
 reply ends, finished, stopped or failed, `runAgent` hands the conversation with the
-reply to `saveMessages`, which replaces the stored one in a transaction; the stream is read to
+reply to `saveConversation` (`threads/answer.ts`), which replaces the stored one in a
+transaction; the stream is read to
 its end on the server (`consumeSseStream`) so the reply is stored even if the browser went away.
 The server names the replies (`generateMessageId`). A thread's chat loads its conversation from
 `GET /api/threads/[id]/messages` the first time it opens; a chat this page started already has
@@ -180,8 +180,8 @@ in `forked_from_*`, not a reference.
 Placement is stored on the thread: `settled_at`, `snoozed_until` and `woke_at`, at most one
 set (`threads_one_placement`), none for active. Settle, snooze, restore, undo and opening a
 woken thread are one action, `placeThreadAction`, whose input names the change (`kind`), not
-the timestamps: `threads/application/place-thread.ts` applies the domain function with the
-server's clock, so the browser cannot date a change; an undo (`return`) puts back the placement
+the timestamps: the handler applies the rule from `threads/placement.ts` with the server's
+clock, so the browser cannot date a change; an undo (`return`) puts back the placement
 the browser saw before. The browser shows the change at once and puts the thread back when the
 action fails (`useThreads`). Nothing runs at a snooze's deadline: a due snooze reads as woken
 at its deadline (`wakeIfDue`, in `listThreads` and before each change), and the browser wakes
@@ -196,10 +196,10 @@ through `queries.ts` and `server.ts`, and reach the browser through `SourcesProv
 `useSourceRecords`), and a new thread starts with all of them. Skill activation and the source panel
 width persist in `localStorage`; the stored skill ids are parsed with `storedSkillIdsSchema`. There are no cache tags: every read is per request, and an action returns what it
 stored, which the browser adds to its state.
-**Enforced by.** The `server-only` import in every `queries.ts`, `commands.ts` and `server.ts`
-(a client component that imports one fails the build); the
-`thread_messages_thread_id_user_id_fkey` and `threads_one_placement` constraints; the command
-tests.
+**Enforced by.** The `server-only` import in every `queries.ts`, `server.ts` and
+`threads/answer.ts` (a client component that imports one fails the build); the
+`thread_messages_thread_id_user_id_fkey` and `threads_one_placement` constraints; the
+integration tests.
 **Recorded in.** This entry.
 
 ### Threads without a project
@@ -207,41 +207,41 @@ tests.
 **Decision.** A thread's `project_id` is nullable: null is a thread without a project, not a
 hidden per-user default project, which would need creating at sign-in and hiding from every
 list. The reference `(project_id, user_id)` → `projects(id, user_id)` lets a thread belong
-only to a project of the same user; with a null `project_id` it does not apply. In the domain,
+only to a project of the same user; with a null `project_id` it does not apply. In the code,
 `Thread.projectId` is the project's id (cross-module references are ids); the workspace
 resolves it to a name through the project list, and the sidebar filter lists threads without
 a project under "No project". A new thread starts without a project unless one is picked.
-**Enforced by.** The `threads_project_id_user_id_fkey` constraint; `startThread` answers
+**Enforced by.** The `threads_project_id_user_id_fkey` constraint; `startThreadAction` answers
 `NotFound` for a project the user does not own.
 **Recorded in.** This entry.
 
-### Command tests
+### Integration tests
 
-**Decision.** A thin write use case is tested at the command level, not by a unit test with
-fakes plus a repository integration test: each module with stored data has one
-`commands.integration.test.ts` that calls its commands and queries against the compose
-Postgres with a user the test builds (`aUser`, `tests/factories/user.ts`), so no session or
-auth mocking is needed. `withUsers()` (`tests/support/users.ts`) signs the test's users up and
-deletes them afterwards. The same file calls `assertIsolation()` through the commands and
-queries. In a module with `commands.ts` the actions are not tested: they only
-validate and hand the user to the command. A module whose actions write themselves (`projects`) has `actions.integration.test.ts`
-instead, which calls the actions as the browser does: `vi.mock("@/lib/auth/session", () =>
-import("@/tests/support/session"))` swaps in a fake session, and `callAs(user, action,
-input)` calls as that user, or as a visitor with `null`, so the test covers the sign-in check
-and the validation too. A use case with rules worth example tables keeps its unit test (`answer-thread.test.ts`);
-pure domain rules are tested by example in `domain/*.test.ts`.
-**Enforced by.** Review; the command tests skip loudly without the stack (`describeIntegration`).
+**Decision.** A write is tested where the browser reaches it, against the compose Postgres, not
+by a unit test with fakes plus a repository test. Each module with stored data has
+`actions.integration.test.ts`, which calls its actions as the browser does and reads back
+through its queries: `vi.mock("@/lib/auth/session", () => import("@/tests/support/session"))`
+swaps in a fake session, and `callAs(user, action, input)` calls as a user the test builds
+(`aUser`, `tests/factories/user.ts`), or as a visitor with `null`, so the test covers the
+sign-in check and the validation too. `withUsers()` (`tests/support/users.ts`) signs the test's
+users up and deletes them afterwards. The same file calls `assertIsolation()` through the
+actions and queries. A route handler that is not an action is tested the same way by calling
+it with the user: `threads/answer.integration.test.ts` calls `answerThread` with `runAgent`
+mocked (`vi.mock("@/modules/agent/server")`), so its example tables run against stored threads
+without a model. Pure rules are tested by example beside the file that holds them
+(`threads/placement.test.ts`, `projects/contracts.test.ts`).
+**Enforced by.** Review; the integration tests skip loudly without the stack
+(`describeIntegration`).
 **Recorded in.** This entry.
 
 ### Answers come from the Vercel AI Gateway
 
 **Decision.** `POST /api/threads/[id]/messages` (`app/api/threads/[id]/messages/route.ts`) only
 reads the user and hands them, the thread id and the body to `answerThread` from
-`modules/threads/server.ts`. `modules/threads/commands.ts` validates the id with
-`threadIdSchema` (an id that is not a uuid is a 404) and the body with `chatTurnDtoSchema`, and
-runs the use case `application/answer-thread.ts`. The use case finds the thread among the
-user's (another user's thread is a `NotFound` like a missing one, answered with a 404), puts
-the new message after the stored conversation and hands both, with the user, to `runAgent` from
+`modules/threads/server.ts`. `answerThread` (`modules/threads/answer.ts`) validates the id with
+`threadIdSchema` (an id that is not a uuid is a 404) and the body with `chatTurnDtoSchema`,
+finds the thread among the user's (another user's thread is answered with a 404 like a
+missing one), puts the new message after the stored conversation and hands both, with the user, to `runAgent` from
 `modules/agent/server.ts`. Once the agent answers, the thread returns to active and records the
 provider of the model that answered.
 
@@ -287,7 +287,7 @@ all three take their colours from the tokens, so `globals.css` stays the only st
 to GitHub pull requests and issues, GitLab merge requests and files show as chips. The
 instructions point diagrams at Mermaid, math at `$$`, tables at Markdown, and charts from
 data and long or sortable tables at `html_render`.
-**Enforced by.** `agent/context.test.ts`, `answer-thread.test.ts` and the command tests.
+**Enforced by.** `agent/context.test.ts` and `threads/answer.integration.test.ts`.
 **Recorded in.** This entry.
 
 ### Agent tools live in their module
@@ -431,9 +431,8 @@ variables, and the VS Code brand colour in `components/ui/vscode-icon.tsx`.
 ### Server actions
 
 **Decision.** Server actions are the project's own `lib/actions/`, not next-safe-action. A
-module's `actions.ts` exports `export const <name>Action = action(schema, (input, { user })
-=> command(user, input))`, or does the write in the handler itself when the module has no
-`commands.ts` (`projects`). Every export of a `"use server"` file can be called from the browser,
+module's `actions.ts` exports `export const <name>Action = action(schema, async (input,
+{ user }) => …)`, and the handler does the write itself (see "Module shape"). Every export of a `"use server"` file can be called from the browser,
 so `actions.ts` exports nothing but actions; a helper the handlers share stays unexported. `action` (`lib/actions/define.ts`, bound to the session in
 `lib/actions/server.ts`) runs four steps in order: it reads the user (`getUser()`) and answers
 `SignedOut` without one, before the input is looked at; it parses the input with the schema and
@@ -441,8 +440,8 @@ answers `ValidationFailed` (`issues: [{ path: "change.until", message }]`); it r
 whose `Result` reaches the caller as is; and it turns anything thrown into `Unexpected` with a
 trace id, logged on the server, after `unstable_rethrow` has let `redirect()` and `notFound()`
 through. `publicAction(schema, handler)` is the same without the first step, for visitors; the
-comment above it says why. The caller gets one flat `Result` whose error type is the command's
-errors plus `ValidationFailed | SignedOut | Unexpected`, inferred from the command's whole return
+comment above it says why. The caller gets one flat `Result` whose error type is the handler's
+errors plus `ValidationFailed | SignedOut | Unexpected`, inferred from the handler's whole return
 type.
 
 In the browser, `callAction(action, input)` (`lib/actions/client.ts`) never throws: a call that
@@ -462,32 +461,32 @@ in `modules/*/actions.ts`, ACTION-02 every export of it is `action(…)` or `pub
 
 ### Module shape
 
-**Decision.** A module is flat by default: `contracts.ts` (types, errors, rules, input
-schemas), `queries.ts` (reads, each taking the user first), `actions.ts` (writes: `action(…)`
-signs the caller in and validates, and the handler queries Drizzle), `components/`, `index.ts`
-and `server.ts`. `projects` has this shape; `server.ts` re-exports its actions for other
-modules' tests and its queries for pages. Every query names `user.id`, and the action test
-calls `assertIsolation()`. A handler reads a refused constraint with `violatedConstraint`
-(`lib/db/errors.ts`) and returns `err(conflict(...))` itself. A module adds a file only for a
-real need, named after what it holds (`tools.ts`, `run.ts`), not after a layer.
-
-`threads` still has the older layered shape (`domain/`, `application/`, `infra/`,
-`commands.ts`); it becomes flat as it changes. `skills` and `sources` are flat. A use case there is a typed `async function` (`defineUseCase` only
-returns its argument), a repository an object that `satisfies` its port, and a module catches
-the `ConstraintViolation` its own repository throws.
+**Decision.** A module is flat: `contracts.ts` (types, errors, rules, input schemas),
+`queries.ts` (reads, each taking the user first), `actions.ts` (writes: `action(…)` signs the
+caller in and validates, and the handler queries Drizzle), `components/`, `index.ts` and
+`server.ts`. `server.ts` re-exports what pages, routes and other modules' tests need. Every
+query names `user.id`, and the integration test calls `assertIsolation()`. A handler reads a
+refused constraint with `violatedConstraint` (`lib/db/errors.ts`) and returns
+`err(conflict(...))` itself. There are no use cases, repositories or ports: a handler that
+needs a read calls the module's query (`findThread`), and a test fakes another module with
+`vi.mock` rather than through an injected dependency. A module adds a file only for a real
+need, named after what it holds, not after a layer: `agent` has `run.ts` and `tools.ts`;
+`threads` has `placement.ts` (where a thread sits in the sidebar) and `conversation.ts` (how a
+conversation grows and forks), which would make `contracts.ts` too long, `rows.ts` (a thread
+and its messages as stored, shared by its reads and writes) and `answer.ts` (the chat route's
+work, which streams and so is not an action).
 **Enforced by.** Review.
 **Recorded in.** This entry.
 
 ### Runtime helpers from `@conventions/nextjs`
 
 **Decision.** The project dropped the conventions profile's tooling (its CLI, ESLint config and
-CI checks) and keeps only its runtime package for what is not yet in `lib/`:
-`@conventions/nextjs/core` (`Result` helpers, `NotFound`, `ValidationFailed`, `notFound`, `bug`,
-`defineUseCase`, `defineRepository`), `/drizzle` (`createTransactionRunner`) and `/testing`
-(`describeIntegration`, `assertIsolation`, `localStack`). The project's own versions have the
-same shapes, so code on either can call the other: `lib/result.ts` (`Result`, `ok`, `err`),
-`lib/errors.ts` (the standard errors) and `lib/db/errors.ts` (`violatedConstraint`). An import
-moves to `lib/` or `tests/support/` when its module is reworked; the package goes when nothing
+CI checks) and keeps only its runtime package for what is not yet in `lib/`: `/drizzle`
+(`createTransactionRunner`, behind `withTransaction` in `lib/db/client.ts`) and `/testing`
+(`describeIntegration`, `assertIsolation`, `localStack`). Nothing imports
+`@conventions/nextjs/core` any more: `lib/result.ts` (`Result`, `ok`, `err`), `lib/errors.ts`
+(the standard errors and `bug`) and `lib/db/errors.ts` (`violatedConstraint`) replace it. The
+rest moves to `lib/` or `tests/support/` when it is next touched; the package goes when nothing
 imports it.
 **Enforced by.** `tsc`.
 **Recorded in.** This entry.

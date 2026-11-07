@@ -1,7 +1,9 @@
+// A thread and its messages as the database stores them, and back. A thread's placement is three
+// nullable columns, at most one set (`threads_one_placement`).
 import type { UserId } from "@/lib/auth/user";
 import type { threadMessagesTable, threadsTable } from "@/lib/db/schema";
 import type { ModelProvider, WorkspaceUIMessage } from "@/modules/agent";
-import type { Thread, ThreadPlacement } from "../domain/thread";
+import type { Thread, ThreadPlacement } from "./contracts";
 
 type ThreadRow = typeof threadsTable.$inferSelect;
 type NewThreadRow = typeof threadsTable.$inferInsert;

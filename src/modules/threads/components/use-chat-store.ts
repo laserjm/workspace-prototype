@@ -6,7 +6,7 @@ import {
   useEffect,
   useSyncExternalStore,
 } from "react";
-import { bug } from "@conventions/nextjs/core";
+import { bug } from "@/lib/errors";
 import type { ChatStore, ConversationLoad } from "./chat-store";
 
 export const ChatStoreContext = createContext<ChatStore | null>(null);

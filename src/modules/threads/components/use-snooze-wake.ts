@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, type Dispatch, type SetStateAction } from "react";
-import { isWakeDue, wake, type Thread } from "../domain/thread";
+import { type Thread } from "../contracts";
+import { isWakeDue, wake } from "../placement";
 
 /** Wakes snoozed threads at their deadlines, and when the tab returns to the foreground. */
 export function useSnoozeWake(

@@ -21,8 +21,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ProjectIcon } from "@/modules/projects";
 import { recordCountLabel, SourceIcon, useSources } from "@/modules/sources";
-import { snoozePresets } from "../domain/snooze";
-import { shelfOf, type Thread } from "../domain/thread";
+import type { Thread } from "../contracts";
+import { shelfOf, snoozePresets } from "../placement";
 import { ProviderIcon } from "./provider-icon";
 import { ThreadContextCard } from "./thread-context-card";
 import { formatAge, formatWakeTime } from "./time-format";

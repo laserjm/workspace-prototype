@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/tooltip";
 import { IconButton } from "@/components/ui/icon-button";
 import { cn } from "@/lib/utils";
-import type { ResponseTiming } from "../domain/thread";
+import type { ResponseTiming } from "../contracts";
 import {
   formatResponseDuration,
   formatResponseTime,

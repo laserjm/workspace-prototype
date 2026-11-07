@@ -1,6 +1,6 @@
 // Who is signed in, from the request's session (ARCHITECTURE.md "Sign-in"). The only place that
 // reads it: actions get the user from `action(…)`, pages and route handlers call `getUser()`,
-// and commands and queries take the user as their first argument.
+// and queries and writes take the user as their first argument.
 import "server-only";
 import { cache } from "react";
 import { headers } from "next/headers";

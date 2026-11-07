@@ -1,5 +1,5 @@
 import "server-only";
-import { bug } from "@conventions/nextjs/core";
+import { bug } from "@/lib/errors";
 import type { User } from "@/lib/auth/user";
 import { accessFor } from "./access";
 import type { RecordPage, RecordQuery, SourceRecord } from "@/modules/sources";
