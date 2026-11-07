@@ -1,6 +1,6 @@
 import type { UserId } from "@/lib/auth/user";
 import type { WorkspaceUIMessage } from "@/modules/agent";
-import type { Thread } from "../../domain/thread";
+import type { Thread } from "../../contracts";
 import type { ThreadRepository } from "../ports";
 
 /** Threads and conversations in memory, kept per owner like the real repository. */

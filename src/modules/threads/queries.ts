@@ -2,7 +2,8 @@ import "server-only";
 import type { User } from "@/lib/auth/user";
 import type { WorkspaceUIMessage } from "@/modules/agent";
 import { threadIdSchema } from "./contracts";
-import { wakeIfDue, type Thread } from "./domain/thread";
+import { type Thread } from "./contracts";
+import { wakeIfDue } from "./placement";
 import { threadRepository } from "./infra/thread.repository";
 
 /** The signed-in user's threads, newest first, as they read now: a due snooze has woken. */

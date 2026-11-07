@@ -10,16 +10,9 @@ import {
 } from "@conventions/nextjs/core";
 import type { User } from "@/lib/auth/user";
 import type { PlaceThreadInput, ThreadChange } from "../contracts";
-import type { SnoozeTimeInPast } from "../domain/errors";
-import {
-  acknowledgeWake,
-  restore,
-  settle,
-  snooze,
-  wakeIfDue,
-  withPlacement,
-  type Thread,
-} from "../domain/thread";
+import type { SnoozeTimeInPast } from "../contracts";
+import { type Thread } from "../contracts";
+import { acknowledgeWake, restore, settle, snooze, wakeIfDue, withPlacement } from "../placement";
 import type { Clock, ThreadRepository } from "./ports";
 
 export type PlaceThreadDeps = {

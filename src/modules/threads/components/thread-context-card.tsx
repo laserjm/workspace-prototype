@@ -9,7 +9,8 @@ import {
   useSources,
 } from "@/modules/sources";
 import { cn } from "@/lib/utils";
-import { shelfOf, type Thread } from "../domain/thread";
+import { type Thread } from "../contracts";
+import { shelfOf } from "../placement";
 import { formatWakeTime } from "./time-format";
 import { useChatStore } from "./use-chat-store";
 

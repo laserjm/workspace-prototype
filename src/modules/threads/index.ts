@@ -1,26 +1,22 @@
 // Browser-safe public API of the threads module.
 export type {
+  ChatTurnDto,
   NewThread,
   ResponseTiming,
-  Thread,
-  ThreadPlacement,
-  ThreadScope,
-  ThreadShelf,
-} from "./domain/thread";
-export { createScope, placementOf, shelfOf } from "./domain/thread";
-export type { SnoozePreset } from "./domain/snooze";
-export type {
   ScopeHasNoRecords,
   SnoozeTimeInPast,
   SnoozeTimeUnreadable,
+  StartThreadInput,
+  Thread,
   ThreadError,
+  ThreadPlacement,
+  ThreadScope,
+  ThreadShelf,
   ThreadStillWorking,
-} from "./domain/errors";
-export {
-  chatTurnDtoSchema,
-  type ChatTurnDto,
-  type StartThreadInput,
 } from "./contracts";
+export { chatTurnDtoSchema, createScope } from "./contracts";
+export type { SnoozePreset } from "./placement";
+export { placementOf, shelfOf } from "./placement";
 export { ChatStore } from "./components/chat-store";
 export { ChatStoreProvider } from "./components/chat-store-provider";
 export { CustomSnoozeDialog } from "./components/custom-snooze-dialog";

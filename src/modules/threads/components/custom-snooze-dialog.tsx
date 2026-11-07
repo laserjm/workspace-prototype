@@ -10,8 +10,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { customSnoozeTime } from "../domain/snooze";
-import type { Thread } from "../domain/thread";
+import { customSnoozeTime } from "../placement";
+import type { Thread } from "../contracts";
 import { toLocalDateTime } from "./time-format";
 import { useChatStore } from "./use-chat-store";
 

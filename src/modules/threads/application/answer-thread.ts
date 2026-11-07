@@ -6,8 +6,8 @@ import type { ChatTurnDto } from "../contracts";
 import {
   withLatestMessage,
   type ConversationMessage,
-} from "../domain/conversation";
-import { continueThread } from "../domain/thread";
+} from "../conversation";
+import { continueThread } from "../contracts";
 import type { AnswerAgent, ThreadRepository } from "./ports";
 
 export type AnswerThreadInput = ChatTurnDto & {

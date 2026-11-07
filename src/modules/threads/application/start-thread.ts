@@ -8,12 +8,8 @@ import {
 } from "@conventions/nextjs/core";
 import type { User } from "@/lib/auth/user";
 import type { StartThreadInput } from "../contracts";
-import type { ScopeHasNoRecords } from "../domain/errors";
-import {
-  createScope,
-  startThread as start,
-  type Thread,
-} from "../domain/thread";
+import type { ScopeHasNoRecords } from "../contracts";
+import { createScope, startThread as start, type Thread } from "../contracts";
 import type { Clock, ProjectDirectory, ThreadRepository } from "./ports";
 
 export type StartThreadDeps = {

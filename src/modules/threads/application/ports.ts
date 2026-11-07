@@ -3,7 +3,7 @@ import type { Result } from "@/lib/result";
 import type { UserId } from "@/lib/auth/user";
 import type { WorkspaceUIMessage } from "@/modules/agent";
 import type { AgentRequest, AgentRun } from "@/modules/agent/server";
-import type { Thread } from "../domain/thread";
+import type { Thread } from "../contracts";
 
 /** Answers a conversation: `runAgent` from the agent module, a fake in tests. */
 export type AnswerAgent = (

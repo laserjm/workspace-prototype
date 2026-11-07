@@ -8,8 +8,8 @@ import {
 } from "@conventions/nextjs/core";
 import type { User } from "@/lib/auth/user";
 import type { ForkThreadInput } from "../contracts";
-import { forkPoint } from "../domain/conversation";
-import { forkThread as fork, type Thread } from "../domain/thread";
+import { forkPoint } from "../conversation";
+import { forkThread as fork, type Thread } from "../contracts";
 import type { Clock, ThreadRepository } from "./ports";
 
 export type ForkThreadDeps = {

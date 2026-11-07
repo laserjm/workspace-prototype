@@ -49,3 +49,19 @@ export class ConstraintViolation extends Error {
     this.name = "ConstraintViolation";
   }
 }
+
+/** Thrown by `bug(...)`: a state the code says cannot happen. Never a refusal, never caught. */
+export class Bug extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "Bug";
+  }
+}
+
+/**
+ * Stops on an impossible state. A refusal the caller can act on returns `err(...)` instead; an
+ * action reports a bug as `Unexpected`, and an open transaction rolls back.
+ */
+export function bug(message: string): never {
+  throw new Bug(message);
+}

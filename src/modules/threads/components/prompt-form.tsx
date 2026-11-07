@@ -32,7 +32,7 @@ import {
   useSources,
 } from "@/modules/sources";
 import type { ModelChoice } from "@/modules/agent";
-import type { ThreadScope } from "../domain/thread";
+import type { ThreadScope } from "../contracts";
 import { attachmentChipClassName } from "./attachment-chip";
 import { ProviderIcon } from "./provider-icon";
 

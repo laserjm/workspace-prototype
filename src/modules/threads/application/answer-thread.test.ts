@@ -3,7 +3,7 @@ import { err } from "@/lib/result";
 import type { WorkspaceUIMessage } from "@/modules/agent";
 import { aUser } from "@/tests/factories/user";
 import { aThread } from "@/tests/factories/thread";
-import type { Thread } from "../domain/thread";
+import type { Thread } from "../contracts";
 import { fakeAgent } from "./__fakes__/agent.fake";
 import { inMemoryThreadRepository } from "./__fakes__/thread-repository.fake";
 import { answerThread, type AnswerThreadInput } from "./answer-thread";

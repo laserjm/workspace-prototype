@@ -10,7 +10,7 @@ import { violatedConstraint } from "@conventions/nextjs/drizzle";
 import { db, withTransaction } from "@/lib/db/client";
 import { threadMessagesTable, threadsTable } from "@/lib/db/schema";
 import type { ThreadRepository } from "../application/ports";
-import type { Thread } from "../domain/thread";
+import type { Thread } from "../contracts";
 import {
   toMessage,
   toMessageRows,
