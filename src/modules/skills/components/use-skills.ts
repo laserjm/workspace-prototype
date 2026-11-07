@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext } from "react";
-import { bug } from "@conventions/nextjs/core";
+import { bug } from "@/lib/errors";
 import { findSkill, type Skill } from "../contracts";
 
 export const SkillsContext = createContext<readonly Skill[] | null>(null);

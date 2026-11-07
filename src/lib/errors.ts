@@ -35,21 +35,6 @@ export type SignedOut = { readonly _tag: "SignedOut" };
 /** Something threw on the server. It was logged under `traceId`; the caller learns nothing else. */
 export type Unexpected = { readonly _tag: "Unexpected"; readonly traceId: string };
 
-/**
- * Thrown by a repository when a constraint refused the write; the command turns it into a
- * `Conflict`. Catch the class the repository throws: until every module imports this one,
- * modules on `@conventions/nextjs/core` throw that package's class instead.
- */
-export class ConstraintViolation extends Error {
-  constructor(
-    readonly constraint: string,
-    entity: string,
-  ) {
-    super(`${entity}: constraint ${constraint} violated`);
-    this.name = "ConstraintViolation";
-  }
-}
-
 /** Thrown by `bug(...)`: a state the code says cannot happen. Never a refusal, never caught. */
 export class Bug extends Error {
   constructor(message: string) {

@@ -6,7 +6,7 @@ import {
   useEffect,
   useSyncExternalStore,
 } from "react";
-import { bug } from "@conventions/nextjs/core";
+import { bug } from "@/lib/errors";
 import { findSource, type Source } from "../contracts";
 import {
   loadingRecords,

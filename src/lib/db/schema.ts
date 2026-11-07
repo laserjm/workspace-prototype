@@ -1,7 +1,7 @@
 // The schema source of truth (code-first). Tables are `export const <nouns>Table =
 // pgTable("<nouns>", …)` and enums `<noun>StatusEnum = pgEnum("<noun>_status", …)`;
 // after a change, `pnpm db:generate --name <verb>-<what>` writes the migration to drizzle/.
-// Only lib/db/ and modules/*/infra/ import drizzle-orm.
+// Only lib/db/ and a module's queries and writes import drizzle-orm.
 import { sql } from "drizzle-orm";
 import {
   boolean,

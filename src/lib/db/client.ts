@@ -1,6 +1,6 @@
 // The project owns this file:
 // adapt the driver and pool to its hosting. Keep `db()` lazy, so importing a module needs no
-// DATABASE_URL, and keep `withTransaction` here so only infra/ reaches it.
+// DATABASE_URL, and keep `withTransaction` here beside it.
 import "server-only";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";

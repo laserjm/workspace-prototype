@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext } from "react";
-import { bug } from "@conventions/nextjs/core";
+import { bug } from "@/lib/errors";
 import type { Connection, ProviderChoice } from "../contracts";
 
 export type Integrations = {
