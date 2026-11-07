@@ -1,19 +1,39 @@
 import "server-only";
+// The module's reads, straight on Drizzle. Every query names the user's id
+// (ARCHITECTURE.md, "Data ownership").
+import { and, asc, desc, eq } from "drizzle-orm";
 import type { User } from "@/lib/auth/user";
+import { db } from "@/lib/db/client";
+import { threadMessagesTable, threadsTable } from "@/lib/db/schema";
 import type { WorkspaceUIMessage } from "@/modules/agent";
-import { threadIdSchema } from "./contracts";
-import { type Thread } from "./contracts";
+import { threadIdSchema, type Thread } from "./contracts";
 import { wakeIfDue } from "./placement";
-import { threadRepository } from "./infra/thread.repository";
+import { toMessage, toThread } from "./rows";
 
 /** The signed-in user's threads, newest first, as they read now: a due snooze has woken. */
-export async function listThreads(
-  user: User,
-): Promise<Thread[]> {
+export async function listThreads(user: User): Promise<Thread[]> {
   const now = new Date();
-  return (await threadRepository.listByUser(user.id)).map((thread) =>
-    wakeIfDue(thread, now),
-  );
+  const rows = await db()
+    .select()
+    .from(threadsTable)
+    .where(eq(threadsTable.userId, user.id))
+    .orderBy(desc(threadsTable.createdAt));
+  return rows.map((row) => wakeIfDue(toThread(row), now));
+}
+
+/**
+ * One of the user's threads as stored, or null when they have none with this id. A due snooze
+ * still reads as snoozed here; a write applies `wakeIfDue` with its own clock.
+ */
+export async function findThread(
+  user: User,
+  id: string,
+): Promise<Thread | null> {
+  const [row] = await db()
+    .select()
+    .from(threadsTable)
+    .where(and(eq(threadsTable.userId, user.id), eq(threadsTable.id, id)));
+  return row ? toThread(row) : null;
 }
 
 /**
@@ -25,6 +45,15 @@ export async function listThreadMessages(
   threadId: string,
 ): Promise<WorkspaceUIMessage[]> {
   if (!threadIdSchema.safeParse(threadId).success) return [];
-  return threadRepository.listMessages(user.id, threadId);
+  const rows = await db()
+    .select()
+    .from(threadMessagesTable)
+    .where(
+      and(
+        eq(threadMessagesTable.userId, user.id),
+        eq(threadMessagesTable.threadId, threadId),
+      ),
+    )
+    .orderBy(asc(threadMessagesTable.position));
+  return rows.map(toMessage);
 }
-

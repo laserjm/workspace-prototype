@@ -17,7 +17,7 @@ import {
   toThread,
   toThreadChanges,
   toThreadRow,
-} from "./thread.mapper";
+} from "../rows";
 
 /** Runs a write; a violated constraint becomes a `ConstraintViolation`. */
 async function writing<T>(write: () => Promise<T>): Promise<T> {
