@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { aThread } from "@/tests/factories/thread";
 import {
   continueThread,
+  countTurn,
   createScope,
   forkThread,
   startThread,
@@ -49,6 +50,8 @@ describe("startThread", () => {
       createdAt: now.toISOString(),
       provider: "openai",
       scope,
+      turnCount: 0,
+      attachmentCount: 0,
     });
     expect(thread.scope?.recordIds).not.toBe(scope.recordIds);
   });
@@ -74,16 +77,35 @@ describe("continueThread", () => {
   });
 });
 
+describe("countTurn", () => {
+  it("adds a question and its attachments", () => {
+    const thread = countTurn(
+      aThread({ turnCount: 2, attachmentCount: 1 }),
+      3,
+    );
+    expect(thread).toMatchObject({ turnCount: 3, attachmentCount: 4 });
+  });
+});
+
 
 describe("forkThread", () => {
   it("copies the thread as active, keeps its project and scope, and names its origin", () => {
     const thread = aThread({
       title: "Fork: Sprint 24 summary",
       settledAt: now.toISOString(),
+      turnCount: 5,
+      attachmentCount: 2,
     });
-    const fork = forkThread(thread, 2, "fork-1", now);
+    const fork = forkThread(
+      thread,
+      { responseIndex: 2, counts: { turnCount: 3, attachmentCount: 1 } },
+      "fork-1",
+      now,
+    );
     expect(fork).toMatchObject({
       id: "fork-1",
+      turnCount: 3,
+      attachmentCount: 1,
       title: "Fork: Sprint 24 summary",
       createdAt: now.toISOString(),
       settledAt: undefined,

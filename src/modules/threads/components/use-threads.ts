@@ -11,6 +11,7 @@ import {
 } from "../actions";
 import {
   continueThread,
+  countTurn,
   type SnoozeTimeInPast,
   type StartThreadInput,
   type Thread,
@@ -132,6 +133,11 @@ export function useThreads(
           return next.ok ? next.value : latest;
         });
       return result;
+    },
+
+    /** Counts a question sent in the thread; the server counts it from the stored messages. */
+    countTurn(id: string, attachmentCount: number) {
+      update(id, (thread) => countTurn(thread, attachmentCount));
     },
 
     /**

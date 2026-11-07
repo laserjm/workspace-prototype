@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  conversationCounts,
   forkPoint,
   withLatestMessage,
   type ConversationMessage,
@@ -72,6 +73,26 @@ describe("forkPoint", () => {
     expect(forkPoint(conversation, messageId)).toEqual({
       ok: false,
       error: { _tag: "NotFound", entity: "Response", id: messageId },
+    });
+  });
+});
+
+describe("conversationCounts", () => {
+  it("counts the questions and their attachments, not the replies", () => {
+    expect(
+      conversationCounts([
+        { ...ask1, metadata: { attachments: ["plan.pdf", "notes.md"] } },
+        reply1,
+        ask2,
+        { ...reply2, metadata: { attachments: ["ignored.txt"] } },
+      ]),
+    ).toEqual({ turnCount: 2, attachmentCount: 2 });
+  });
+
+  it("counts nothing in an empty conversation", () => {
+    expect(conversationCounts([])).toEqual({
+      turnCount: 0,
+      attachmentCount: 0,
     });
   });
 });

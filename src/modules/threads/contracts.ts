@@ -38,7 +38,10 @@ export type Thread = ThreadPlacement & {
   provider: ModelProvider;
   forkedFrom?: { threadId: string; title: string; responseIndex: number };
   scope?: ThreadScope;
-};
+} & ConversationCounts;
+
+/** How much the thread's stored conversation holds: its questions and their attachments. */
+export type ConversationCounts = { turnCount: number; attachmentCount: number };
 
 /** The placement of an active thread, spread over a thread to clear the one it had. */
 export const ACTIVE: { [K in keyof Required<ThreadPlacement>]: undefined } = {
@@ -100,6 +103,9 @@ export function startThread(input: NewThread, now: Date): Thread {
     scope: input.scope
       ? { ...input.scope, recordIds: [...input.scope.recordIds] }
       : undefined,
+    // The first message is sent once the thread is stored.
+    turnCount: 0,
+    attachmentCount: 0,
   };
 }
 
@@ -116,19 +122,31 @@ export function continueThread(
   return ok({ ...thread, ...ACTIVE, provider });
 }
 
+/** The thread with one more question, carrying `attachmentCount` attachments. */
+export function countTurn(thread: Thread, attachmentCount: number): Thread {
+  return {
+    ...thread,
+    turnCount: thread.turnCount + 1,
+    attachmentCount: thread.attachmentCount + attachmentCount,
+  };
+}
+
 /**
  * An independent copy of the thread through response `responseIndex`, with the same project and
- * scope. The conversation through that response is copied with it (`forkPoint`).
+ * scope. The conversation through that response is copied with it (`forkPoint`); `counts` are
+ * that copy's.
  */
 export function forkThread(
   thread: Thread,
-  responseIndex: number,
+  through: { responseIndex: number; counts: ConversationCounts },
   id: string,
   now: Date,
 ): Thread {
+  const { responseIndex, counts } = through;
   return {
     ...thread,
     ...ACTIVE,
+    ...counts,
     id,
     title: `Fork: ${thread.title.replace(/^Fork: /, "")}`,
     createdAt: now.toISOString(),
@@ -156,7 +174,7 @@ export const threadIdSchema = z.uuid();
 
 /**
  * The POST body of /api/threads/[id]/messages: the thread's latest message, which the AI SDK chat
- * transport sends (`prepareSendMessagesRequest` in `ChatStore`); the URL names the thread. The
+ * transport sends (`prepareSendMessagesRequest` in `ThreadChat`); the URL names the thread. The
  * server holds the rest of the conversation, so a browser cannot rewrite it. The message is
  * validated with the conversation against the agent's tools.
  */

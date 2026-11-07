@@ -30,7 +30,7 @@ import {
   type Thread,
   type ThreadChange,
 } from "./contracts";
-import { forkPoint } from "./conversation";
+import { conversationCounts, forkPoint } from "./conversation";
 import {
   acknowledgeWake,
   restore,
@@ -88,7 +88,10 @@ export const forkThreadAction = action(
 
     const fork = forkThread(
       thread,
-      point.value.responseIndex,
+      {
+        responseIndex: point.value.responseIndex,
+        counts: conversationCounts(point.value.messages),
+      },
       input.id,
       new Date(),
     );
