@@ -41,10 +41,3 @@ export type ThreadRepository = {
     messages: readonly WorkspaceUIMessage[],
   ): Promise<void>;
 };
-
-/** The user's projects, as the projects module answers for them. */
-export type ProjectDirectory = {
-  exists(projectId: string): Promise<boolean>;
-};
-
-export type Clock = { now(): Date };

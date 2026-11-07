@@ -9,13 +9,18 @@ import { composeStack } from "@/tests/support/compose-stack";
 import { withUsers } from "@/tests/support/users";
 import { callAs } from "@/tests/support/session";
 import { aUser } from "@/tests/factories/user";
-import { answerThread, forkThread, placeThread, startThread } from "./commands";
+import {
+  forkThreadAction,
+  placeThreadAction,
+  startThreadAction,
+} from "./actions";
+import { answerThread } from "./commands";
 import type { WorkspaceUIMessage } from "@/modules/agent";
 import type { StartThreadInput, ThreadChange } from "./contracts";
 import { threadRepository } from "./infra/thread.repository";
 import { listThreadMessages, listThreads } from "./queries";
 
-// The projects module creates projects only through its action, which reads the session.
+// The actions read the session; callAs signs a test's user in.
 vi.mock("@/lib/auth/session", () => import("@/tests/support/session"));
 
 function aNewThread(
@@ -61,7 +66,7 @@ const conversation: WorkspaceUIMessage[] = [
  * these tests do not call; the repository stands in for that write.
  */
 async function aConversationOf(user: ReturnType<typeof aUser>) {
-  const thread = await startThread(user, aNewThread());
+  const thread = await callAs(user, startThreadAction, aNewThread());
   if (!thread.ok) throw new Error("the thread was not started");
   await threadRepository.saveMessages(
     user.id,
@@ -90,11 +95,10 @@ async function aProjectOf(user: ReturnType<typeof aUser>) {
   return project.value.id;
 }
 
-// Command-level: the commands and queries against the compose Postgres, with a user built
-// here instead of a session. Stands in for the use case's unit test and the repository's
-// integration test (ARCHITECTURE.md, "Command tests").
+// The actions as the browser calls them (sign-in, validation, the write) and the queries,
+// against the compose Postgres with users built here (ARCHITECTURE.md, "Command tests").
 describeIntegration(
-  "threads commands",
+  "threads actions",
   () => {
     const ana = aUser("test-threads-ana");
     const ben = aUser("test-threads-ben");
@@ -102,7 +106,7 @@ describeIntegration(
 
     it("starts a thread without a project, titled by its first message", async () => {
       const input = aNewThread();
-      const result = await startThread(ana, input);
+      const result = await callAs(ana, startThreadAction, input);
       expect(result).toEqual({
         ok: true,
         value: expect.objectContaining({
@@ -116,16 +120,30 @@ describeIntegration(
       expect(await listThreads(ana)).toContainEqual(result.ok && result.value);
     });
 
+    it("refuses a visitor and stores nothing", async () => {
+      const input = aNewThread();
+      expect(await callAs(null, startThreadAction, input)).toEqual({
+        ok: false,
+        error: { _tag: "SignedOut" },
+      });
+      const stored = (await listThreads(ana)).map((thread) => thread.id);
+      expect(stored).not.toContain(input.id);
+    });
+
     it("starts a thread in one of the user's projects", async () => {
       const projectId = await aProjectOf(ana);
-      const result = await startThread(ana, aNewThread({ projectId }));
+      const result = await callAs(
+        ana,
+        startThreadAction,
+        aNewThread({ projectId }),
+      );
       expect(result.ok && result.value.projectId).toBe(projectId);
     });
 
     it("refuses another user's project as if it did not exist", async () => {
       const projectId = await aProjectOf(ben);
       const input = aNewThread({ projectId });
-      expect(await startThread(ana, input)).toEqual({
+      expect(await callAs(ana, startThreadAction, input)).toEqual({
         ok: false,
         error: { _tag: "NotFound", entity: "Project", id: projectId },
       });
@@ -161,7 +179,7 @@ describeIntegration(
     it("forks through a response with a copy of the conversation up to it", async () => {
       const thread = await aConversationOf(ana);
       const id = randomUUID();
-      const result = await forkThread(ana, {
+      const result = await callAs(ana, forkThreadAction, {
         fromThreadId: thread.id,
         id,
         throughMessageId: "a1",
@@ -190,7 +208,7 @@ describeIntegration(
       const thread = await aConversationOf(ana);
       for (const throughMessageId of ["u2", "a9"])
         expect(
-          await forkThread(ana, {
+          await callAs(ana, forkThreadAction, {
             fromThreadId: thread.id,
             id: randomUUID(),
             throughMessageId,
@@ -205,7 +223,7 @@ describeIntegration(
       const thread = await aConversationOf(ben);
       const id = randomUUID();
       expect(
-        await forkThread(ana, {
+        await callAs(ana, forkThreadAction, {
           fromThreadId: thread.id,
           id,
           throughMessageId: "a1",
@@ -218,7 +236,7 @@ describeIntegration(
     });
 
     async function aStartedThreadOf(user: ReturnType<typeof aUser>) {
-      const thread = await startThread(user, aNewThread());
+      const thread = await callAs(user, startThreadAction, aNewThread());
       if (!thread.ok) throw new Error("the thread was not started");
       return thread.value;
     }
@@ -254,7 +272,7 @@ describeIntegration(
       },
     ])("$name a thread and keeps it there", async ({ change, placement }) => {
       const thread = await aStartedThreadOf(ana);
-      const result = await placeThread(ana, {
+      const result = await callAs(ana, placeThreadAction, {
         threadId: thread.id,
         change: change(),
       });
@@ -267,11 +285,11 @@ describeIntegration(
 
     it("restores a settled thread to active", async () => {
       const thread = await aStartedThreadOf(ana);
-      await placeThread(ana, {
+      await callAs(ana, placeThreadAction, {
         threadId: thread.id,
         change: { kind: "settle" },
       });
-      await placeThread(ana, {
+      await callAs(ana, placeThreadAction, {
         threadId: thread.id,
         change: { kind: "restore" },
       });
@@ -280,7 +298,7 @@ describeIntegration(
 
     it("reads a snooze whose time has come as woken, until the thread is opened", async () => {
       const thread = await aStartedThreadOf(ana);
-      await placeThread(ana, {
+      await callAs(ana, placeThreadAction, {
         threadId: thread.id,
         change: { kind: "return", placement: { snoozedUntil: anHourAgo() } },
       });
@@ -288,7 +306,7 @@ describeIntegration(
         snoozedUntil: undefined,
         wokeAt: expect.any(String),
       });
-      await placeThread(ana, {
+      await callAs(ana, placeThreadAction, {
         threadId: thread.id,
         change: { kind: "acknowledgeWake" },
       });
@@ -298,7 +316,7 @@ describeIntegration(
     it("refuses a snooze that ends in the past and keeps the thread as it was", async () => {
       const thread = await aStartedThreadOf(ana);
       expect(
-        await placeThread(ana, {
+        await callAs(ana, placeThreadAction, {
           threadId: thread.id,
           change: { kind: "snooze", until: anHourAgo() },
         }),
@@ -309,7 +327,7 @@ describeIntegration(
     // Ben cannot settle or snooze Ana's thread; it is a NotFound and her thread stays active.
     let placedThreadId = "";
     assertIsolation({
-      name: "placeThread, listThreads",
+      name: "placeThreadAction, listThreads",
       ownerA: ana.id,
       ownerB: ben.id,
       arrange: async (owner) => {
@@ -318,11 +336,11 @@ describeIntegration(
       read: (owner) => listed(aUser(owner), placedThreadId),
       change: async (owner) => {
         const ben = aUser(owner);
-        await placeThread(ben, {
+        await callAs(ben, placeThreadAction, {
           threadId: placedThreadId,
           change: { kind: "settle" },
         });
-        await placeThread(ben, {
+        await callAs(ben, placeThreadAction, {
           threadId: placedThreadId,
           change: { kind: "snooze", until: inAnHour() },
         });
@@ -332,16 +350,19 @@ describeIntegration(
     // Ben sending a thread id Ana already uses is refused; her thread stays as it was.
     const isolated = aNewThread();
     assertIsolation({
-      name: "startThread, listThreads",
+      name: "startThreadAction, listThreads",
       ownerA: ana.id,
       ownerB: ben.id,
-      arrange: (owner) => startThread(aUser(owner), isolated),
+      arrange: (owner) => callAs(aUser(owner), startThreadAction, isolated),
       read: async (owner) =>
         (await listThreads(aUser(owner))).filter(
           (thread) => thread.id === isolated.id,
         ),
       change: (owner) =>
-        startThread(aUser(owner), { ...isolated, prompt: "Taken over" }),
+        callAs(aUser(owner), startThreadAction, {
+          ...isolated,
+          prompt: "Taken over",
+        }),
     });
 
     // Ben cannot read Ana's conversation, and a chat turn on her thread is a 404 that stores
@@ -362,7 +383,7 @@ describeIntegration(
           conversationThreadId,
           aChatTurn(),
         );
-        await forkThread(aUser(owner), {
+        await callAs(aUser(owner), forkThreadAction, {
           fromThreadId: conversationThreadId,
           id: randomUUID(),
           throughMessageId: "a1",
