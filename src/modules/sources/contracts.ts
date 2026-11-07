@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { SourceRef } from "@/modules/integrations";
 
 export const RECORD_STATUSES = [
   "To do",
@@ -6,16 +7,21 @@ export const RECORD_STATUSES = [
   "In review",
   "Done",
 ] as const;
-
 export type RecordStatus = (typeof RECORD_STATUSES)[number];
 
 export const RECORD_PRIORITIES = ["High", "Medium", "Low"] as const;
 export type RecordPriority = (typeof RECORD_PRIORITIES)[number];
 
+/**
+ * A record of a source: a ticket, a page, a test case. A provider's reader produces it
+ * (integrations module, which imports this as a type).
+ */
 export type SourceRecord = {
+  /** Unique within its source; the provider reads it back by this id. */
   id: string;
   title: string;
   type: string;
+  /** The system's status mapped onto the workspace's four categories. */
   status: RecordStatus;
   priority: RecordPriority;
   owner: string;
@@ -26,9 +32,27 @@ export type SourceRecord = {
   updated: string;
 };
 
-/** An enterprise system and the records it exposes to a thread. */
+/** What a page of a source's records is asked for. Every field is optional. */
+export const recordQuerySchema = z.object({
+  text: z.string().max(200).optional(),
+  /** The `nextCursor` of the page before. */
+  cursor: z.string().max(500).optional(),
+});
+export type RecordQuery = z.infer<typeof recordQuerySchema>;
+
+export type RecordPage = {
+  records: SourceRecord[];
+  /** Set when there are more records; ask again with it as `cursor`. */
+  nextCursor?: string;
+};
+
+/** A collection of records in one of the user's connections, which a thread can attach. */
 export type Source = {
+  /** `<connectionId>:<sourceKey>`; see `sourceIdOf`. Threads store it. */
   id: string;
+  connectionId: string;
+  /** The mark `SourceIcon` draws, from the product's presentation. */
+  icon: string;
   name: string;
   description: string;
   workspace: string;
@@ -44,20 +68,37 @@ export type Source = {
   hasBoard: boolean;
   singular: string;
   plural: string;
-  records: SourceRecord[];
 };
+
+/** A source's id: its connection and its key there, e.g. "sample:jira". */
+export function sourceIdOf({ connectionId, sourceKey }: SourceRef) {
+  return `${connectionId}:${sourceKey}`;
+}
+
+/** The connection and key a source id names; `undefined` for an id that names neither. */
+export function sourceRefOf(sourceId: string): SourceRef | undefined {
+  const colon = sourceId.indexOf(":");
+  if (colon <= 0 || colon === sourceId.length - 1) return undefined;
+  return {
+    connectionId: sourceId.slice(0, colon),
+    sourceKey: sourceId.slice(colon + 1),
+  };
+}
 
 export function findSource(sources: readonly Source[], id: string) {
   return sources.find((source) => source.id === id);
 }
 
-/** The source's records whose ids are listed, in the source's order. */
-export function recordsIn(source: Source, recordIds: readonly string[]) {
-  return source.records.filter((record) => recordIds.includes(record.id));
+/** The records whose ids are listed, in the records' order. */
+export function recordsIn(
+  records: readonly SourceRecord[],
+  recordIds: readonly string[],
+) {
+  return records.filter((record) => recordIds.includes(record.id));
 }
 
-export function allRecordIds(source: Source) {
-  return source.records.map((record) => record.id);
+export function allRecordIds(records: readonly SourceRecord[]) {
+  return records.map((record) => record.id);
 }
 
 /** "1 ticket", "5 tickets". */

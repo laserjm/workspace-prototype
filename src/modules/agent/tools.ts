@@ -1,5 +1,6 @@
 import "server-only";
 import { skillTools } from "@/modules/skills/server";
+import type { User } from "@/lib/auth/user";
 import type { RecordScope } from "@/modules/sources";
 import { sourceTools } from "@/modules/sources/server";
 import type { AgentContext } from "./context";
@@ -24,10 +25,14 @@ export type ToolName = keyof typeof tools;
  * context the thread does not have is left out: `search_records` only with attached records,
  * `load_skill` only with skills to load.
  */
-export function toolsFor({ attached, offeredSkills }: AgentContext): {
+export function toolsFor({
+  user,
+  attached,
+  offeredSkills,
+}: AgentContext): {
   activeTools: ToolName[];
   toolsContext: {
-    search_records: { scope?: RecordScope };
+    search_records: { user: User; scope?: RecordScope };
     load_skill: { skillIds: string[] };
   };
 } {
@@ -43,7 +48,7 @@ export function toolsFor({ attached, offeredSkills }: AgentContext): {
       ...(skillIds.length > 0 ? (["load_skill"] as const) : []),
     ],
     toolsContext: {
-      search_records: { scope },
+      search_records: { user, scope },
       load_skill: { skillIds },
     },
   };

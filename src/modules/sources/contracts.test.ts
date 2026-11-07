@@ -6,32 +6,49 @@ import {
   recordCountLabel,
   recordsIn,
   searchRecords,
+  sourceIdOf,
+  sourceRefOf,
 } from "./contracts";
 
-describe("recordsIn", () => {
-  const source = aSource({
-    records: [
-      aSourceRecord({ id: "A-1" }),
-      aSourceRecord({ id: "A-2" }),
-      aSourceRecord({ id: "A-3" }),
-    ],
+describe("sourceIdOf and sourceRefOf", () => {
+  it.each([
+    { connectionId: "sample", sourceKey: "jira" },
+    { connectionId: "c-42", sourceKey: "laserjm/workspace-prototype" },
+    { connectionId: "c-7", sourceKey: "space:PLATFORM" },
+  ])("round-trips $connectionId and $sourceKey", (ref) => {
+    expect(sourceRefOf(sourceIdOf(ref))).toEqual(ref);
   });
+
+  it.each(["jira", ":jira", "sample:", ""])(
+    "names no source with %j",
+    (sourceId) => {
+      expect(sourceRefOf(sourceId)).toBeUndefined();
+    },
+  );
+});
+
+describe("recordsIn", () => {
+  const records = [
+    aSourceRecord({ id: "A-1" }),
+    aSourceRecord({ id: "A-2" }),
+    aSourceRecord({ id: "A-3" }),
+  ];
 
   it.each([
     { ids: ["A-3", "A-1"], expected: ["A-1", "A-3"] },
     { ids: ["A-2", "UNKNOWN"], expected: ["A-2"] },
     { ids: [], expected: [] },
   ])(
-    "returns $expected for $ids in the source's order",
+    "returns $expected for $ids in the records' order",
     ({ ids, expected }) => {
-      expect(recordsIn(source, ids).map((record) => record.id)).toEqual(
+      expect(recordsIn(records, ids).map((record) => record.id)).toEqual(
         expected,
       );
     },
   );
 
-  it("lists every record id of a source", () => {
-    expect(allRecordIds(source)).toEqual(["A-1", "A-2", "A-3"]);
+  it("lists every record id", () => {
+    expect(allRecordIds(records)).toEqual(["A-1", "A-2", "A-3"]);
   });
 });
 

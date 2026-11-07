@@ -52,13 +52,14 @@ unchanged).
 ### Data ownership
 
 **Decision.** Each signed-in user owns their threads, projects and skill
-preferences; there are no shared workspaces. The enterprise source catalogue and the skill
-catalogue are shared data. Shared workspaces, such as a team seeing each other's
+preferences; there are no shared workspaces. A user's sources come from their connections
+(see "Integrations are provider folders"); the provider and skill catalogues are shared data. Shared workspaces, such as a team seeing each other's
 threads or source connections configured once per organisation, would add an
 organisation to every owned row, recorded here when it comes.
 The owner is the signed-in Keycloak user, so the code says user: `User.id` (a `UserId`) is their
 `sub`, which is also `users.id` (see the sign-in). The four sign-in tables are Better Auth's,
-not owned data the app reads. The owned tables are `projects`, `threads` and `thread_messages`:
+not owned data the app reads. The owned tables are `projects`, `threads`, `thread_messages`, `connections` and
+`connection_secrets`:
 each row has a `user_id` referencing `users.id`, like `sessions` and `accounts` (deleting a user
 deletes what they own); a message's reference `(thread_id, user_id)` → `threads(id, user_id)`
 lets it belong only to a thread of the same user. Every query and repository method on owned
@@ -70,9 +71,12 @@ test (see "Command tests").
 
 ### Modules
 
-**Decision.** Five modules. `agent` (the runtime AI: the model allowlist, instructions, tools
+**Decision.** Six modules. `agent` (the runtime AI: the model allowlist, instructions, tools
 and the agent loop; see "Answers come from the Vercel AI Gateway"), `threads` (rich:
-conversations, settle, snooze, wake, fork, the live chat), `sources` (the enterprise systems and their records; a read-only domain),
+conversations, settle, snooze, wake, fork, the live chat), `integrations` (the providers the
+workspace connects to, the user's connections and what they read; a leaf that imports no other
+module), `sources` (the sources and records of the user's connections, the thread scope and the
+explorer; a read-only domain),
 `skills` (the skill catalogue and its activation in this browser) and `projects` (the project
 list, the add-project rule and the sidebar filter). `app/(workspace)/` composes them; its
 `_components/` hold the shell, sidebar, settings and new-thread heading, which only that route
@@ -88,9 +92,12 @@ by anything but `index` or `server` is an error); the `server-only` import in ev
 **Decision.** A module's `domain/` imports no value from another module, only a type such as
 `ModelProvider` from `agent`, so a
 thread refers to its source, records and skill by id (`ThreadScope = { sourceId, recordIds }`,
-`skillId`). Components resolve the ids through the other module's public API
+`skillId`; a source id is `<connectionId>:<sourceKey>`, `sourceIdOf` in `sources/contracts.ts`). Components resolve the ids through the other module's public API
 (`useSources().sourceById`, `useSkills().skillById`). Source-specific presentation (overview
-title, breadcrumb, board view, list label) is data on the source, not a branch on its id.
+title, breadcrumb, board view, list label, the icon `SourceIcon` draws) is data on the source,
+from its provider's product, not a branch on its id. The record vocabulary (`RECORD_STATUSES`,
+`SourceRecord`, `RecordQuery`, `RecordPage`) is `sources`'; `integrations` imports it as types
+only, so loading `sources` never loads the `integrations` components and actions.
 **Enforced by.** Review.
 **Recorded in.** This entry.
 
@@ -180,10 +187,13 @@ action fails (`useThreads`). Nothing runs at a snooze's deadline: a due snooze r
 at its deadline (`wakeIfDue`, in `listThreads` and before each change), and the browser wakes
 an open page's threads live (`useSnoozeWake`). Asking again returns a parked thread to active
 and stores the provider it now talks to (`answerThread`). Whether a response is in flight only
-the browser knows, so it refuses a snooze while one is. The source catalogue is read-only
-sample data in `sources/catalog.ts`; the skill catalogue is one
-`skills/catalog/<id>/SKILL.md` per skill (see "Skills are SKILL.md files"). Both are read through
-`queries.ts` and `server.ts`, and reach the browser through `SourcesProvider` and `SkillsProvider`. Skill activation and the source panel
+the browser knows, so it refuses a snooze while one is. A user's sources
+are read from their connections (see "Integrations are provider folders"); the skill catalogue
+is one `skills/catalog/<id>/SKILL.md` per skill (see "Skills are SKILL.md files"). Both are read
+through `queries.ts` and `server.ts`, and reach the browser through `SourcesProvider` and
+`SkillsProvider`. A source's records are not part of the page: the browser loads them from
+`GET /api/sources/[sourceId]/records` the first time a view needs them (`SourceRecordsStore`,
+`useSourceRecords`), and a new thread starts with all of them. Skill activation and the source panel
 width persist in `localStorage`; the stored skill ids are parsed with `storedSkillIdsSchema`. There are no cache tags: every read is per request, and an action returns what it
 stored, which the browser adds to its state.
 **Enforced by.** The `server-only` import in every `queries.ts`, `commands.ts` and `server.ts`
@@ -231,7 +241,7 @@ reads the user and hands them, the thread id and the body to `answerThread` from
 `threadIdSchema` (an id that is not a uuid is a 404) and the body with `chatTurnDtoSchema`, and
 runs the use case `application/answer-thread.ts`. The use case finds the thread among the
 user's (another user's thread is a `NotFound` like a missing one, answered with a 404), puts
-the new message after the stored conversation and hands both to `runAgent` from
+the new message after the stored conversation and hands both, with the user, to `runAgent` from
 `modules/agent/server.ts`. Once the agent answers, the thread returns to active and records the
 provider of the model that answered.
 
@@ -239,9 +249,11 @@ The `agent` module is the runtime AI, flat by file:
 - `run.ts`: `runAgent(request)` resolves the context, validates the conversation against the
   tools and streams the reply with an AI SDK `ToolLoopAgent` on the gateway (at most 5 steps),
   then hands the conversation to `onEnd`. It returns the response and the model.
-- `context.ts`: `resolveContext` turns the browser's ids into the model, skill and records
+- `context.ts`: `resolveContext` turns the browser's ids into the model, skill and records (the
+  scope's records are read for the user by `runAgent` first, through `listScopedRecords`)
   (unknown ids are `NotFound`, answered with a 400), so the prompt only ever holds what the
-  server offers. It also turns `skillIds`, the skills switched on in this browser, into
+  server offers. The `AgentContext` it returns carries the signed-in user, so a tool reads only
+  what is theirs. It also turns `skillIds`, the skills switched on in this browser, into
   `offeredSkills`: known ones only (a stale id is left out, not refused), without the picked
   skill.
 - `models.ts`: the model allowlist with gateway ids, and `listModelChoices` for the composer.
@@ -293,8 +305,9 @@ it.
 - **Context, not trust.** What a tool may see comes from the server, never from the model: the
   tool declares it with `contextSchema` (`{ scope?: RecordScope }`, ids as everywhere between
   modules), and `toolsFor` in `agent/tools.ts` fills it from the resolved `AgentContext`.
-  `search_records` reads through `listScopedRecords(scope)`, so a record outside the thread's
-  scope is never read, whatever the model asks. A tool whose context the thread lacks is not
+  `search_records` (context `{ user?, scope? }`) reads through `listScopedRecords(user, scope)`,
+  so a record outside the thread's scope or the user's connections is never read, whatever the
+  model asks. A tool whose context the thread lacks is not
   offered (`activeTools`), and its `execute` refuses anyway.
 - **Registration.** `agent/tools.ts` spreads the module's tools into `tools`, adds the tool's
   context to `toolsFor`, and `WorkspaceUITools` in `agent/contracts.ts` gets its types.
@@ -305,6 +318,64 @@ it.
 model, the call offers the tools and `execute` sees the thread's scope); `tsc`
 (`WorkspaceUITools`, `toolsContext`).
 **Recorded in.** This entry.
+
+### Integrations are provider folders
+
+**Decision.** `docs/adr/0002` chose one leaf module, `integrations`, with one folder per
+provider: a system the workspace connects to (`providers/sample/` and `providers/github/` today;
+Atlassian, codebeamer, PostHog, Stripe and Supabase are planned). A provider is
+`defineProvider({ id, name, description, auth, baseUrl?, verify?, records? })` (`contracts.ts`),
+registered by one line in `providers.ts`, and written in at most three files: `index.ts` (the
+manifest), `api.ts` (its HTTP calls, every response parsed with zod) and `records.ts` (its
+`RecordReader`, only with records). A provider's code is handed a `ProviderAccess` (the API
+address and the `Authorization` header value) and never reads a secret, an env var or the
+database. `auth` lists how a user connects: `none` (the sample), `token` (sent as `Bearer`) or
+`basic` (username and password, or an email and API token, sent as HTTP Basic); `verify` checks a
+credential and names the account.
+
+A connection is one user's link to one account of a provider at one address (`connections`,
+unique per user, provider, `base_url` and `account_ref`). `listConnections(user)` answers with
+the built-in sample connection, which every user has and nothing stores, then the stored ones.
+`connectAction` verifies the credential with the provider before anything is stored, then
+writes the connection and its credential in one transaction; connecting the same account again
+updates both. `testConnectionAction` asks the provider again (a refused credential is
+`needs_reconnect`; an unreachable provider changes nothing), and `disconnectAction` deletes the
+connection and, by cascade, its credential. The base URL must be HTTPS. Settings → Sources
+(`SourcesSettingsPanel`, the connect form built from the provider's `auth` and `baseUrl`) lists
+every provider and the user's connections; `IntegrationsProvider` holds them, and an action's
+answer goes into its state. `integrations/records.ts` runs a connection's reader for `sources`
+(`listConnectedSources`, `searchConnectionRecords`, `getConnectionRecords`); `sources` turns that
+into `Source`s, the scope's records and the records route. The sample records are the
+provider's `data.ts`; the stored threads' sample ids moved to `sample:<product>` in
+`drizzle/0006_rename-sample-source-ids.sql`. Unit tests that read sources swap the connection
+query for `tests/support/connections.ts` (the sample connection alone), so they need no Postgres.
+**Enforced by.** `integrations/providers.test.ts` (every provider in the registry: unique ids, a
+way to connect, a base URL and `verify` when it takes a credential, sources in a declared
+product, records read back by id in order, nothing for an unknown key);
+`integrations/actions.integration.test.ts` (connect, reconnect, refusals, test, disconnect, a
+visitor, `assertIsolation()`); `providers/github/api.test.ts`; `sources/queries.test.ts`; `tsc`.
+**Recorded in.** This entry; `docs/adr/0002-integrations.md`.
+
+### Connection credentials live in the vault
+
+**Decision.** A credential is stored only in `connection_secrets`, one row per connection, as
+AES-256-GCM ciphertext (`integrations/cipher.ts`, pure) whose authenticated data binds it to its
+connection and user, so a copy in another row does not decrypt. The keys are `INTEGRATION_KEYS`
+(`lib/env.ts`): `<version>:<32-byte base64 key>`, the newest first; new secrets use the first,
+and `key_version` names the one a row used, so a key is rotated by adding a version in front and
+re-encrypting. It is separate from `BETTER_AUTH_SECRET`. `integrations/vault.ts` is the only
+reader and writer of the table, and reads the key ring on first use. `access.ts` turns a
+connection into a `ConnectionAccess` per request, the only form in which a credential leaves the
+vault. Nothing returns, logs or renders a credential: `Connection` has no secret field, and the
+connect form never shows a stored token. Better Auth's `accounts` stays the sign-in identity; it
+holds no integration tokens.
+**Enforced by.** ESLint `no-restricted-imports` (`eslint.config.mjs`: only `vault.ts` and the
+module's integration tests import `connectionSecretsTable`); other modules reach `integrations`
+only through `index.ts` and `server.ts`, which export neither the vault nor `accessFor`;
+`integrations/cipher.test.ts` (round trip, a fresh iv, the wrong binding, a changed ciphertext,
+an older key version); `integrations/actions.integration.test.ts` (the stored row holds no
+token; another user's read is no credential).
+**Recorded in.** This entry; `docs/adr/0002-integrations.md`; `.env.example`.
 
 ### Skills are SKILL.md files
 

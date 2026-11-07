@@ -29,7 +29,7 @@ import {
 import { RecordStatusBadge } from "./record-status-badge";
 import { ResizableSourcePanel } from "./resizable-source-panel";
 import { SourceIcon } from "./source-icon";
-import { useSources } from "./use-sources";
+import { useSourceRecords, useSources } from "./use-sources";
 
 const PRIORITY_DOTS: Record<RecordPriority, string> = {
   High: "bg-red-300 dark:bg-red-400",
@@ -86,7 +86,9 @@ export function SourceExplorer({
     () => false,
   );
   const source = useSources().sourceById(sourceId);
-  const records = recordsIn(source, recordIds);
+  const load = useSourceRecords(sourceId);
+  const records =
+    load.status === "ready" ? recordsIn(load.records, recordIds) : [];
   const selected = records.find((record) => record.id === selectedId);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("All statuses");
@@ -108,7 +110,7 @@ export function SourceExplorer({
       aria-label={`${source.name} source explorer`}
     >
       <div className="flex shrink-0 items-center gap-2 px-4 pt-4 pb-3">
-        <SourceIcon id={source.id} />
+        <SourceIcon icon={source.icon} />
         <div className="min-w-0">
           <strong className="block text-sm font-medium text-secondary-foreground">
             {source.name}
@@ -264,8 +266,8 @@ export function SourceExplorer({
           <div className="flex shrink-0 items-center px-4 pb-2.5 text-3xs text-muted-foreground/70">
             {filtered.length} of {records.length} {source.plural}
             <span className="ml-auto inline-flex items-center gap-1 text-muted-foreground">
-              <Check size={12} />
-              Loaded
+              {load.status === "ready" && <Check size={12} />}
+              {LOAD_LABELS[load.status]}
             </span>
           </div>
           <div
@@ -307,9 +309,15 @@ export function SourceExplorer({
                     onClick={() => onSelect(record.id)}
                   />
                 ))}
-            {!filtered.length && (
+            {load.status === "ready" && !filtered.length && (
               <p className={noResultsClassName}>
                 No matching {source.plural}. Try another search or status.
+              </p>
+            )}
+            {load.status === "failed" && (
+              <p className={noResultsClassName}>
+                The {source.plural} could not be loaded. Close and open the
+                explorer to try again.
               </p>
             )}
           </div>
@@ -346,6 +354,12 @@ export function SourceExplorer({
     );
   return <ResizableSourcePanel>{content}</ResizableSourcePanel>;
 }
+
+const LOAD_LABELS = {
+  loading: "Loading…",
+  failed: "Not loaded",
+  ready: "Loaded",
+} as const;
 
 const detailHeading = "mt-5 mb-2 text-xs font-medium text-accent-foreground";
 const detailText = "text-xs leading-loose text-muted-foreground";

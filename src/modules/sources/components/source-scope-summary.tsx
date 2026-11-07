@@ -27,7 +27,7 @@ export function SourceScopeSummary({
     >
       {showSource && (
         <>
-          <SourceIcon id={source.id} size="sm" />
+          <SourceIcon icon={source.icon} size="sm" />
           <strong className="font-medium text-accent-foreground">
             {source.name}
           </strong>

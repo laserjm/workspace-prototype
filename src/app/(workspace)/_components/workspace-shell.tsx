@@ -72,7 +72,7 @@ export function WorkspaceShell({
   models: ModelChoice[];
   user: { name: string; email: string };
 }) {
-  const { sourceById } = useSources();
+  const { sourceById, loadRecords } = useSources();
   const [threadNotice, setThreadNotice] = useState<{
     message: string;
     undo?: {
@@ -222,8 +222,14 @@ export function WorkspaceShell({
   }
 
   function chooseSource(sourceId: string) {
-    const scope = createScope(sourceId, allRecordIds(sourceById(sourceId)));
-    setDraftScope(scope.ok ? scope.value : undefined);
+    // A new thread starts with all of the source's records; the scope dialog narrows them.
+    loadRecords(sourceId).then(
+      (records) => {
+        const scope = createScope(sourceId, allRecordIds(records));
+        setDraftScope(scope.ok ? scope.value : undefined);
+      },
+      () => setDraftScope(undefined),
+    );
     if (activeThread) {
       setProjectId(currentProjectId);
       navigate(null);
@@ -665,7 +671,6 @@ export function WorkspaceShell({
                 enabledSkills={enabledSkills}
                 onToggleSkill={toggleSkill}
                 project={currentProject}
-                onSources={() => setDialog("sources")}
               />
             )}
 

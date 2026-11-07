@@ -10,6 +10,7 @@ import {
   index,
   integer,
   jsonb,
+  pgEnum,
   pgTable,
   primaryKey,
   text,
@@ -233,6 +234,93 @@ export const threadMessagesTable = pgTable(
       name: "thread_messages_thread_id_user_id_fkey",
       columns: [table.threadId, table.userId],
       foreignColumns: [threadsTable.id, threadsTable.userId],
+    }).onDelete("cascade"),
+  ],
+);
+
+// ---- Connections (ARCHITECTURE.md "Integrations are provider folders") -------------------------
+// A user's links to the systems the workspace connects to. The secret is in its own table, which
+// only modules/integrations/vault.ts reads or writes (ESLint), so listing connections never
+// touches it.
+
+export const connectionAuthKindEnum = pgEnum("connection_auth_kind", [
+  "token",
+  "basic",
+]);
+
+/** `needs_reconnect`: the provider refused the stored credential; the user connects again. */
+export const connectionStatusEnum = pgEnum("connection_status", [
+  "active",
+  "needs_reconnect",
+]);
+
+/**
+ * One user's link to one account of a provider at one address. Connecting the same account
+ * again updates the row (`connections_user_id_provider_id_base_url_account_ref_key`).
+ */
+export const connectionsTable = pgTable(
+  "connections",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => usersTable.id, { onDelete: "cascade" }),
+    providerId: text("provider_id").notNull(),
+    /** The API address: https://api.github.com, a GitHub Enterprise or codebeamer instance. */
+    baseUrl: text("base_url").notNull(),
+    /** The provider's stable id for the account, e.g. GitHub's numeric user id. */
+    accountRef: text("account_ref").notNull(),
+    /** Who it is connected as, e.g. "@micha". */
+    accountLabel: text("account_label").notNull(),
+    authKind: connectionAuthKindEnum("auth_kind").notNull(),
+    status: connectionStatusEnum("status").notNull().default("active"),
+    scopes: text("scopes").array().notNull().default(sql`'{}'::text[]`),
+    /** When the credential stops working, if the provider says. */
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    lastVerifiedAt: timestamp("last_verified_at", {
+      withTimezone: true,
+    }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("connections_user_id_provider_id_base_url_account_ref_key").on(
+      table.userId,
+      table.providerId,
+      table.baseUrl,
+      table.accountRef,
+    ),
+    // The target of connection_secrets' (connection_id, user_id) reference.
+    unique("connections_id_user_id_key").on(table.id, table.userId),
+  ],
+);
+
+/**
+ * A connection's credential, AES-256-GCM encrypted (`vault.ts`): `iv` and `ciphertext` (with its
+ * tag) in base64, under the key `key_version` names, bound to the connection and user. Deleting
+ * the connection deletes it.
+ */
+export const connectionSecretsTable = pgTable(
+  "connection_secrets",
+  {
+    connectionId: uuid("connection_id").primaryKey(),
+    userId: text("user_id").notNull(),
+    keyVersion: integer("key_version").notNull(),
+    iv: text("iv").notNull(),
+    ciphertext: text("ciphertext").notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    foreignKey({
+      name: "connection_secrets_connection_id_user_id_fkey",
+      columns: [table.connectionId, table.userId],
+      foreignColumns: [connectionsTable.id, connectionsTable.userId],
     }).onDelete("cascade"),
   ],
 );

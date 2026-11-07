@@ -2,6 +2,7 @@
 // offered and to what a tool's execute sees. No gateway, no network.
 import { MockLanguageModelV4 } from "ai/test";
 import { describe, expect, it, vi } from "vitest";
+import { aUser } from "@/tests/factories/user";
 import type { WorkspaceUIMessage } from "./contracts";
 import { runAgent } from "./run";
 
@@ -31,6 +32,11 @@ const reply = () =>
     finish("stop"),
   ]);
 
+// The sample connection alone, without the compose Postgres.
+vi.mock("@/modules/integrations/queries", () =>
+  import("@/tests/support/connections"),
+);
+
 const { model } = vi.hoisted(() => ({ model: { current: undefined as unknown } }));
 vi.mock("./models", () => ({
   get models() {
@@ -50,6 +56,7 @@ vi.mock("./models", () => ({
 async function run(options: Parameters<typeof runAgent>[0]["options"]) {
   let stored: WorkspaceUIMessage[] = [];
   const result = await runAgent({
+    user: aUser("ana"),
     options,
     messages: [
       { id: "u1", role: "user", parts: [{ type: "text", text: "Which are in review?" }] },
@@ -76,7 +83,7 @@ describe("runAgent", () => {
   });
 
   it("lets the model search the attached records, and only those", async () => {
-    const scope = { sourceId: "jira", recordIds: ["PLAT-124", "PLAT-125", "PLAT-127"] };
+    const scope = { sourceId: "sample:jira", recordIds: ["PLAT-124", "PLAT-125", "PLAT-127"] };
     const mock = new MockLanguageModelV4({
       doStream: [
         step([

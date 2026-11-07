@@ -20,7 +20,9 @@ export function aSourceRecord(
 
 export function aSource(overrides: Partial<Source> = {}): Source {
   return {
-    id: "jira",
+    id: "sample:jira",
+    connectionId: "sample",
+    icon: "jira",
     name: "Jira",
     description: "Tickets",
     workspace: "Acme",
@@ -32,7 +34,6 @@ export function aSource(overrides: Partial<Source> = {}): Source {
     hasBoard: false,
     singular: "ticket",
     plural: "tickets",
-    records: [aSourceRecord()],
     ...overrides,
   };
 }

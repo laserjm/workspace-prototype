@@ -8,9 +8,10 @@ import {
   type ThemePreference,
 } from "@/lib/theme/theme";
 import { useThemePreference } from "@/lib/theme/use-theme-preference";
+import { SourcesSettingsPanel } from "@/modules/integrations";
 import { SkillSettingsPanel } from "@/modules/skills";
 
-export type SettingsSection = "general" | "skills";
+export type SettingsSection = "general" | "skills" | "sources";
 
 const THEME_LABELS: Record<ThemePreference, string> = {
   system: "System",
@@ -35,14 +36,12 @@ export function WorkspaceSettings({
   enabledSkills,
   onToggleSkill,
   project,
-  onSources,
 }: {
   section: SettingsSection;
   onSection: (section: SettingsSection) => void;
   enabledSkills: string[];
   onToggleSkill: (id: string) => void;
   project: string | null;
-  onSources: () => void;
 }) {
   const [skillQuery, setSkillQuery] = useState("");
   const theme = useThemePreference();
@@ -72,6 +71,15 @@ export function WorkspaceSettings({
           <span className="ml-auto text-3xs text-muted-foreground/70">
             {enabledSkills.length}
           </span>
+        </button>
+        <button
+          type="button"
+          className={navButton}
+          aria-pressed={section === "sources"}
+          onClick={() => onSection("sources")}
+        >
+          <Cable />
+          Sources
         </button>
       </nav>
       {section === "general" ? (
@@ -110,7 +118,7 @@ export function WorkspaceSettings({
           </div>
           <Button
             variant="outline"
-            onClick={onSources}
+            onClick={() => onSection("sources")}
             className="[&_svg]:text-icon-muted"
           >
             <Cable />
@@ -122,6 +130,8 @@ export function WorkspaceSettings({
             browser.
           </p>
         </section>
+      ) : section === "sources" ? (
+        <SourcesSettingsPanel />
       ) : (
         <SkillSettingsPanel
           enabledSkills={enabledSkills}

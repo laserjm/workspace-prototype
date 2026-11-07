@@ -36,6 +36,7 @@ export async function answerThread(
 
   const stored = await threads.listMessages(user.id, thread.id);
   const run = await agent({
+    user,
     options,
     messages: withLatestMessage<ConversationMessage>(stored, message),
     signal,
