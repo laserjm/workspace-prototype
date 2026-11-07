@@ -10,6 +10,8 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## Project conventions
 
+- Name things with the terms in `GLOSSARY.md`. A new or renamed domain term changes it in the
+  same change.
 - Read `ARCHITECTURE.md` before changing structure. Each entry records a decision and what
   enforces it; change the entry together with the decision.
 - Another module is reached only through its `index.ts` (browser-safe) or `server.ts`
