@@ -42,7 +42,7 @@ async function aProjectOf(user: ReturnType<typeof aUser>) {
 }
 
 // The actions as the browser calls them (sign-in, validation, the write) and the queries,
-// against the compose Postgres with users built here (ARCHITECTURE.md, "Command tests").
+// against the compose Postgres with users built here (ARCHITECTURE.md, "Integration tests").
 describeIntegration(
   "threads actions",
   () => {

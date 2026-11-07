@@ -43,7 +43,7 @@ const secretRows = (connectionId: string) =>
     .where(eq(connectionSecretsTable.connectionId, connectionId));
 
 // The actions as the browser calls them, against the compose Postgres, with GitHub's /user
-// answered here (ARCHITECTURE.md "Command tests").
+// answered here (ARCHITECTURE.md "Integration tests").
 describeIntegration(
   "integrations actions",
   () => {

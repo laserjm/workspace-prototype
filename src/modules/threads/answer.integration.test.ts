@@ -83,7 +83,7 @@ async function listed(user: ReturnType<typeof aUser>, id: string) {
 }
 
 // The chat route's answer against the compose Postgres, with the agent faked
-// (ARCHITECTURE.md, "Command tests").
+// (ARCHITECTURE.md, "Integration tests").
 describeIntegration(
   "threads answer",
   () => {
