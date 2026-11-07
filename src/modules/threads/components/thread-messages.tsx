@@ -2,14 +2,13 @@
 
 import { Fragment, useLayoutEffect, useRef, type ReactNode } from "react";
 import { FileText } from "lucide-react";
-import { useChat } from "@ai-sdk/react";
 import { Markdown } from "@/components/ui/markdown";
 import { cn } from "@/lib/utils";
 import type { ModelChoice, WorkspaceUIMessage } from "@/modules/agent";
 import type { Thread } from "../contracts";
 import { attachmentChipClassName } from "./attachment-chip";
 import { LiveResponse } from "./live-response";
-import { useChatStore, useConversationLoad } from "./use-chat-store";
+import type { StoredConversation } from "./use-stored-conversation";
 
 export type ForkTarget = { messageId: string; responseIndex: number };
 
@@ -19,9 +18,15 @@ const errorNotice =
 // Keep following the stream while the reader is within this distance of the end.
 const PINNED_DISTANCE = 80;
 
-/** The thread's messages from its chat. */
+/** The thread's messages, as its chat holds them. */
 export function ThreadMessages({
   thread,
+  messages,
+  inFlight,
+  error,
+  load,
+  onReload,
+  onRetry,
   models,
   onFork,
   laneClassName,
@@ -29,6 +34,15 @@ export function ThreadMessages({
   leading,
 }: {
   thread: Thread;
+  messages: WorkspaceUIMessage[];
+  /** A response is in flight. */
+  inFlight: boolean;
+  /** Why the last response did not finish. */
+  error?: Error;
+  /** Where loading the stored conversation is. */
+  load: StoredConversation["state"];
+  onReload: () => void;
+  onRetry: () => void;
   models: ModelChoice[];
   onFork: (target: ForkTarget) => void;
   /** The centred column the messages sit in; the list scrolls across the full width. */
@@ -38,11 +52,6 @@ export function ThreadMessages({
   /** The first row of the list, which scrolls away with the messages. */
   leading?: ReactNode;
 }) {
-  const store = useChatStore();
-  const load = useConversationLoad(thread.id);
-  const { messages, status, error } = useChat({
-    chat: store.getChat(thread.id),
-  });
   const scrollRef = useRef<HTMLDivElement>(null);
   const pinned = useRef(messages.length > 0);
   const lastUserId = messages.findLast(
@@ -76,7 +85,6 @@ export function ThreadMessages({
     return () => observer.disconnect();
   }, []);
 
-  const inFlight = status === "submitted" || status === "streaming";
   const last = messages.at(-1);
   let responseIndex = 0;
 
@@ -166,7 +174,7 @@ export function ThreadMessages({
         {load === "failed" && messages.length === 0 && (
           <div className={errorNotice} role="alert">
             <span>The conversation could not be loaded.</span>
-            <button type="button" onClick={() => void store.load(thread.id)}>
+            <button type="button" onClick={onReload}>
               Try again
             </button>
           </div>
@@ -174,7 +182,7 @@ export function ThreadMessages({
         {error && !inFlight && (
           <div className={errorNotice} role="alert">
             <span>The response did not finish. {error.message}</span>
-            <button type="button" onClick={() => void store.retry(thread.id)}>
+            <button type="button" onClick={onRetry}>
               Try again
             </button>
           </div>

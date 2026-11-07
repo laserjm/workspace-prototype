@@ -34,7 +34,8 @@ import { useSnoozeWake } from "./use-snooze-wake";
  * Settle, snooze, restore, undo and acknowledging a wake show at once through a domain function
  * and are then stored; a thread the server would not change goes back where it was, and
  * `onPlacementNotStored` says so. A snooze wakes here at its deadline, and the server reads it as
- * woken from then on. Conversations live in the `ChatStore`; `working` comes from there.
+ * woken from then on. The conversation is not here: the open thread's chat loads it from the
+ * server (`ThreadConversation`); a thread only counts the questions it is sent.
  */
 export function useThreads(
   initialThreads: Thread[],

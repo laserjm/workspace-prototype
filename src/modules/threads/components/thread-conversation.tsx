@@ -4,11 +4,18 @@ import { useLayoutEffect, useRef, type ReactNode } from "react";
 import { ChevronDown, GitFork } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { recordCountLabel, SourceIcon, useSources } from "@/modules/sources";
-import type { ModelChoice } from "@/modules/agent";
+import type { ModelChoice, WorkspaceUIMessage } from "@/modules/agent";
 import { type Thread } from "../contracts";
 import { shelfOf } from "../placement";
 import { ThreadMessages, type ForkTarget } from "./thread-messages";
 import { formatWakeTime } from "./time-format";
+import { useStoredConversation } from "./use-stored-conversation";
+import {
+  LOADING_CONTROLS,
+  useThreadChat,
+  type ConversationControls,
+  type FirstQuestion,
+} from "./use-thread-chat";
 
 /**
  * The centred column a conversation's content sits in. The conversation itself
@@ -22,23 +29,107 @@ function conversationLane(inSourceSession: boolean) {
     : "mx-auto w-[min(var(--workspace-composer-width),calc(100%-4rem))] max-desktop:w-[calc(100%-3rem)] max-md:w-[calc(100%-1.75rem)]";
 }
 
-/** An open thread: its placement, origin, source, messages and responses, then the composer. */
-export function ThreadConversation({
-  thread,
-  models,
-  composer,
-  onRestore,
-  onOpenThread,
-  onViewSource,
-  onFork,
-}: {
+type ThreadConversationProps = {
   thread: Thread;
   models: ModelChoice[];
-  composer: ReactNode;
+  /** The skills switched on in this browser, which a retry passes on. */
+  enabledSkills: string[];
+  /** The composer, given what it can do with the conversation. */
+  composer: (controls: ConversationControls) => ReactNode;
+  /** The first question of a thread this page just started: it opens empty and sends it. */
+  firstQuestion?: FirstQuestion;
+  onFirstQuestionSent?: () => void;
+  /** Whether a response is in flight; only the open thread can have one. */
+  onWorkingChange: (working: boolean) => void;
   onRestore: () => void;
   onOpenThread: (id: string) => void;
   onViewSource: () => void;
   onFork: (target: ForkTarget) => void;
+};
+
+/**
+ * An open thread: its placement, origin, source, messages and responses, then the composer.
+ * It opens with the conversation the database holds; key it by the thread's id.
+ */
+export function ThreadConversation(props: ThreadConversationProps) {
+  const { conversation, reload } = useStoredConversation(
+    props.thread.id,
+    Boolean(props.firstQuestion),
+  );
+  if (conversation.state === "ready")
+    return (
+      <LiveConversation {...props} initialMessages={conversation.messages} />
+    );
+  return (
+    <ConversationLayout
+      {...props}
+      composer={props.composer(LOADING_CONTROLS)}
+      list={(lane) => (
+        <ThreadMessages
+          {...lane}
+          thread={props.thread}
+          messages={[]}
+          inFlight={false}
+          load={conversation.state}
+          onReload={reload}
+          onRetry={() => undefined}
+          models={props.models}
+          onFork={props.onFork}
+        />
+      )}
+    />
+  );
+}
+
+/** The thread's chat, opened with its stored conversation. */
+function LiveConversation({
+  initialMessages,
+  ...props
+}: ThreadConversationProps & { initialMessages: WorkspaceUIMessage[] }) {
+  const chat = useThreadChat({ ...props, initialMessages });
+  return (
+    <ConversationLayout
+      {...props}
+      composer={props.composer(chat.controls)}
+      list={(lane) => (
+        <ThreadMessages
+          {...lane}
+          thread={props.thread}
+          messages={chat.messages}
+          inFlight={chat.busy}
+          error={chat.error}
+          load="ready"
+          onReload={() => undefined}
+          onRetry={chat.retry}
+          models={props.models}
+          onFork={props.onFork}
+        />
+      )}
+    />
+  );
+}
+
+/** Where the message list sits, which the layout works out. */
+type ListLane = {
+  laneClassName: string;
+  fadeTop: boolean;
+  leading: ReactNode;
+};
+
+function ConversationLayout({
+  thread,
+  composer,
+  list,
+  onRestore,
+  onOpenThread,
+  onViewSource,
+}: {
+  thread: Thread;
+  composer: ReactNode;
+  list: (lane: ListLane) => ReactNode;
+  onRestore: () => void;
+  onOpenThread: (id: string) => void;
+  onViewSource: () => void;
 }) {
   const { sourceById } = useSources();
   const source = thread.scope ? sourceById(thread.scope.sourceId) : undefined;
@@ -138,15 +229,11 @@ export function ThreadConversation({
           </div>
         </div>
       )}
-      <ThreadMessages
-        key={`conversation:${thread.id}`}
-        thread={thread}
-        models={models}
-        onFork={onFork}
-        laneClassName={lane}
-        fadeTop={!hasTopRows}
-        leading={forkOrigin}
-      />
+      {list({
+        laneClassName: lane,
+        fadeTop: !hasTopRows,
+        leading: forkOrigin,
+      })}
       {/* Over the list's end: messages fade out in a short strip above the
           composer, then pass behind a solid backdrop. Only the composer
           itself takes clicks. */}

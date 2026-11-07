@@ -163,17 +163,23 @@ the user's a `NotFound`.
 
 The conversation follows the AI SDK's message persistence: one `thread_messages` row per
 `UIMessage`, with `parts` and `metadata` in `jsonb` as streamed, ordered by `position`, keyed
-`(thread_id, id)` so a fork copies messages under their ids. The chat sends only its latest
-message (`prepareSendMessagesRequest` in `ChatStore`); the server puts it after the stored
+`(thread_id, id)` so a fork copies messages under their ids. The database is the only copy:
+the browser keeps no conversation between openings of a thread. The open thread has one AI SDK
+`useChat` (`useThreadChat`), which opens with the conversation fetched from
+`GET /api/threads/[id]/messages` each time the thread opens (`useStoredConversation`; a thread
+the page just started opens empty and its chat sends the first question). The chat sends only
+its latest message (`prepareSendMessagesRequest`); the server puts it after the stored
 conversation, or in its old place when it is sent again, dropping what came after it, which is
 how a regenerate replaces a reply (`withLatestMessage`, `threads/conversation.ts`). When the
 reply ends, finished, stopped or failed, `runAgent` hands the conversation with the
 reply to `saveConversation` (`threads/answer.ts`), which replaces the stored one in a
 transaction; the stream is read to
 its end on the server (`consumeSseStream`) so the reply is stored even if the browser went away.
-The server names the replies (`generateMessageId`). A thread's chat loads its conversation from
-`GET /api/threads/[id]/messages` the first time it opens; a chat this page started already has
-it. A fork is stored first, with the conversation through the chosen response, then opened
+The server names the replies (`generateMessageId`). Leaving a thread stops its response, as
+closing the page does: `useChat` stops its chat when it unmounts, and the reply is stored as it
+ended. A question stores the model and skill it asked for, which a retry asks again
+(`lastRequest`). `listThreads` counts each thread's stored questions and attachments for the
+sidebar. A fork is stored first, with the conversation through the chosen response, then opened
 (`forkPoint`; a question or a response not stored yet is a `NotFound`); its origin is a snapshot
 in `forked_from_*`, not a reference.
 
@@ -187,7 +193,8 @@ action fails (`useThreads`). Nothing runs at a snooze's deadline: a due snooze r
 at its deadline (`wakeIfDue`, in `listThreads` and before each change), and the browser wakes
 an open page's threads live (`useSnoozeWake`). Asking again returns a parked thread to active
 and stores the provider it now talks to (`answerThread`). Whether a response is in flight only
-the browser knows, so it refuses a snooze while one is. A user's sources
+the browser knows, and only the open thread can have one; the browser refuses a snooze while it
+does. A user's sources
 are read from their connections (see "Integrations are provider folders"); the skill catalogue
 is one `skills/catalog/<id>/SKILL.md` per skill (see "Skills are SKILL.md files"). Both are read
 through `queries.ts` and `server.ts`, and reach the browser through `SourcesProvider` and

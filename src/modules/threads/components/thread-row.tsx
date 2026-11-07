@@ -26,7 +26,6 @@ import { shelfOf, snoozePresets } from "../placement";
 import { ProviderIcon } from "./provider-icon";
 import { ThreadContextCard } from "./thread-context-card";
 import { formatAge, formatWakeTime } from "./time-format";
-import { useThreadWorking } from "./use-chat-store";
 
 // Shown on hover, focus, while the snooze menu is open, and always on touch screens.
 const revealed =
@@ -43,6 +42,7 @@ export function ThreadRow({
   thread,
   projectName,
   active,
+  working,
   onSelect,
   onSettle,
   onRestore,
@@ -54,6 +54,8 @@ export function ThreadRow({
   /** The thread's project, or "No project". */
   projectName: string;
   active: boolean;
+  /** A response is in flight. */
+  working: boolean;
   onSelect: () => void;
   onSettle: () => void;
   onRestore: () => void;
@@ -66,7 +68,6 @@ export function ThreadRow({
   const { sourceById } = useSources();
   const source = thread.scope ? sourceById(thread.scope.sourceId) : undefined;
   const shelf = shelfOf(thread);
-  const working = useThreadWorking(thread.id);
   const restoreLabel = shelf === "snoozed" ? "Wake thread" : "Un-settle thread";
   return (
     <div
