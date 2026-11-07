@@ -8,83 +8,29 @@ import { createProjectAction } from "@/modules/projects/server";
 import { composeStack } from "@/tests/support/compose-stack";
 import { withUsers } from "@/tests/support/users";
 import { callAs } from "@/tests/support/session";
+import { aConversation, aNewThread } from "@/tests/factories/thread";
 import { aUser } from "@/tests/factories/user";
 import {
   forkThreadAction,
   placeThreadAction,
   startThreadAction,
 } from "./actions";
-import { answerThread } from "./commands";
-import type { WorkspaceUIMessage } from "@/modules/agent";
-import type { StartThreadInput, ThreadChange } from "./contracts";
-import { threadRepository } from "./infra/thread.repository";
+import { saveConversation } from "./answer";
+import type { ThreadChange } from "./contracts";
 import { listThreadMessages, listThreads } from "./queries";
 
 // The actions read the session; callAs signs a test's user in.
 vi.mock("@/lib/auth/session", () => import("@/tests/support/session"));
 
-function aNewThread(
-  overrides: Partial<StartThreadInput> = {},
-): StartThreadInput {
-  return {
-    id: randomUUID(),
-    projectId: null,
-    prompt: "Summarize these tickets",
-    provider: "claude",
-    scope: { sourceId: "jira", recordIds: ["PLAT-124", "PLAT-125"] },
-    ...overrides,
-  };
-}
-
-const conversation: WorkspaceUIMessage[] = [
-  {
-    id: "u1",
-    role: "user",
-    parts: [{ type: "text", text: "Summarize these tickets" }],
-    metadata: { createdAt: "2026-11-05T09:00:00.000Z" },
-  },
-  {
-    id: "a1",
-    role: "assistant",
-    parts: [{ type: "text", text: "Two tickets are blocked." }],
-    metadata: { modelId: "opus", completedAt: "2026-11-05T09:00:05.000Z" },
-  },
-  {
-    id: "u2",
-    role: "user",
-    parts: [{ type: "text", text: "Which ones?" }],
-  },
-  {
-    id: "a2",
-    role: "assistant",
-    parts: [{ type: "text", text: "PLAT-124 and PLAT-125." }],
-  },
-];
-
 /**
  * A stored thread with a conversation. Replies are stored when the model's stream ends, which
- * these tests do not call; the repository stands in for that write.
+ * these tests do not run; `saveConversation` stands in for it.
  */
 async function aConversationOf(user: ReturnType<typeof aUser>) {
   const thread = await callAs(user, startThreadAction, aNewThread());
   if (!thread.ok) throw new Error("the thread was not started");
-  await threadRepository.saveMessages(
-    user.id,
-    thread.value.id,
-    conversation,
-  );
+  await saveConversation(user, thread.value.id, aConversation);
   return thread.value;
-}
-
-function aChatTurn() {
-  return {
-    modelId: "opus",
-    message: {
-      id: "u3",
-      role: "user",
-      parts: [{ type: "text", text: "And now?" }],
-    },
-  };
 }
 
 async function aProjectOf(user: ReturnType<typeof aUser>) {
@@ -153,27 +99,7 @@ describeIntegration(
 
     it("keeps a thread's conversation in order, metadata included", async () => {
       const thread = await aConversationOf(ana);
-      expect(await listThreadMessages(ana, thread.id)).toEqual(conversation);
-    });
-
-    it("replaces the stored conversation when a reply ends", async () => {
-      const thread = await aConversationOf(ana);
-      const regenerated = [
-        ...conversation.slice(0, 3),
-        { ...conversation[3]!, id: "a2b" },
-      ];
-      await threadRepository.saveMessages(ana.id, thread.id, regenerated);
-      expect(await listThreadMessages(ana, thread.id)).toEqual(regenerated);
-    });
-
-    it("answers a missing thread with a 404 before asking the model", async () => {
-      const response = await answerThread(ana, randomUUID(), aChatTurn());
-      expect(response.status).toBe(404);
-    });
-
-    it("answers a thread id that is not a uuid like a missing thread", async () => {
-      const response = await answerThread(ana, "thread-1", aChatTurn());
-      expect(response.status).toBe(404);
+      expect(await listThreadMessages(ana, thread.id)).toEqual(aConversation);
     });
 
     it("forks through a response with a copy of the conversation up to it", async () => {
@@ -199,9 +125,9 @@ describeIntegration(
       });
       expect(await listThreads(ana)).toContainEqual(result.ok && result.value);
       expect(await listThreadMessages(ana, id)).toEqual(
-        conversation.slice(0, 2),
+        aConversation.slice(0, 2),
       );
-      expect(await listThreadMessages(ana, thread.id)).toEqual(conversation);
+      expect(await listThreadMessages(ana, thread.id)).toEqual(aConversation);
     });
 
     it("refuses to fork from a question or a response that is not stored", async () => {
@@ -365,11 +291,10 @@ describeIntegration(
         }),
     });
 
-    // Ben cannot read Ana's conversation, and a chat turn on her thread is a 404 that stores
-    // nothing.
+    // Ben cannot read or fork Ana's conversation; the fork stores nothing.
     let conversationThreadId = "";
     assertIsolation({
-      name: "answerThread, forkThread, listThreadMessages",
+      name: "forkThreadAction, listThreadMessages",
       ownerA: ana.id,
       ownerB: ben.id,
       arrange: async (owner) => {
@@ -378,11 +303,6 @@ describeIntegration(
       read: (owner) =>
         listThreadMessages(aUser(owner), conversationThreadId),
       change: async (owner) => {
-        await answerThread(
-          aUser(owner),
-          conversationThreadId,
-          aChatTurn(),
-        );
         await callAs(aUser(owner), forkThreadAction, {
           fromThreadId: conversationThreadId,
           id: randomUUID(),
