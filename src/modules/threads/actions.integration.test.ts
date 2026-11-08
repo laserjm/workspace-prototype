@@ -3,9 +3,8 @@ import { expect, it, vi } from "vitest";
 import {
   assertIsolation,
   describeIntegration,
-} from "@conventions/nextjs/testing";
+} from "@/tests/support/integration";
 import { createProjectAction } from "@/modules/projects/server";
-import { composeStack } from "@/tests/support/compose-stack";
 import { withUsers } from "@/tests/support/users";
 import { callAs } from "@/tests/support/session";
 import { aConversation, aNewThread } from "@/tests/factories/thread";
@@ -327,5 +326,4 @@ describeIntegration(
       },
     });
   },
-  { when: composeStack },
 );

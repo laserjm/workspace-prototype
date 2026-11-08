@@ -4,12 +4,10 @@
 import "server-only";
 import { and, eq } from "drizzle-orm";
 import type { UserId } from "@/lib/auth/user";
-import { db, type withTransaction } from "@/lib/db/client";
+import { db, type Transaction } from "@/lib/db/client";
 import { connectionSecretsTable } from "@/lib/db/schema";
 import { parseKeyring, seal, unseal, type Keyring } from "./cipher";
 import type { Credential } from "./contracts";
-
-type Transaction = Parameters<Parameters<typeof withTransaction>[1]>[0];
 
 let keyring: Keyring | undefined;
 /**

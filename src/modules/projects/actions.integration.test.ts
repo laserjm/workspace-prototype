@@ -2,8 +2,7 @@ import { expect, it, vi } from "vitest";
 import {
   assertIsolation,
   describeIntegration,
-} from "@conventions/nextjs/testing";
-import { composeStack } from "@/tests/support/compose-stack";
+} from "@/tests/support/integration";
 import { withUsers } from "@/tests/support/users";
 import { callAs } from "@/tests/support/session";
 import { aUser } from "@/tests/factories/user";
@@ -93,5 +92,4 @@ describeIntegration(
         callAs(aUser(owner), createProjectAction, { name: "isolated" }),
     });
   },
-  { when: composeStack },
 );

@@ -83,7 +83,7 @@ export async function saveConversation(
   threadId: string,
   messages: readonly WorkspaceUIMessage[],
 ): Promise<void> {
-  await withTransaction("interactive", async (tx) => {
+  await withTransaction(async (tx) => {
     await tx
       .delete(threadMessagesTable)
       .where(

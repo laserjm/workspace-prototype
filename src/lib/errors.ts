@@ -1,6 +1,4 @@
-// The errors more than one module answers with. Same shapes as `@conventions/nextjs/core`'s, so
-// either can be returned while the app moves off the package (ARCHITECTURE.md, "Runtime
-// helpers from @conventions/nextjs").
+// The errors more than one module answers with.
 
 /** A constraint refused the write: a unique key, a check, a foreign key. */
 export type Conflict = { readonly _tag: "Conflict"; readonly constraint: string };

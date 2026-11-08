@@ -28,8 +28,8 @@ confidential client, `workspace-web` (authorization code with PKCE, no direct gr
 self-registration, no roles, and development users with fixed ids, so a user's `sub` is the
 same after every reset. Its only redirect URI is `http://localhost:3000/api/auth/callback/keycloak`,
 and its post-logout URI is `http://localhost:3000/`. `pnpm stack:up|down|reset` drive it.
-Integration tests pass `describeIntegration` the probe `composeStack`
-(`tests/support/compose-stack.ts`, `pg_isready` in the compose Postgres), and read `DATABASE_URL` from `.env.local` (`tests/support/env.ts`).
+Integration tests run when `pg_isready` succeeds in the compose Postgres (`describeIntegration`,
+`tests/support/integration.ts`), and read `DATABASE_URL` from `.env.local` (`tests/support/env.ts`).
 **Enforced by.** The compose health checks (`pnpm stack:up` waits for both).
 **Recorded in.** This entry; `.env.example`.
 
@@ -40,8 +40,8 @@ Integration tests pass `describeIntegration` the probe `composeStack`
 <verb>-<what>` writes the SQL migration to `drizzle/` and `pnpm db:migrate` applies it. The
 migrations are never edited by hand. `lib/db/client.ts` runs on postgres.js,
 with prepared statements on because the app connects to Postgres directly, not through a
-transaction pooler. `withTransaction` keeps the default statement timeouts (8 s
-interactive, 5 min system). The first tables are the sign-in's four. `drizzle-kit generate` adds
+transaction pooler. `withTransaction` sets an 8 s statement timeout for the transaction
+only (`set_config(…, true)`), so it never reaches the next client of a pooled connection. The first tables are the sign-in's four. `drizzle-kit generate` adds
 a new table's foreign keys before the unique constraints added to existing tables in the same
 migration, so a reference to a constraint that does not exist yet is generated as two
 migrations (`0002_add-thread-forks`, then `0003_create-thread-messages`).
@@ -238,7 +238,7 @@ mocked (`vi.mock("@/modules/agent/server")`), so its example tables run against 
 without a model. Pure rules are tested by example beside the file that holds them
 (`threads/placement.test.ts`, `projects/contracts.test.ts`).
 **Enforced by.** Review; the integration tests skip loudly without the stack
-(`describeIntegration`).
+(`describeIntegration`, `tests/support/integration.ts`).
 **Recorded in.** This entry.
 
 ### Answers come from the Vercel AI Gateway
@@ -485,15 +485,14 @@ work, which streams and so is not an action).
 **Enforced by.** Review.
 **Recorded in.** This entry.
 
-### Runtime helpers from `@conventions/nextjs`
+### No conventions package
 
-**Decision.** The project dropped the conventions profile's tooling (its CLI, ESLint config and
-CI checks) and keeps only its runtime package for what is not yet in `lib/`: `/drizzle`
-(`createTransactionRunner`, behind `withTransaction` in `lib/db/client.ts`) and `/testing`
-(`describeIntegration`, `assertIsolation`, `localStack`). Nothing imports
-`@conventions/nextjs/core` any more: `lib/result.ts` (`Result`, `ok`, `err`), `lib/errors.ts`
-(the standard errors and `bug`) and `lib/db/errors.ts` (`violatedConstraint`) replace it. The
-rest moves to `lib/` or `tests/support/` when it is next touched; the package goes when nothing
-imports it.
-**Enforced by.** `tsc`.
+**Decision.** The project owns its runtime helpers and depends on no conventions profile. It
+dropped the profile's tooling (its CLI, ESLint config and CI checks) first, then its runtime
+package: `lib/result.ts` (`Result`, `ok`, `err`), `lib/errors.ts` (the standard errors and
+`bug`), `lib/db/errors.ts` (`violatedConstraint`), `withTransaction` in `lib/db/client.ts`, and
+`describeIntegration` and `assertIsolation` in `tests/support/integration.ts`. They do what the
+app uses and no more: one statement timeout, no caller classes, no transaction joining. Add an
+option when a call needs it.
+**Enforced by.** Review.
 **Recorded in.** This entry.

@@ -1,4 +1,4 @@
-// Reads a Postgres error for the repositories: postgres.js puts the code and the constraint on the
+// Reads a Postgres error for the actions: postgres.js puts the code and the constraint on the
 // error, and Drizzle wraps it in `cause`.
 
 const CONSTRAINT_CODES = new Set(["23505", "23503", "23514", "23502", "23P01"]); // unique, fk, check, not-null, exclusion
