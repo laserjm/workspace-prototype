@@ -534,7 +534,8 @@ export function WorkspaceShell({
                 </div>
               ) : (
                 <ThreadConversation
-                  key={activeThread.id}
+                  // The source explorer beside it is keyed by the bare id.
+                  key={`conversation:${activeThread.id}`}
                   thread={activeThread}
                   models={models}
                   enabledSkills={enabledSkills}
