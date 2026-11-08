@@ -1,7 +1,7 @@
 import "server-only";
 // The module's reads, straight on Drizzle. Every query names the user's id
 // (ARCHITECTURE.md, "Data ownership").
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, getTableColumns, sql } from "drizzle-orm";
 import type { User } from "@/lib/auth/user";
 import { db } from "@/lib/db/client";
 import { threadMessagesTable, threadsTable } from "@/lib/db/schema";
@@ -10,11 +10,34 @@ import { threadIdSchema, type Thread } from "./contracts";
 import { wakeIfDue } from "./placement";
 import { toMessage, toThread } from "./rows";
 
+const questions = sql`${threadMessagesTable.userId} = ${threadsTable.userId}
+  and ${threadMessagesTable.threadId} = ${threadsTable.id}
+  and ${threadMessagesTable.role} = 'user'`;
+
+/**
+ * A thread's columns with what its stored conversation holds, counted in the same read: its
+ * questions and their attachments (`conversationCounts` counts the same in the browser).
+ */
+const threadColumns = {
+  ...getTableColumns(threadsTable),
+  turnCount: sql<number>`(
+    select count(*)::int from ${threadMessagesTable} where ${questions}
+  )`.mapWith(Number),
+  attachmentCount: sql<number>`(
+    select coalesce(sum(
+      case when jsonb_typeof(${threadMessagesTable.metadata} -> 'attachments') = 'array'
+        then jsonb_array_length(${threadMessagesTable.metadata} -> 'attachments')
+        else 0 end
+    ), 0)::int
+    from ${threadMessagesTable} where ${questions}
+  )`.mapWith(Number),
+};
+
 /** The signed-in user's threads, newest first, as they read now: a due snooze has woken. */
 export async function listThreads(user: User): Promise<Thread[]> {
   const now = new Date();
   const rows = await db()
-    .select()
+    .select(threadColumns)
     .from(threadsTable)
     .where(eq(threadsTable.userId, user.id))
     .orderBy(desc(threadsTable.createdAt));
@@ -30,7 +53,7 @@ export async function findThread(
   id: string,
 ): Promise<Thread | null> {
   const [row] = await db()
-    .select()
+    .select(threadColumns)
     .from(threadsTable)
     .where(and(eq(threadsTable.userId, user.id), eq(threadsTable.id, id)));
   return row ? toThread(row) : null;

@@ -31,14 +31,13 @@ import {
   useSources,
 } from "@/modules/sources";
 import {
-  ChatStore,
-  ChatStoreProvider,
   createScope,
   placementOf,
   PromptForm,
   ThreadConversation,
   useThreads,
-  useThreadWorking,
+  type ConversationControls,
+  type FirstQuestion,
   type ForkTarget,
   type SnoozeTimeInPast,
   type Thread,
@@ -46,7 +45,7 @@ import {
   type ThreadScope,
   type ThreadStillWorking,
 } from "@/modules/threads";
-import type { ModelChoice } from "@/modules/agent";
+import type { ChatOptions, ModelChoice } from "@/modules/agent";
 import { NewThreadHeading } from "./new-thread-heading";
 import { WorkspaceSettings, type SettingsSection } from "./workspace-settings";
 import { WorkspaceSidebar } from "./workspace-sidebar";
@@ -90,6 +89,7 @@ export function WorkspaceShell({
     acknowledgeWake,
     startThread,
     continueThread,
+    countTurn,
     forkThread,
   } = useThreads(initialThreads, {
     onPlacementNotStored: () =>
@@ -97,7 +97,12 @@ export function WorkspaceShell({
         message: "The session could not be moved. Try again.",
       }),
   });
-  const [chatStore] = useState(() => new ChatStore());
+  // Only the open thread can have a response in flight: leaving it stops its response.
+  const [workingThreadId, setWorkingThreadId] = useState<string | null>(null);
+  // A thread this page just started, and the first question its chat sends when it opens.
+  const [started, setStarted] = useState<
+    FirstQuestion & { threadId: string }
+  >();
   const [projects, setProjects] = useState(initialProjects);
   // The project a new thread goes into; null: no project.
   const [projectId, setProjectId] = useState<string | null>(null);
@@ -122,7 +127,6 @@ export function WorkspaceShell({
   const currentProject = currentProjectId
     ? projectName(currentProjectId)
     : null;
-  const responseWorking = useThreadWorking(activeThread?.id, chatStore);
 
   useEffect(() => {
     if (!threadNotice) return;
@@ -193,7 +197,7 @@ export function WorkspaceShell({
     const result = snoozeThread(
       thread,
       new Date(until),
-      chatStore.isWorking(thread.id),
+      workingThreadId === thread.id,
     );
     if (!result.ok) {
       setThreadNotice({ message: SNOOZE_REFUSED[result.error._tag] });
@@ -264,7 +268,6 @@ export function WorkspaceShell({
       });
       return;
     }
-    chatStore.fork(activeThread.id, fork.id, target.messageId);
     setProjectId(fork.projectId);
     navigate(fork.id);
   }
@@ -293,7 +296,44 @@ export function WorkspaceShell({
     return () => window.removeEventListener("keydown", handleKey);
   }, []);
 
-  async function sendMessage(
+  function chatOptions(
+    modelId: string,
+    skillId: string | undefined,
+    scope: ThreadScope | undefined,
+  ): ChatOptions {
+    return { modelId, skillId, skillIds: enabledSkills, scope };
+  }
+
+  /** Asks the open thread's chat; false keeps the draft in the composer. */
+  async function askThread(
+    controls: ConversationControls,
+    prompt: string,
+    attachments: string[],
+    modelId: string,
+    skillId?: string,
+  ): Promise<boolean> {
+    const model = models.find((item) => item.id === modelId);
+    // Until the stored conversation is here, the composer keeps the draft: a send now would
+    // show without the messages before it.
+    if (!activeThread || !model || !controls.ready) return false;
+    const continued = continueThread(
+      activeThread,
+      model.provider,
+      controls.busy,
+    );
+    if (!continued.ok) return false;
+    if (threadNotice?.undo?.threadId === activeThread.id)
+      setThreadNotice(undefined);
+    controls.send(
+      { text: prompt, attachments },
+      chatOptions(modelId, skillId, activeThread.scope),
+    );
+    countTurn(activeThread.id, attachments.length);
+    return true;
+  }
+
+  /** Stores a new thread, then opens it; its chat sends the first question. */
+  async function startNewThread(
     prompt: string,
     attachments: string[],
     modelId: string,
@@ -301,27 +341,6 @@ export function WorkspaceShell({
   ): Promise<boolean> {
     const model = models.find((item) => item.id === modelId);
     if (!model) return false;
-    const message = { text: prompt, attachments };
-    if (activeThread) {
-      // Until the stored conversation is here, the composer keeps the draft: a send now would
-      // show without the messages before it.
-      if (chatStore.loadState(activeThread.id) === "loading") return false;
-      const continued = continueThread(
-        activeThread,
-        model.provider,
-        responseWorking,
-      );
-      if (!continued.ok) return false;
-      if (threadNotice?.undo?.threadId === activeThread.id)
-        setThreadNotice(undefined);
-      void chatStore.send(activeThread.id, message, {
-        modelId,
-        skillId,
-        skillIds: enabledSkills,
-        scope: activeThread.scope,
-      });
-      return true;
-    }
     const thread = await startThread({
       id: crypto.randomUUID(),
       projectId,
@@ -335,12 +354,12 @@ export function WorkspaceShell({
       });
       return false;
     }
-    void chatStore.send(thread.id, message, {
-      modelId,
-      skillId,
-      skillIds: enabledSkills,
-      scope: thread.scope,
+    setStarted({
+      threadId: thread.id,
+      question: { text: prompt, attachments },
+      options: chatOptions(modelId, skillId, thread.scope),
     });
+    countTurn(thread.id, attachments.length);
     navigate(thread.id);
     return true;
   }
@@ -351,8 +370,7 @@ export function WorkspaceShell({
   }
 
   return (
-    <ChatStoreProvider store={chatStore}>
-      <TooltipProvider delay={450}>
+    <TooltipProvider delay={450}>
         {/* Layout state for descendants: utilities read it as
             group-data-[sidebar=collapsed]/app:… and
             group-data-[mobile-sidebar=open]/app:…. The two widths are
@@ -383,6 +401,7 @@ export function WorkspaceShell({
             projects={projects}
             projectName={projectName}
             activeId={activeThread?.id}
+            workingId={workingThreadId}
             onSelect={(thread) => {
               if (thread.wokeAt) acknowledgeWake(thread.id);
               setProjectId(thread.projectId);
@@ -499,7 +518,7 @@ export function WorkspaceShell({
                   <PromptForm
                     key={projectId ?? "no-project"}
                     models={models}
-                    onSend={sendMessage}
+                    onSend={startNewThread}
                     onSources={() => setDialog("sources")}
                     scope={draftScope}
                     onScope={() => setEditingScope(true)}
@@ -515,35 +534,53 @@ export function WorkspaceShell({
                 </div>
               ) : (
                 <ThreadConversation
+                  // The source explorer beside it is keyed by the bare id.
+                  key={`conversation:${activeThread.id}`}
                   thread={activeThread}
                   models={models}
+                  enabledSkills={enabledSkills}
+                  firstQuestion={
+                    started?.threadId === activeThread.id ? started : undefined
+                  }
+                  onFirstQuestionSent={() => setStarted(undefined)}
+                  onWorkingChange={(working) =>
+                    setWorkingThreadId((current) =>
+                      working
+                        ? activeThread.id
+                        : current === activeThread.id
+                          ? null
+                          : current,
+                    )
+                  }
                   onRestore={() => handleRestore(activeThread.id)}
                   onOpenThread={navigate}
                   onViewSource={showSource}
                   onFork={(target) => void handleFork(target)}
-                  composer={
+                  composer={(controls) => (
                     <PromptForm
-                      key={activeThread.id}
                       compact
-                      busy={responseWorking}
-                      onStop={() => void chatStore.stop(activeThread.id)}
+                      busy={controls.busy}
+                      onStop={controls.stop}
                       models={models}
-                      onSend={sendMessage}
+                      onSend={(prompt, attachments, modelId, skillId) =>
+                        askThread(
+                          controls,
+                          prompt,
+                          attachments,
+                          modelId,
+                          skillId,
+                        )
+                      }
                       onSources={() => setDialog("sources")}
                       scope={activeThread.scope}
                       enabledSkills={enabledSkills}
-                      initialSkill={
-                        chatStore
-                          .peekMessages(activeThread.id)
-                          .findLast((message) => message.role === "user")
-                          ?.metadata?.skillId
-                      }
+                      initialSkill={controls.lastSkillId}
                       onManageSkills={() => openSettings("skills")}
                       onChooseSource={chooseSource}
                       onClearSource={clearSource}
                       onScope={showSource}
                     />
-                  }
+                  )}
                 />
               )}
               {activeThread?.scope && sourceOpen && (
@@ -711,6 +748,5 @@ export function WorkspaceShell({
           />
         )}
       </TooltipProvider>
-    </ChatStoreProvider>
   );
 }

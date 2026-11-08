@@ -23,8 +23,8 @@ async function fetchRecords(sourceId: string): Promise<SourceRecord[]> {
 
 /**
  * Holds each source's records for the lifetime of the page, loaded the first time a view needs
- * them (`load`). A failed load is tried again the next time. Lives outside React state, like
- * `ChatStore`, so a handler can wait for a source's records (`load` resolves with them).
+ * them (`load`). A failed load is tried again the next time. Lives outside React state, so a
+ * handler can wait for a source's records (`load` resolves with them).
  */
 export class SourceRecordsStore {
   #loads = new Map<string, RecordsLoad>();

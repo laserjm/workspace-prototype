@@ -1,7 +1,8 @@
-// How a thread's conversation grows and forks. The rules read only a message's id and role, so
-// they hold for the chat's messages as they are stored.
+// How a thread's conversation grows and forks, and what it holds. The rules read only a message's
+// id, role and attachments, so they hold for the chat's messages as they are stored.
 import { notFound, type NotFound } from "@/lib/errors";
 import { err, ok, type Result } from "@/lib/result";
+import type { ConversationCounts } from "./contracts";
 
 /** What the conversation rules need of a message; the chat's messages carry more. */
 export type ConversationMessage = {
@@ -39,4 +40,20 @@ export function forkPoint<M extends ConversationMessage>(
     responseIndex:
       through.filter((item) => item.role === "assistant").length - 1,
   });
+}
+
+/** The questions in a conversation and the attachments they carry. */
+export function conversationCounts(
+  messages: readonly (ConversationMessage & {
+    metadata?: { attachments?: readonly string[] };
+  })[],
+): ConversationCounts {
+  const questions = messages.filter((message) => message.role === "user");
+  return {
+    turnCount: questions.length,
+    attachmentCount: questions.reduce(
+      (count, message) => count + (message.metadata?.attachments?.length ?? 0),
+      0,
+    ),
+  };
 }

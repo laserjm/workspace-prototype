@@ -39,6 +39,8 @@ type SidebarProps = {
   /** The name the sidebar shows for a thread's project. */
   projectName: (projectId: string | null) => string;
   activeId?: string;
+  /** The thread with a response in flight: only the open one can have one. */
+  workingId?: string | null;
   onSelect: (thread: Thread) => void;
   onNewThread: () => void;
   onNewProject: () => void;
@@ -106,6 +108,7 @@ export function WorkspaceSidebar(props: SidebarProps) {
         thread={thread}
         projectName={props.projectName(thread.projectId)}
         active={props.activeId === thread.id}
+        working={props.workingId === thread.id}
         onSelect={() => props.onSelect(thread)}
         onSettle={() => props.onSettle(thread.id, nextThread(thread.id))}
         onRestore={() => props.onRestore(thread.id)}
@@ -290,6 +293,7 @@ export function WorkspaceSidebar(props: SidebarProps) {
         <CustomSnoozeDialog
           key={customSnoozeThread.id}
           thread={customSnoozeThread}
+          working={props.workingId === customSnoozeThread.id}
           onClose={() => setCustomSnoozeId(null)}
           onSnooze={(until) => {
             props.onSnooze(

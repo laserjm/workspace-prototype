@@ -102,6 +102,20 @@ describeIntegration(
       expect(await listThreadMessages(ana, thread.id)).toEqual(aConversation);
     });
 
+    it("lists a thread with the questions and attachments of its stored conversation", async () => {
+      const thread = await aConversationOf(ana);
+      await saveConversation(ana, thread.id, [
+        {
+          ...aConversation[0]!,
+          metadata: { attachments: ["plan.pdf", "notes.md"] },
+        },
+        ...aConversation.slice(1),
+      ]);
+      expect(
+        (await listThreads(ana)).find((item) => item.id === thread.id),
+      ).toMatchObject({ turnCount: 2, attachmentCount: 2 });
+    });
+
     it("forks through a response with a copy of the conversation up to it", async () => {
       const thread = await aConversationOf(ana);
       const id = randomUUID();
@@ -121,6 +135,8 @@ describeIntegration(
             title: thread.title,
             responseIndex: 0,
           },
+          turnCount: 1,
+          attachmentCount: 0,
         }),
       });
       expect(await listThreads(ana)).toContainEqual(result.ok && result.value);

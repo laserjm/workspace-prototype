@@ -3,15 +3,18 @@
 import type { UserId } from "@/lib/auth/user";
 import type { threadMessagesTable, threadsTable } from "@/lib/db/schema";
 import type { ModelProvider, WorkspaceUIMessage } from "@/modules/agent";
-import type { Thread, ThreadPlacement } from "./contracts";
+import type { ConversationCounts, Thread, ThreadPlacement } from "./contracts";
 
 type ThreadRow = typeof threadsTable.$inferSelect;
 type NewThreadRow = typeof threadsTable.$inferInsert;
 type MessageRow = typeof threadMessagesTable.$inferSelect;
 type NewMessageRow = typeof threadMessagesTable.$inferInsert;
 
-/** The thread as stored; a due snooze still reads as snoozed here (`wakeIfDue`). */
-export function toThread(row: ThreadRow): Thread {
+/**
+ * The thread as stored, with the counts its messages give (`threadColumns`, `queries.ts`); a due
+ * snooze still reads as snoozed here (`wakeIfDue`).
+ */
+export function toThread(row: ThreadRow & ConversationCounts): Thread {
   return {
     id: row.id,
     projectId: row.projectId,
@@ -33,6 +36,8 @@ export function toThread(row: ThreadRow): Thread {
             responseIndex: row.forkedFromResponseIndex,
           }
         : undefined,
+    turnCount: row.turnCount,
+    attachmentCount: row.attachmentCount,
     ...placementOfRow(row),
   };
 }

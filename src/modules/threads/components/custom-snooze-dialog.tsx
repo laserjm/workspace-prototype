@@ -13,18 +13,19 @@ import {
 import { customSnoozeTime } from "../placement";
 import type { Thread } from "../contracts";
 import { toLocalDateTime } from "./time-format";
-import { useChatStore } from "./use-chat-store";
 
 export function CustomSnoozeDialog({
   thread,
+  working,
   onClose,
   onSnooze,
 }: {
   thread: Thread;
+  /** A response is in flight, which a snooze waits for. */
+  working: boolean;
   onClose: () => void;
   onSnooze: (until: string) => void;
 }) {
-  const chatStore = useChatStore();
   const [mode, setMode] = useState<"date" | "duration">("date");
   const [date, setDate] = useState(() =>
     toLocalDateTime(new Date(Date.now() + 3_600_000)),
@@ -64,7 +65,7 @@ export function CustomSnoozeDialog({
               );
               return;
             }
-            if (chatStore.isWorking(thread.id)) {
+            if (working) {
               setError("Wait for the response to finish before snoozing.");
               return;
             }

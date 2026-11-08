@@ -71,6 +71,10 @@ export type WorkspaceMessageMetadata = {
   /** Assistant messages: stamped by the server on stream start and finish. */
   startedAt?: string;
   completedAt?: string;
+  /**
+   * User messages: the model and skill the question asked for, which a retry asks again.
+   * Assistant messages: the ones that answered.
+   */
   modelId?: string;
   skillId?: string;
 };

@@ -11,6 +11,8 @@ export function aThread(overrides: Partial<Thread> = {}): Thread {
     createdAt: "2026-11-03T11:05:00.000Z",
     provider: "claude",
     scope: { sourceId: "jira", recordIds: ["PLAT-124", "PLAT-125"] },
+    turnCount: 0,
+    attachmentCount: 0,
     ...overrides,
   };
 }
