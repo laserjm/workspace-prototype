@@ -3,7 +3,7 @@ import { beforeEach, expect, it, vi } from "vitest";
 import {
   assertIsolation,
   describeIntegration,
-} from "@conventions/nextjs/testing";
+} from "@/tests/support/integration";
 import { err, ok } from "@/lib/result";
 import type { WorkspaceUIMessage } from "@/modules/agent";
 import {
@@ -11,7 +11,6 @@ import {
   type AgentModel,
   type AgentRequest,
 } from "@/modules/agent/server";
-import { composeStack } from "@/tests/support/compose-stack";
 import { callAs } from "@/tests/support/session";
 import { withUsers } from "@/tests/support/users";
 import { aConversation, aNewThread } from "@/tests/factories/thread";
@@ -214,5 +213,4 @@ describeIntegration(
       },
     });
   },
-  { when: composeStack },
 );

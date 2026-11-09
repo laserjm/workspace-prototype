@@ -148,9 +148,8 @@ tests/                          test factories and support
 A module is reached from outside only through `index.ts` (browser-safe) or `server.ts`
 (server-only); ESLint refuses any deeper import. Inside, `contracts.ts` holds types and input
 schemas, `queries.ts` the reads, `actions.ts` the server actions and `components/` the browser
-UI. `threads` still has its older layers (`domain/`, `application/`, `infra/`); its
-`application/answer-thread.ts` is the use case behind `POST /api/threads/[id]/messages`, and it
-hands the conversation to `runAgent` (`agent/run.ts`). See "Module shape" in ARCHITECTURE.md.
+UI. `threads/answer.ts` is the work behind `POST /api/threads/[id]/messages`: it hands the
+conversation to `runAgent` (`agent/run.ts`) and stores what comes back. See "Module shape" in ARCHITECTURE.md.
 
 ```sh
 pnpm lint          # ESLint, design tokens (scripts/check-styles.mjs), server actions (scripts/check-actions.mjs)

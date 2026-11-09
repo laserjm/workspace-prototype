@@ -1,10 +1,9 @@
-// The project owns this file:
-// adapt the driver and pool to its hosting. Keep `db()` lazy, so importing a module needs no
+// Adapt the driver and pool to the hosting. Keep `db()` lazy, so importing a module needs no
 // DATABASE_URL, and keep `withTransaction` here beside it.
 import "server-only";
+import { sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { createTransactionRunner } from "@conventions/nextjs/drizzle";
 import * as schema from "./schema";
 
 function connect() {
@@ -24,5 +23,19 @@ export function db() {
 }
 
 export type Database = ReturnType<typeof db>;
+export type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 
-export const withTransaction = createTransactionRunner(() => db());
+/** How long one statement of a request's transaction may run. */
+const STATEMENT_TIMEOUT = "8s";
+
+/**
+ * Runs `fn` in a transaction: commits when it returns, rolls back when it throws. The timeout is
+ * set with `set_config(…, true)`, so it ends with the transaction and never reaches the next
+ * client of a pooled connection.
+ */
+export function withTransaction<T>(fn: (tx: Transaction) => Promise<T>): Promise<T> {
+  return db().transaction(async (tx) => {
+    await tx.execute(sql`select set_config('statement_timeout', ${STATEMENT_TIMEOUT}, true)`);
+    return fn(tx);
+  });
+}

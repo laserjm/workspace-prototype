@@ -96,7 +96,7 @@ export const forkThreadAction = action(
       new Date(),
     );
     try {
-      await withTransaction("interactive", async (tx) => {
+      await withTransaction(async (tx) => {
         await tx.insert(threadsTable).values(toThreadRow(user.id, fork));
         await tx
           .insert(threadMessagesTable)

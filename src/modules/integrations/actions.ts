@@ -68,7 +68,7 @@ export const connectAction = action(
       expiresAt: expiresAt ?? null,
       lastVerifiedAt: now,
     };
-    const stored = await withTransaction("interactive", async (tx) => {
+    const stored = await withTransaction(async (tx) => {
       const [row] = await tx
         .insert(connectionsTable)
         .values({ userId: user.id, providerId, baseUrl, accountRef, ...account })

@@ -1,6 +1,4 @@
-// A refusal is a value, not a throw. Same shape as `@conventions/nextjs/core`'s `Result`, so
-// modules that still import that package and modules that import this file can call each other
-// while the app moves off the package (ARCHITECTURE.md, "Runtime helpers from @conventions/nextjs").
+// A refusal is a value, not a throw.
 
 export type Ok<T> = { readonly ok: true; readonly value: T };
 export type Err<E> = { readonly ok: false; readonly error: E };

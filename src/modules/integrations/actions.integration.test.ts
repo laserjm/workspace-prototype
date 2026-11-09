@@ -3,11 +3,10 @@ import { eq } from "drizzle-orm";
 import {
   assertIsolation,
   describeIntegration,
-} from "@conventions/nextjs/testing";
+} from "@/tests/support/integration";
 import type { User } from "@/lib/auth/user";
 import { db } from "@/lib/db/client";
 import { connectionSecretsTable } from "@/lib/db/schema";
-import { composeStack } from "@/tests/support/compose-stack";
 import { callAs } from "@/tests/support/session";
 import { withUsers } from "@/tests/support/users";
 import { aUser } from "@/tests/factories/user";
@@ -238,5 +237,4 @@ describeIntegration(
       },
     });
   },
-  { when: composeStack },
 );

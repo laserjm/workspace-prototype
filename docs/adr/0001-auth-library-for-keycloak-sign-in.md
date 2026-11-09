@@ -5,6 +5,11 @@
 - **Deciders:** Michael Laser
 - **Related:** `ARCHITECTURE.md` (Local stack, Data ownership, "No tables or sign-in yet");
   `lib/auth/requester.ts` (the starter that comes back with the sign-in, NX-AUTH-01)
+- **Note (2026-11-08):** written while the project used the `@conventions/nextjs` profile. The
+  project has since dropped it, so the rule ids (`NX-…`), `rulesets`, `isolation: owner`,
+  `conventions check`, `lib/safe-action.ts` and `getRequester()` below no longer exist. The
+  decision stands; the sign-in as built is `ARCHITECTURE.md`, "Sign-in: Better Auth against
+  Keycloak".
 
 ## Context
 

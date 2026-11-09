@@ -25,10 +25,5 @@ minimumReleaseAgeExclude:
   - better-auth@1.7.17
   - better-call@1.4.5
 
-# @conventions/nextjs depends on @conventions/cli by its release-tarball URL, which pnpm treats as
-# an exotic subdependency. Both tarballs are pinned to the same release in package.json.
-blockExoticSubdeps: false
-
 allowBuilds:
-  '@ast-grep/cli': true
   esbuild: true
