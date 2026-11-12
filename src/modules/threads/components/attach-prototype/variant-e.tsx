@@ -29,7 +29,7 @@ export function VariantEEntry({ draft, mode }: { draft: DraftApi; mode: Mode }) 
     <>
       <button type="button" className={cn(inlineTriggerClassName, "shrink-0 py-1")} onClick={() => setOpen(true)}>
         <Plus />
-        <span>{draft.draft.length ? "Change attached items" : "Attach issues or pull requests"}</span>
+        <span>{draft.draft.length ? "Change data sources" : "Choose a data source"}</span>
       </button>
       {open && <SimpleAttachDialog draft={draft} mode={mode} onClose={() => setOpen(false)} />}
     </>
