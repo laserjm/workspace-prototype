@@ -35,6 +35,8 @@ import type { ModelChoice } from "@/modules/agent";
 import type { ThreadScope } from "../contracts";
 import { attachmentChipClassName } from "./attachment-chip";
 import { ProviderIcon } from "./provider-icon";
+// PROTOTYPE, throwaway: `?variant=` swaps the source picker for the attach prototype.
+import { useAttachPrototype } from "./attach-prototype/attach-prototype";
 
 // The send button's two looks: idle grey, ready dark. Disabled stays opaque.
 const sendButton =
@@ -103,9 +105,15 @@ export function PromptForm({
   const fileInput = useRef<HTMLInputElement>(null);
   const textarea = useRef<HTMLTextAreaElement>(null);
   const canSend = prompt.trim().length > 0 && !busy;
+  const proto = useAttachPrototype({ prompt, setPrompt, textarea });
 
   async function submit() {
     if (!canSend) return;
+    if (proto) {
+      proto.send(prompt.trim());
+      setPrompt("");
+      return;
+    }
     const draft = { prompt, attachments };
     setPrompt("");
     setAttachments([]);
@@ -122,7 +130,10 @@ export function PromptForm({
 
   return (
     <div className="relative w-full shrink-0">
-      {!compact && scope && (
+      {proto?.simulation}
+      {proto?.overlay}
+      {proto?.switcher}
+      {!proto && !compact && scope && (
         <button
           type="button"
           className="mx-2 mb-3 flex items-center gap-2 rounded-sm text-left text-2xs text-secondary-label hover:text-info-foreground max-md:ml-1 max-md:max-w-full max-md:gap-1 max-md:text-3xs"
@@ -141,14 +152,15 @@ export function PromptForm({
         </button>
       )}
       <div className="mx-2 mb-2.5 flex min-w-0 items-center gap-3 max-md:mx-1 max-md:gap-2">
-        {onChooseSource && onClearSource && (
+        {proto?.entry}
+        {!proto && onChooseSource && onClearSource && (
           <SourcePicker
             selected={scope?.sourceId}
             onSelect={onChooseSource}
             onClear={onClearSource}
           />
         )}
-        {scope && onScope && (
+        {!proto && scope && onScope && (
           <SourceScopeSummary
             sourceId={scope.sourceId}
             recordCount={scope.recordIds.length}
@@ -168,6 +180,7 @@ export function PromptForm({
           void submit();
         }}
       >
+        {proto?.chips}
         {attachments.length > 0 && (
           <div className="flex flex-wrap gap-1.5 px-2 pb-3">
             {attachments.map((file, index) => (
@@ -203,14 +216,20 @@ export function PromptForm({
           )}
           aria-label="Message"
           placeholder={
-            source
+            proto
+              ? proto.placeholder
+              : source
               ? `Ask about these ${source.plural}…`
               : "Ask anything, or choose a source to add context…"
           }
           value={prompt}
           rows={compact ? 2 : 3}
-          onChange={(event) => setPrompt(event.target.value)}
+          onChange={(event) => {
+            setPrompt(event.target.value);
+            proto?.onPromptChange?.(event.target.value);
+          }}
           onKeyDown={(event) => {
+            if (proto?.onKeyDown?.(event)) return;
             if (
               event.key === "Enter" &&
               !event.shiftKey &&
