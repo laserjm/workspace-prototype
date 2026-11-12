@@ -1,7 +1,7 @@
 "use client";
 // PROTOTYPE, throwaway (wayfinder: "How the attach dialog filters and picks GitHub issues and pull
 // requests"). Four variants of picking GitHub issues and pull requests into the composer, on the
-// real composer, gated by `?variant=A|B|C|D`. Without `?variant=` the composer is unchanged.
+// real composer, gated by `?variant=A` to `F`. Without `?variant=` the composer is unchanged.
 // Sending is simulated: the question is not sent, it is shown in the dashed strip above the
 // composer as the sent message would look. Data is canned (./fixtures.ts).
 import { useState, type ReactNode, type RefObject } from "react";
@@ -13,12 +13,15 @@ import { VariantAEntry } from "./variant-a";
 import { VariantB } from "./variant-b";
 import { useVariantC } from "./variant-c";
 import { VariantD } from "./variant-d";
+import { VariantEEntry } from "./variant-e";
 
 const VARIANTS = [
   { key: "A", name: "Dialog + facets" },
   { key: "B", name: "Query palette" },
   { key: "C", name: "Inline #" },
   { key: "D", name: "Browse sheet" },
+  { key: "E", name: "Simple dialog, typeahead + list" },
+  { key: "F", name: "Simple dialog, chips in the field" },
 ] as const;
 
 export function useAttachPrototype({
@@ -40,7 +43,13 @@ export function useAttachPrototype({
   if (!key) return undefined;
 
   const entry: ReactNode =
-    key === "A" ? <VariantAEntry draft={draft} /> : key === "B" ? <VariantB draft={draft} /> : key === "C" ? c.entry : <VariantD draft={draft} />;
+    key === "A" ? <VariantAEntry draft={draft} /> : key === "B" ? <VariantB draft={draft} /> : key === "C" ? (
+      c.entry
+    ) : key === "D" ? (
+      <VariantD draft={draft} />
+    ) : (
+      <VariantEEntry key={key} draft={draft} mode={key === "E" ? "list" : "chips"} />
+    );
 
   const open = (connectionId: string, itemKey?: string) => {
     const item = itemKey ? itemByKey(connectionId, itemKey) : undefined;
