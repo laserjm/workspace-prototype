@@ -49,6 +49,8 @@ import type { ChatOptions, ModelChoice } from "@/modules/agent";
 import { NewThreadHeading } from "./new-thread-heading";
 import { WorkspaceSettings, type SettingsSection } from "./workspace-settings";
 import { WorkspaceSidebar } from "./workspace-sidebar";
+import { usePrototypeVariant } from "@/components/ui/prototype-switcher";
+import { RecordPanelPrototype } from "./record-panel-prototype/record-panel-prototype";
 
 type DialogKind = "project" | "settings" | "sources" | "activity" | null;
 
@@ -120,6 +122,8 @@ export function WorkspaceShell({
   const [editingScope, setEditingScope] = useState(false);
   const [sourceOpen, setSourceOpen] = useState(true);
   const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);
+  // PROTOTYPE, throwaway: `?variant=` swaps the source explorer for the record-panel prototype.
+  const panelVariant = usePrototypeVariant();
   const activeThread = threads.find(
     (thread) => thread.id === history[historyIndex],
   );
@@ -497,7 +501,7 @@ export function WorkspaceShell({
               // A source session sets the conversation beside the source panel.
               className={cn(
                 "group/main relative min-h-0 flex-1 outline-none",
-                activeThread?.scope && "flex",
+                (activeThread?.scope || panelVariant) && "flex",
                 // A short window lets the new-thread draft scroll.
                 !activeThread && "short:overflow-y-auto",
               )}
@@ -583,7 +587,14 @@ export function WorkspaceShell({
                   )}
                 />
               )}
-              {activeThread?.scope && sourceOpen && (
+              {activeThread && panelVariant && (
+                <RecordPanelPrototype
+                  key={`record-panel:${activeThread.id}`}
+                  threadId={activeThread.id}
+                  variant={panelVariant}
+                />
+              )}
+              {!panelVariant && activeThread?.scope && sourceOpen && (
                 <SourceExplorer
                   key={activeThread.id}
                   sourceId={activeThread.scope.sourceId}
