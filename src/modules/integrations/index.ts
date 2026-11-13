@@ -16,6 +16,7 @@ export type {
   RecordError,
   RecordFilter,
   RecordReader,
+  RecordSearchHint,
   RecordSearchPage,
   RecordSearchQuery,
   RecordSummary,
@@ -30,6 +31,7 @@ export {
   pluralLabels,
   RECORD_TONES,
   toneOf,
+  waitLabel,
 } from "./contracts";
 export { IntegrationsProvider } from "./components/integrations-provider";
 export { ProviderMark, RecordKindMark } from "./components/record-marks";

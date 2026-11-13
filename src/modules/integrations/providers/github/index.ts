@@ -27,6 +27,11 @@ export const github = defineProvider({
   records: {
     types: githubRecordTypes,
     filters: ["type", "includeClosed"],
+    hint: {
+      idle: "Involving you first, then recently updated. Type words, a number (482) or a repository name (web).",
+      typing:
+        "Matches words in titles and descriptions. Type a repository name to search only there.",
+    },
     search: searchGithubRecords,
   },
 });

@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import type { RecordSearchPage, RecordSummary } from "@/modules/integrations";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { RecordSearchPage } from "@/modules/integrations";
 
 /** Typing settles for this long before the dialog searches. */
 const PAUSE_MS = 250;
@@ -27,7 +27,7 @@ const UNREACHABLE: SearchError = {
 async function fetchPage(
   { connectionId, text, type, includeClosed }: SearchInput,
   cursor: string | undefined,
-  signal: AbortSignal,
+  signal?: AbortSignal,
 ): Promise<Answer> {
   const params = new URLSearchParams({
     ...(text.trim() ? { q: text.trim() } : {}),
@@ -49,87 +49,116 @@ async function fetchPage(
   }
 }
 
-type Loaded = {
-  /** The search this answers. */
+/** One search's answer, with every page loaded so far. */
+type Loaded = RecordSearchPage & {
+  /** The search this answers: `(connection, q, toggles)`. */
   key: string;
   connectionId: string;
-  results: RecordSummary[];
-  next?: string;
-  total?: number;
-  reach?: string;
-  error?: SearchError;
 };
+
+const keyOf = ({ connectionId, text, type, includeClosed }: SearchInput) =>
+  JSON.stringify([connectionId, text.trim(), type, includeClosed]);
+
+export type SearchCache = {
+  get(key: string): Loaded | undefined;
+  put(loaded: Loaded): void;
+};
+
+/**
+ * The answers of the searches run while the attach dialog is open, by `(connection, q, toggles)`,
+ * so going back to an earlier search is instant (#43). It goes with the dialog.
+ */
+export function useSearchCache(): SearchCache {
+  const [answers, setAnswers] = useState<ReadonlyMap<string, Loaded>>(() => new Map());
+  const put = useCallback(
+    (loaded: Loaded) => setAnswers((previous) => new Map(previous).set(loaded.key, loaded)),
+    [],
+  );
+  return useMemo(() => ({ get: (key) => answers.get(key), put }), [answers, put]);
+}
 
 /**
  * Searches one connection's records as the dialog's field and toggles change, after a pause, and
  * pages on with `loadMore`. A newer search aborts the one in flight, so an older answer never
- * replaces a newer one. While a search runs, the last answer stays.
+ * replaces a newer one, and a search answered before comes from `cache` without asking again.
+ * While a search runs, or when it fails, the last answer stays. A disabled search asks nothing.
  */
-export function useRecordSearch(input: SearchInput) {
+export function useRecordSearch(
+  input: SearchInput,
+  { cache, enabled, onError }: { cache: SearchCache; enabled: boolean; onError?: (error: SearchError) => void },
+) {
   const { connectionId, text, type, includeClosed } = input;
-  const key = JSON.stringify([connectionId, text.trim(), type, includeClosed]);
-  const [loaded, setLoaded] = useState<Loaded | null>(null);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const more = useRef<AbortController | null>(null);
+  const key = keyOf(input);
+  const current = cache.get(key);
+  const cached = current !== undefined;
+  const { put } = cache;
+  // The last answer shown, which stays while a search runs or after it failed.
+  const [lastKey, setLastKey] = useState<string>();
+  if (current && lastKey !== key) setLastKey(key);
+  const last = lastKey === undefined ? undefined : cache.get(lastKey);
+  const shown = current ?? (last?.connectionId === connectionId ? last : undefined);
+  const [failure, setFailure] = useState<{ key: string; error: SearchError }>();
+  const error = failure?.key === key ? failure.error : undefined;
+  const [loadingMore, setLoadingMore] = useState<string>();
+  const reportError = useRef(onError);
+  useEffect(() => {
+    reportError.current = onError;
+  });
+  const fail = useCallback((key: string, error: SearchError) => {
+    setFailure({ key, error });
+    reportError.current?.(error);
+  }, []);
 
   useEffect(() => {
+    if (!enabled || cached) return;
     const controller = new AbortController();
     const search = { connectionId, text, type, includeClosed };
     const timer = setTimeout(async () => {
-      more.current?.abort();
       const answer = await fetchPage(search, undefined, controller.signal);
       if (controller.signal.aborted) return;
-      setLoadingMore(false);
-      setLoaded(
-        answer.ok
-          ? { key, connectionId, ...answer.page }
-          : { key, connectionId, results: [], error: answer.error },
-      );
+      if (answer.ok) {
+        put({ key, connectionId, ...answer.page });
+        setFailure(undefined);
+      } else fail(key, answer.error);
     }, PAUSE_MS);
     return () => {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [key, connectionId, text, type, includeClosed]);
-
-  const current = loaded?.key === key ? loaded : undefined;
-  // Another connection's answer is never shown, not even while this one loads.
-  const shown = loaded?.connectionId === connectionId ? loaded : undefined;
+  }, [enabled, cached, put, fail, key, connectionId, text, type, includeClosed]);
 
   async function loadMore() {
-    if (!current?.next || loadingMore) return;
-    const controller = new AbortController();
-    more.current = controller;
-    setLoadingMore(true);
-    const answer = await fetchPage(input, current.next, controller.signal);
-    if (controller.signal.aborted) return;
-    setLoadingMore(false);
-    setLoaded((previous) => {
-      if (previous?.key !== current.key) return previous;
-      if (!answer.ok) return { ...previous, error: answer.error };
-      const known = new Set(previous.results.map((result) => `${result.type}:${result.key}`));
-      return {
-        ...previous,
-        ...answer.page,
-        // The last page answers without `next`, which must not keep the one before.
-        next: answer.page.next,
-        error: undefined,
-        results: [
-          ...previous.results,
-          ...answer.page.results.filter((result) => !known.has(`${result.type}:${result.key}`)),
-        ],
-      };
+    if (!current?.next || loadingMore === key) return;
+    const from = current;
+    setLoadingMore(from.key);
+    const answer = await fetchPage(input, from.next);
+    setLoadingMore((loading) => (loading === from.key ? undefined : loading));
+    if (!answer.ok) return fail(from.key, answer.error);
+    const known = new Set(from.results.map((result) => `${result.type}:${result.key}`));
+    // The first page's total and reach stand; a later page may count only part of the search.
+    put({
+      ...from,
+      // The last page answers without `next`, which must not keep the one before.
+      next: answer.page.next,
+      results: [
+        ...from.results,
+        ...answer.page.results.filter((result) => !known.has(`${result.type}:${result.key}`)),
+      ],
     });
   }
 
   return {
-    loading: !current,
+    loading: enabled && !current && !error,
     results: shown?.results ?? [],
-    total: shown?.total,
+    /** The results shown are kept from an earlier search, not this one's answer. */
+    stale: shown !== undefined && shown !== current,
+    total: current?.total,
     reach: shown?.reach,
-    error: shown?.error,
+    // Only the answer to this text says what it narrowed to.
+    narrowedTo: current?.narrowedTo,
+    error,
     hasMore: Boolean(current?.next),
-    loadingMore,
+    loadingMore: loadingMore === key,
     loadMore,
   };
 }

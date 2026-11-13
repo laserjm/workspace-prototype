@@ -3,6 +3,7 @@ import type { RecordSummary } from "@/modules/integrations";
 import {
   applyPicks,
   canPick,
+  defaultConnectionId,
   itemCount,
   removeConnection,
   removeItem,
@@ -104,5 +105,31 @@ describe("applying the dialog", () => {
     expect(applyPicks(removeItem(pickMany(1), acme.connectionId, "issue", "acme/web#1"), acme)).toEqual([
       { ...acme, items: [] },
     ]);
+  });
+});
+
+describe("the connection the dialog opens on", () => {
+  const working = (id: string) => ({ id, status: "active" as const });
+  const broken = (id: string) => ({ id, status: "needs_reconnect" as const });
+  const attachedFrom = (connectionId: string) => [{ ...acme, connectionId, items: [] }];
+
+  it("is the one already attached, or else the first", () => {
+    const connections = [working("c-1"), working("c-2")];
+    expect(defaultConnectionId(connections, attachedFrom("c-2"))).toBe("c-2");
+    expect(defaultConnectionId(connections, [])).toBe("c-1");
+  });
+
+  it("skips a broken connection while a working one exists", () => {
+    expect(defaultConnectionId([broken("c-1"), working("c-2")], [])).toBe("c-2");
+    expect(defaultConnectionId([broken("c-1"), working("c-2")], attachedFrom("c-1"))).toBe("c-2");
+  });
+
+  it("is a broken one when nothing works, the attached one first", () => {
+    expect(defaultConnectionId([broken("c-1"), broken("c-2")], attachedFrom("c-2"))).toBe("c-2");
+    expect(defaultConnectionId([broken("c-1"), broken("c-2")], [])).toBe("c-1");
+  });
+
+  it("is nothing without connections", () => {
+    expect(defaultConnectionId([], [])).toBeUndefined();
   });
 });

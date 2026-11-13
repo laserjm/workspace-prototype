@@ -45,7 +45,10 @@ get repos/laserjm/workspace-fixtures/pulls/9 > pull-request-draft.json
 The three searches are the ones #43 describes, with "Include closed" on: the two that run
 before typing (`involves:@me`, then the same scope without it) and one narrowed by a repository
 word (`workspace-fixtures status` becomes `repo:… status in:title,body`) with the issue toggle and
-"Include closed" off. The JSON is formatted with `python3 -m json.tool --no-ensure-ascii`.
+"Include closed" off. They were captured with a classic token, which may search issues and pull
+requests at once; a fine-grained token may not, so the provider sends one search per type (#58),
+and the route tests answer each with its type's part of these files (`perType` in `route.test.ts`).
+The JSON is formatted with `python3 -m json.tool --no-ensure-ascii`.
 
 Two answers are cut down before they are saved, so that nothing private reaches this public
 repository:
