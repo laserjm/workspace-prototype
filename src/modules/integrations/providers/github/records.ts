@@ -987,10 +987,10 @@ const readPullRequest: Reader<GithubPullRequestDetail> = async (access, key) => 
 
 // --- Trimming a read for the model (`read_record`), within `MODEL_LIMITS`. ---
 
-type Comment = GithubIssueDetail["comments"][number];
+type IssueComment = GithubIssueDetail["comments"][number];
 
 /** A comment as the model reads it: no id, its body cut. */
-const trimComment = ({ author, createdAt, body }: Comment) => ({
+const trimComment = ({ author, createdAt, body }: IssueComment) => ({
   author,
   createdAt,
   body: cutText(body, MODEL_LIMITS.commentCharacters),
@@ -1026,22 +1026,20 @@ type ReviewComment = Review["comments"][number];
 function trimPullRequest(detail: GithubPullRequestDetail) {
   const reviews = newestEntries(detail.reviews, detail.reviews.length, "reviews");
   // The inline comments of every review read, oldest first; the newest of the kept reviews' stay.
-  const read = detail.reviews
-    .flatMap((review) => review.comments)
-    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-  const keptReviews = new Set(reviews.kept.map((review) => review.id));
-  const shown = new Set(
-    detail.reviews
-      .filter((review) => keptReviews.has(review.id))
-      .flatMap((review) => review.comments)
-      .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+  const keptReviewIds = new Set(reviews.kept.map((review) => review.id));
+  const readReviewComments = detail.reviews
+    .flatMap((review) => review.comments.map((comment) => ({ reviewId: review.id, comment })))
+    .sort((a, b) => a.comment.createdAt.localeCompare(b.comment.createdAt));
+  const shownCommentIds = new Set(
+    readReviewComments
+      .filter(({ reviewId }) => keptReviewIds.has(reviewId))
       .slice(-MODEL_LIMITS.comments)
-      .map((comment) => comment.id),
+      .map(({ comment }) => comment.id),
   );
   const olderReviewComments = cutNote(
     "review comments",
-    read.length - shown.size,
-    detail.reviewCommentCount - read.length,
+    readReviewComments.length - shownCommentIds.size,
+    detail.reviewCommentCount - readReviewComments.length,
   );
   const trimReviewComment = ({ author, createdAt, path, line, body }: ReviewComment) => ({
     author,
@@ -1060,7 +1058,7 @@ function trimPullRequest(detail: GithubPullRequestDetail) {
       ...(review.submittedAt ? { submittedAt: review.submittedAt } : {}),
       body: cutText(review.body, MODEL_LIMITS.commentCharacters),
       comments: review.comments
-        .filter((comment) => shown.has(comment.id))
+        .filter((comment) => shownCommentIds.has(comment.id))
         .map(trimReviewComment),
     })),
     reviewCommentCount: detail.reviewCommentCount,

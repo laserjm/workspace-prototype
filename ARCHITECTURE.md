@@ -370,7 +370,7 @@ thread attached, through the provider's own search, the same code the attach dia
   tool declares it with `contextSchema`, and `toolsFor` in `agent/tools.ts` fills it from the
   resolved `AgentContext`. `search_records` and `read_record` (context `{ user?, connectionIds }`) answer
   `no_access` for a `connectionId` outside the **allowed connections** (`allowedConnections`, see
-  "Answers come from the Vercel AI Gateway"), whatever the model asks, and is offered
+  "Answers come from the Vercel AI Gateway"), whatever the model asks, and are offered
   (`activeTools`) only while one connection is allowed, even one attached with no items. A tool
   whose context the thread lacks is not offered, and its `execute` refuses anyway.
 - **`search_records`.** `{ connectionId, query, type?, includeClosed? }` answers `{ results:
@@ -391,7 +391,8 @@ thread attached, through the provider's own search, the same code the attach dia
   comments (and, for a pull request, reviews and inline review comments), 2,000 characters each.
   Every cut says what it cut (`cutText`: `[… 32,000 more characters, open the view]`;
   `newestEntries` and `cutNote`: `+ 12 older comments`, and the comments a reader did not reach
-  as `+ 50 later comments not read`). The trimmed copy is the tool's output and so what the
+  as `+ 50 later comments not read, open the view`: GitHub's readers read the first 100, so
+  past that the model gets the newest of those). The trimmed copy is the tool's output and so what the
   conversation stores. Field meanings are in the provider's detail schema's `.describe()` and,
   since the model never sees an output schema, its guide (GitHub's `mergeableState`). The
   description asks for one call per record in the same step. Its card is one quiet line ("Read"
@@ -566,7 +567,7 @@ seeded case found by its label, CI on the heads of the merged and the draft pull
 or `Authorization`);
 `integrations/providers.test.ts` (the declarations of every provider in the registry: unique ids,
 an auth method, a base URL and `verify`, declared record types whose states' tones are in the
-set, every declared type with a reader, a view and an icon and every view of a declared type, a
+set, every declared type with a reader, a trim, a view and an icon and every view of a declared type, a
 provider mark, a guide under its size cap);
 `integrations/actions.integration.test.ts` (connect, reconnect, refusals including each internal
 address kind with name resolution stubbed, test, disconnect, a search marking only its user's

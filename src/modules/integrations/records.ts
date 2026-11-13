@@ -59,7 +59,7 @@ async function readWith(
   connectionId: string,
   type: string,
   key: string,
-  shown: (detail: unknown, declared: RecordType) => unknown,
+  present: (detail: unknown, declared: RecordType) => unknown,
 ): Promise<Result<RecordRead, RecordReadRefusal>> {
   const found = await recordsConnection(user, connectionId);
   const declared = found && Object.hasOwn(found.records.types, type) ? found.records.types[type] : undefined;
@@ -73,7 +73,7 @@ async function readWith(
     return err({ ...read.error, url });
   }
   const { summary, detail } = read.value;
-  return ok({ summary: { ...summary, url }, detail: shown(detail, declared) });
+  return ok({ summary: { ...summary, url }, detail: present(detail, declared) });
 }
 
 /**

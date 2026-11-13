@@ -24,6 +24,6 @@ comments. A pull request adds its newest reviews with their inline comments, its
 its changed files (paths and line counts, no diffs) and the CI of its head commit: the GitHub
 Actions runs and the combined commit status (`readable: false` when the token may not read it).
 `merge.mergeableState` is GitHub's `mergeable_state`: `clean` can merge, `unstable` can merge
-with a failing check, `behind` needs the base branch merged in, `blocked` lacks a required
-review or check, `dirty` has a merge conflict, `unknown` is not worked out yet (and after a
-merge). A review is `APPROVED`, `CHANGES_REQUESTED`, `COMMENTED`, `DISMISSED` or `PENDING`.
+with a failing check, `has_hooks` can merge with hooks, `behind` needs the base branch merged
+in, `blocked` lacks a required review or check, `dirty` has a merge conflict, `draft` is not
+ready for review, `unknown` is not worked out yet (and after a merge). A review is `APPROVED`, `CHANGES_REQUESTED`, `COMMENTED`, `DISMISSED` or `PENDING`.
