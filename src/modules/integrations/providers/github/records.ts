@@ -85,7 +85,7 @@ const itemSchema = z.object({
   repository_url: z.string(),
   updated_at: z.string(),
 });
-type SearchItem = z.infer<typeof itemSchema>;
+type GithubItem = z.infer<typeof itemSchema>;
 
 const searchSchema = z.object({ total_count: z.number(), items: z.array(itemSchema) });
 
@@ -115,31 +115,37 @@ const QUERY_LIMIT = 256;
 
 /** What one search asks GitHub for, besides the dialog's toggles. */
 type SearchTerms = {
-  /** The repositories searched, e.g. "acme/web". */
-  repositories: readonly string[];
+  /** `repo:acme/web …`, or `user:acme …`. */
+  scope: readonly string[];
   words: readonly string[];
   /** Only what involves the token's user (`involves:@me`). */
   involvesMe?: boolean;
 };
 
-/**
- * The search query: the repositories, the words, the type and whether closed items count. When
- * naming each repository makes it too long, it names their owners instead, which may also find
- * an owner's public repositories the token was not given (#43).
- */
-function queryOf({ repositories, words, involvesMe }: SearchTerms, query: RecordSearchQuery): string {
-  const rest = [
+/** The query after the scope: the words, the type and whether closed items count. */
+function qualifiersOf({ words, involvesMe }: Omit<SearchTerms, "scope">, query: RecordSearchQuery) {
+  return [
     ...(involvesMe ? ["involves:@me"] : []),
     ...words,
     ...(words.length ? ["in:title,body"] : []),
     ...(query.type ? [QUALIFIER[query.type as GithubRecordType]] : []),
     ...(query.includeClosed ? [] : ["is:open"]),
   ];
-  const byRepository = [...repositories.map((name) => `repo:${name}`), ...rest].join(" ");
-  if (byRepository.length <= QUERY_LIMIT) return byRepository;
-  const owners = new Set(repositories.map((name) => name.split("/")[0]));
-  return [...[...owners].map((owner) => `user:${owner}`), ...rest].join(" ");
 }
+
+/**
+ * The repositories as `repo:` qualifiers, or, when that makes `longest` (the longest query to be
+ * sent) too long, their owners as `user:`, which may also find an owner's public repositories the
+ * token was not given (#43).
+ */
+function scopeOf(repositories: readonly string[], longest: readonly string[]): string[] {
+  const byRepository = repositories.map((name) => `repo:${name}`);
+  if ([...byRepository, ...longest].join(" ").length <= QUERY_LIMIT) return byRepository;
+  return [...new Set(repositories.map((name) => `user:${name.split("/")[0]}`))];
+}
+
+const queryOf = (terms: SearchTerms, query: RecordSearchQuery) =>
+  [...terms.scope, ...qualifiersOf(terms, query)].join(" ");
 
 /** One page of one search: GitHub's best matches with words, the most recently updated without. */
 function searchPage(
@@ -173,7 +179,7 @@ function pageOf(cursor: string | undefined): number | undefined {
 }
 
 /** The state GitHub's search item is in, as declared above. */
-function stateOf(item: SearchItem): string {
+function stateOf(item: GithubItem): string {
   if (item.pull_request) {
     if (item.pull_request.merged_at) return "merged";
     if (item.state === "closed") return "closed";
@@ -183,12 +189,14 @@ function stateOf(item: SearchItem): string {
   return item.state_reason === "not_planned" ? "not_planned" : "closed";
 }
 
-function summaryOf(connectionId: string, item: SearchItem): RecordSummary {
+const typeOf = (item: GithubItem): GithubRecordType => (item.pull_request ? "pull-request" : "issue");
+
+function summaryOf(connectionId: string, item: GithubItem): RecordSummary {
   const repository = item.repository_url.split("/").slice(-2).join("/");
   const name = repository.split("/")[1];
   return {
     connectionId,
-    type: item.pull_request ? "pull-request" : "issue",
+    type: typeOf(item),
     key: `${repository}#${item.number}`,
     label: `${name}#${item.number}`,
     title: item.title,
@@ -222,14 +230,16 @@ export async function searchGithubRecords(
   const named = typed.map((word) => repositoriesNamed(repositories.value, word));
   const narrowedTo = [...new Set(named.flat().map((repo) => repo.full_name))];
   const inPlay = narrowedTo.length ? narrowedTo : repositories.value.map((repo) => repo.full_name);
-  const terms: SearchTerms = {
-    repositories: inPlay,
-    words: typed
-      .filter((_, index) => named[index].length === 0)
-      .map(searchWord)
-      .filter(Boolean),
-  };
+  const words = typed
+    .filter((_, index) => named[index].length === 0)
+    .map(searchWord)
+    .filter(Boolean);
   const suggesting = typed.length === 0 && page === 1;
+  // Both searches before typing share one scope, decided on the longer of them.
+  const terms: SearchTerms = {
+    scope: scopeOf(inPlay, qualifiersOf({ words, involvesMe: suggesting }, query)),
+    words,
+  };
   // With one repository in play, a typed number is also read directly and put on top: the search
   // has no number qualifier.
   const number = page === 1 && inPlay.length === 1 ? typed.map(numberIn).find(Boolean) : undefined;
@@ -265,16 +275,15 @@ function repositoriesNamed(repositories: readonly Repository[], word: string) {
 }
 
 /** Whether an item read directly is one the dialog's toggles let through. */
-function matchesToggles(item: SearchItem, query: RecordSearchQuery): boolean {
-  const type: GithubRecordType = item.pull_request ? "pull-request" : "issue";
-  if (query.type !== undefined && query.type !== type) return false;
+function matchesToggles(item: GithubItem, query: RecordSearchQuery): boolean {
+  if (query.type !== undefined && query.type !== typeOf(item)) return false;
   return query.includeClosed === true || item.state === "open";
 }
 
-const idOf = (item: SearchItem) => `${item.repository_url}#${item.number}`;
+const idOf = (item: GithubItem) => `${item.repository_url}#${item.number}`;
 
 /** Each item once, where it first appears. */
-function uniqueItems(items: readonly SearchItem[]): SearchItem[] {
+function uniqueItems(items: readonly GithubItem[]): GithubItem[] {
   const seen = new Set<string>();
   return items.filter((item) => {
     const id = idOf(item);

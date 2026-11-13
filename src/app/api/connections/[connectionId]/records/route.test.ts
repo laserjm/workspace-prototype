@@ -222,6 +222,22 @@ describe("GET /api/connections/[connectionId]/records", () => {
     expect(requests).toHaveLength(2);
   });
 
+  it("names the owners in both searches before typing when only the one involving the user is too long", async () => {
+    // 10 × "repo:acme/repository-0N" and " is:open" make 247 characters; " involves:@me" makes 260.
+    const repositories = Array.from({ length: 10 }, (_, index) => ({
+      full_name: `acme/repository-0${index}`,
+      owner: { login: "acme", type: "Organization" },
+    }));
+    const { requests } = useRecordedGithub({
+      [REPOS]: { status: 200, body: repositories },
+      "GET /search/issues?q=user:acme involves:@me is:open&sort=updated&order=desc&per_page=20":
+        "search-narrowed.json",
+      "GET /search/issues?q=user:acme is:open&sort=updated&order=desc&per_page=20": "search.json",
+    });
+    expect((await search()).response.status).toBe(200);
+    expect(requests).toHaveLength(3);
+  });
+
   describe("before typing", () => {
     const involving = (q: string) =>
       `GET /search/issues?q=${SCOPE} involves:@me${q}&sort=updated&order=desc&per_page=20`;

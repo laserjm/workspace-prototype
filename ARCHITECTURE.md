@@ -430,7 +430,8 @@ connection `needs_reconnect`, a visitor, `assertIsolation()`); the marks registr
 `app/api/connections/[connectionId]/records/route.test.ts` (the scoped query, the toggles and
 the cursor, the before-typing pair, narrowing by a repository name, the number on top, the
 `user:` fallback, the computed states, another user's connection, each classifier case and a 401
-marking the connection); `records/contracts.test.ts` (the dialog's default connection); `sources/queries.test.ts`; `tsc`.
+marking the connection); `records/contracts.test.ts` (the dialog's default connection);
+`sources/queries.test.ts`; `tsc`.
 **Recorded in.** This entry; `docs/adr/0002-integrations.md`;
 `docs/adr/0003-attached-items-and-record-views.md`.
 

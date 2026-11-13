@@ -63,11 +63,11 @@ function ago(iso: string, now = Date.now()) {
   return relative.format(Math.round(days / 30), "month");
 }
 
-/** The typed words worth marking in a title: a number without its `#`, other words of 2 letters on. */
+/** The typed words worth marking in a title, without leading marks: a digit, or 2 letters on. */
 function markedWords(text: string): string[] {
   return text
     .split(/\s+/)
-    .map((word) => word.replace(/^#(?=\d)/, ""))
+    .map((word) => word.replace(/^[^\p{L}\p{N}]+/u, ""))
     .filter((word) => word.length > 1 || /^\d$/.test(word));
 }
 
@@ -189,18 +189,18 @@ function RateLimitWait({ retryAt, provider }: { retryAt: string; provider: Provi
 /** The one quiet line a refused search leaves above the results it keeps. */
 function SearchErrorLine({
   error,
-  broken,
+  needsReconnect,
   provider,
   onReconnect,
 }: {
   error: SearchError | undefined;
-  broken: boolean;
+  needsReconnect: boolean;
   provider: ProviderChoice;
   onReconnect: () => void;
 }) {
   const retryAt = error?.kind === "rate_limited" ? error.retryAt : undefined;
   let line: ReactNode;
-  if (broken || error?.kind === "needs_reconnect")
+  if (needsReconnect || error?.kind === "needs_reconnect")
     line = (
       <button type="button" className="text-info-foreground hover:underline" onClick={onReconnect}>
         Reconnect {provider.name}
@@ -241,7 +241,7 @@ function ConnectionSearch({
 }) {
   const { connection, provider } = shown;
   const { putConnection } = useIntegrations();
-  const broken = connection.status === "needs_reconnect";
+  const needsReconnect = connection.status === "needs_reconnect";
   const records = provider.records!;
   const types = Object.entries(records.types);
   const [text, setText] = useState("");
@@ -252,7 +252,7 @@ function ConnectionSearch({
     { connectionId: connection.id, text, type, includeClosed },
     {
       cache,
-      enabled: !broken,
+      enabled: !needsReconnect,
       onError(error) {
         // The server marked it; the dialog and Settings now show it too.
         if (error.kind === "needs_reconnect")
@@ -295,7 +295,7 @@ function ConnectionSearch({
           <strong className="block text-xs font-medium">
             {provider.name} · {connection.accountLabel}
           </strong>
-          {broken ? (
+          {needsReconnect ? (
             <small className="mt-1 block text-3xs text-warning-foreground">Needs reconnecting</small>
           ) : (
             <small className="mt-1 block truncate text-3xs text-secondary-label">
@@ -303,7 +303,7 @@ function ConnectionSearch({
             </small>
           )}
         </div>
-        {broken && (
+        {needsReconnect && (
           <Button variant="outline" size="xs" onClick={onReconnect}>
             Reconnect
           </Button>
@@ -332,7 +332,7 @@ function ConnectionSearch({
         <div
           className={cn(
             "flex min-h-9 min-w-0 cursor-text flex-wrap items-center gap-1.5 rounded-sm border border-border bg-card px-2 py-1.5 text-icon-muted focus-within:border-ring",
-            broken && "cursor-default",
+            needsReconnect && "cursor-default",
           )}
           onClick={() => input.current?.focus()}
         >
@@ -366,7 +366,7 @@ function ConnectionSearch({
           <input
             ref={input}
             autoFocus
-            disabled={broken}
+            disabled={needsReconnect}
             aria-label={`Search ${pluralLabels(records)}`}
             className="min-w-24 flex-1 bg-transparent py-0.5 text-xs text-accent-foreground outline-none placeholder:text-placeholder disabled:cursor-not-allowed"
             placeholder={picked.length ? "Add more…" : "Search titles and descriptions…"}
@@ -403,7 +403,7 @@ function ConnectionSearch({
                   <button
                     key={value}
                     type="button"
-                    disabled={broken}
+                    disabled={needsReconnect}
                     aria-pressed={type === value}
                     onClick={() => setType(value)}
                     className={cn(
@@ -422,7 +422,7 @@ function ConnectionSearch({
               <input
                 type="checkbox"
                 className="size-3.5 accent-primary"
-                disabled={broken}
+                disabled={needsReconnect}
                 checked={includeClosed}
                 onChange={(event) => setIncludeClosed(event.target.checked)}
               />
@@ -447,7 +447,7 @@ function ConnectionSearch({
         </div>
         <SearchErrorLine
           error={search.error}
-          broken={broken}
+          needsReconnect={needsReconnect}
           provider={provider}
           onReconnect={onReconnect}
         />
@@ -508,7 +508,7 @@ function ConnectionSearch({
               </div>
             );
           })}
-          {!search.loading && !search.error && !broken && search.results.length === 0 && (
+          {!search.loading && !search.error && !needsReconnect && search.results.length === 0 && (
             <p className="py-6 text-center text-xs text-muted-foreground">
               Nothing matches{text.trim() ? ` “${text.trim()}”` : ""}.
             </p>

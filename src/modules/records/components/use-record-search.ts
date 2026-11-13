@@ -104,6 +104,10 @@ export function useRecordSearch(
   useEffect(() => {
     reportError.current = onError;
   });
+  const fail = useCallback((key: string, error: SearchError) => {
+    setFailure({ key, error });
+    reportError.current?.(error);
+  }, []);
 
   useEffect(() => {
     if (!enabled || cached) return;
@@ -115,16 +119,13 @@ export function useRecordSearch(
       if (answer.ok) {
         put({ key, connectionId, ...answer.page });
         setFailure(undefined);
-      } else {
-        setFailure({ key, error: answer.error });
-        reportError.current?.(answer.error);
-      }
+      } else fail(key, answer.error);
     }, PAUSE_MS);
     return () => {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [enabled, cached, put, key, connectionId, text, type, includeClosed]);
+  }, [enabled, cached, put, fail, key, connectionId, text, type, includeClosed]);
 
   async function loadMore() {
     if (!current?.next || loadingMore === key) return;
@@ -132,11 +133,7 @@ export function useRecordSearch(
     setLoadingMore(from.key);
     const answer = await fetchPage(input, from.next);
     setLoadingMore((loading) => (loading === from.key ? undefined : loading));
-    if (!answer.ok) {
-      setFailure({ key: from.key, error: answer.error });
-      reportError.current?.(answer.error);
-      return;
-    }
+    if (!answer.ok) return fail(from.key, answer.error);
     const known = new Set(from.results.map((result) => `${result.type}:${result.key}`));
     put({
       ...from,
@@ -155,7 +152,8 @@ export function useRecordSearch(
     results: shown?.results ?? [],
     total: current?.total,
     reach: shown?.reach,
-    narrowedTo: shown?.narrowedTo,
+    // Only the answer to this text says what it narrowed to.
+    narrowedTo: current?.narrowedTo,
     error,
     hasMore: Boolean(current?.next),
     loadingMore: loadingMore === key,
