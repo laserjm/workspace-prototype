@@ -254,7 +254,8 @@ describeIntegration(
       });
 
       it("answer Try again on a question whose connection was removed since, and still refuse it on a new one", async () => {
-        // One of Ana's connections, stored as connecting it does; Settings removes it below.
+        // One of Ana's connections, stored and later removed as `integrations` does. Its actions
+        // are not part of its public API, so the test writes the row the way they would.
         const [own] = await db()
           .insert(connectionsTable)
           .values({
@@ -274,6 +275,7 @@ describeIntegration(
         // The answer failed: the thread holds the question and no reply.
         await requests[0]!.onEnd([...aConversation.slice(0, 2), question]);
 
+        // Removed, as Settings → Data sources does.
         await db().delete(connectionsTable).where(eq(connectionsTable.id, own!.id));
         const retried = await answerThread(ana, thread.id, aChatTurn(question));
         expect(retried.status).toBe(200);

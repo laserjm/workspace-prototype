@@ -142,19 +142,16 @@ describe("following the conversation", () => {
     );
   });
 
-  it("starts a fork open on Attached with nothing open, and its first new question opens and focuses its items", () => {
-    // The fork copies u1 and a1; its panel stored nothing, whatever the origin thread's holds.
-    const copied = [question("u1", issue(1), issue(2)), reply("a1")];
-    const fork = initialPanelState({ stored: undefined, wide: true, hasAttached: true });
-    expect(fork).toEqual({
-      views: [],
-      activeId: null,
-      pinnedId: null,
-      shown: true,
-      rearranged: false,
-    });
-    expect(followConversation(fork, { seen: ids(copied), messages: copied, wide: true })).toBe(fork);
+  // A fork is a new thread: its panel stored nothing, whatever the origin's holds, so it starts
+  // open on Attached with nothing open (see "a thread's panel when it opens"). It copies u1 and a1.
+  const copied = [question("u1", issue(1), issue(2)), reply("a1")];
+  const fork = initialPanelState({ stored: undefined, wide: true, hasAttached: true });
 
+  it("opens nothing for the questions a fork copied", () => {
+    expect(followConversation(fork, { seen: ids(copied), messages: copied, wide: true })).toBe(fork);
+  });
+
+  it("opens and focuses the items of a fork's first new question", () => {
     const asked = [...copied, question("u2", issue(3)), reply("a2")];
     const state = followConversation(fork, { seen: ids(copied), messages: asked, wide: true });
     expect(openIds(state)).toEqual([idOf(issue(3))]);
@@ -185,7 +182,7 @@ describe("closing a view", () => {
 });
 
 describe("a thread's panel when it opens", () => {
-  it("starts open on a wide screen when the thread has attached items, and hidden otherwise", () => {
+  it("starts open on a wide screen when the thread has attached items, as a fork does, and hidden otherwise", () => {
     expect(initialPanelState({ stored: undefined, wide: true, hasAttached: true })).toEqual({
       views: [],
       activeId: null,
