@@ -20,6 +20,20 @@ import { listConnections } from "./queries";
 
 vi.mock("@/lib/auth/session", () => import("@/tests/support/session"));
 
+/** Name resolution as the test sees it: which addresses a hostname resolves to. */
+const names = vi.hoisted(() => new Map<string, string[]>());
+vi.mock("node:dns/promises", () => {
+  const lookup = async (hostname: string) => {
+    const addresses = names.get(hostname);
+    if (!addresses) throw new Error(`getaddrinfo ENOTFOUND ${hostname}`);
+    return addresses.map((address) => ({
+      address,
+      family: address.includes(":") ? 6 : 4,
+    }));
+  };
+  return { lookup, default: { lookup } };
+});
+
 /** GitHub as the test sees it: which token belongs to whom, and whether it answers at all. */
 const github = {
   accounts: new Map<string, { id: number; login: string }>(),
@@ -57,6 +71,13 @@ describeIntegration(
         ["tok-ben", { id: 2002, login: "ben" }],
       ]);
       github.down = false;
+      names.clear();
+      names.set("api.github.com", ["140.82.121.6"]);
+      names.set("github.acme.test", ["198.51.100.7", "2001:db8::7"]);
+      names.set("loop.acme.test", ["127.0.0.2"]);
+      names.set("git.acme.test", ["10.0.0.7"]);
+      names.set("meta.acme.test", ["fe80::a9fe:a9fe"]);
+      names.set("mixed.acme.test", ["198.51.100.7", "fd00::7"]);
       vi.stubGlobal(
         "fetch",
         vi.fn(async (_url: string, init: RequestInit) => {
@@ -169,6 +190,47 @@ describeIntegration(
         ok: false,
         error: { _tag: "ValidationFailed", issues: [{ path: "baseUrl" }] },
       });
+    });
+
+    it.each([
+      { name: "localhost", baseUrl: "https://localhost/api/v3" },
+      { name: "a loopback IPv4 address", baseUrl: "https://127.0.0.1/api/v3" },
+      { name: "a loopback IPv6 address", baseUrl: "https://[::1]/api/v3" },
+      { name: "an RFC 1918 address (10/8)", baseUrl: "https://10.1.2.3" },
+      { name: "an RFC 1918 address (172.16/12)", baseUrl: "https://172.20.0.1" },
+      { name: "an RFC 1918 address (192.168/16)", baseUrl: "https://192.168.1.10" },
+      { name: "a unique local IPv6 address", baseUrl: "https://[fd12:3456::1]" },
+      { name: "a link-local IPv4 address", baseUrl: "https://169.254.169.254" },
+      { name: "a link-local IPv6 address", baseUrl: "https://[fe80::1]" },
+      { name: "an IPv4-mapped IPv6 loopback", baseUrl: "https://[::ffff:127.0.0.1]" },
+      { name: "a hostname resolving to a loopback address", baseUrl: "https://loop.acme.test" },
+      { name: "a hostname resolving to a private address", baseUrl: "https://git.acme.test" },
+      { name: "a hostname resolving to a link-local address", baseUrl: "https://meta.acme.test" },
+      {
+        name: "a hostname with one private address among public ones",
+        baseUrl: "https://mixed.acme.test/api/v3",
+      },
+      { name: "a hostname that does not resolve", baseUrl: "https://nowhere.acme.test" },
+    ])("refuses $name as the address, and stores nothing", async ({ baseUrl }) => {
+      expect(await connectGithub(ana, "tok-ana", baseUrl)).toEqual({
+        ok: false,
+        error: {
+          _tag: "ValidationFailed",
+          issues: [{ path: "baseUrl", message: expect.any(String) }],
+        },
+      });
+      expect(fetch).not.toHaveBeenCalled();
+      expect(await stored(ana)).toEqual([]);
+    });
+
+    it("connects at a host on the internet, without following redirects", async () => {
+      expect(
+        await connectGithub(ana, "tok-ana", "https://github.acme.test/api/v3/"),
+      ).toMatchObject({ ok: true, value: { baseUrl: "https://github.acme.test/api/v3" } });
+      expect(fetch).toHaveBeenCalledWith(
+        "https://github.acme.test/api/v3/user",
+        expect.objectContaining({ redirect: "error" }),
+      );
     });
 
     it("tests a connection: works, then needs reconnecting once GitHub refuses the token", async () => {

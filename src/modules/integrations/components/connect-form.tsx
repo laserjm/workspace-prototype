@@ -45,6 +45,12 @@ export function ConnectForm({
     (method.kind === "token" ? token.trim() : username.trim() && password) &&
     (!provider.baseUrl || baseUrl.trim());
   const id = (field: string) => `connect-${provider.id}-${field}`;
+  // Any issue with the address (not HTTPS, internal, not found) is the URL field's error; every
+  // other error is the form's.
+  const urlError =
+    provider.baseUrl && connect.error?._tag === "ValidationFailed"
+      ? connect.error.issues.find((issue) => issue.path === "baseUrl")?.message
+      : undefined;
 
   return (
     <form
@@ -89,7 +95,18 @@ export function ConnectForm({
             value={baseUrl}
             onChange={(event) => setBaseUrl(event.target.value)}
             required
+            aria-invalid={urlError ? true : undefined}
+            aria-describedby={urlError ? id("url-error") : undefined}
           />
+          {urlError && (
+            <p
+              id={id("url-error")}
+              className="text-xs text-destructive-foreground"
+              role="alert"
+            >
+              {urlError}
+            </p>
+          )}
         </div>
       )}
       {method.kind === "token" ? (
@@ -140,13 +157,12 @@ export function ConnectForm({
           </div>
         </>
       )}
-      {connect.error && (
+      {connect.error && !urlError && (
         <p className="text-xs text-destructive-foreground" role="alert">
           {connect.error._tag === "CredentialRejected" ||
           connect.error._tag === "ProviderUnreachable"
             ? connect.error.message
             : errorMessage(connect.error, {
-                ValidationFailed: "Check the address: it has to start with https://.",
                 NotFound: `${provider.name} cannot be connected this way.`,
               })}
         </p>

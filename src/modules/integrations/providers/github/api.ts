@@ -22,6 +22,8 @@ export function githubGet(path: string, { baseUrl, authorization }: ProviderAcce
       "User-Agent": "workspace-prototype",
       ...(authorization ? { Authorization: authorization } : {}),
     },
+    // A redirect could lead to an address the connect check refused, so none is followed.
+    redirect: "error",
     signal: AbortSignal.timeout(TIMEOUT_MS),
   });
 }
