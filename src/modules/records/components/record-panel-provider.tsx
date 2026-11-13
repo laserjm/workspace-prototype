@@ -11,7 +11,8 @@ import {
   type ReactNode,
 } from "react";
 import { bug } from "@/lib/errors";
-import type { AttachedConnection } from "../contracts";
+import { viewKindOf } from "@/modules/integrations";
+import type { AttachedConnection, AttachedItem, ConnectionRef } from "../contracts";
 import {
   closeView,
   focusView,
@@ -63,9 +64,21 @@ function writeStored(threadId: string, state: PanelState) {
   }
 }
 
+/** A record to open, with its connection. */
+type Openable = { connection: ConnectionRef; item: AttachedItem };
+
+/** The record with the view kind it opens in. */
+const targetOf = ({ connection, item }: Openable): ViewTarget => ({
+  kind: viewKindOf(connection.provider, item.type),
+  connection,
+  item,
+});
+
 /** The items of a question's attached connections; a whole connection opens no view. */
 const targetsOf = (attached: readonly AttachedConnection[]): ViewTarget[] =>
-  attached.flatMap(({ items, ...connection }) => items.map((item) => ({ connection, item })));
+  attached.flatMap(({ items, ...connection }) =>
+    items.map((item) => targetOf({ connection, item })),
+  );
 
 export type RecordPanelControls = {
   /** The open thread's panel; none before its conversation has loaded and nothing set it up. */
@@ -75,7 +88,7 @@ export type RecordPanelControls = {
   /** Sets the thread's panel up once its conversation is here, as stored or from defaults. */
   ensure: (hasAttached: boolean) => void;
   /** Opens a record's view, or focuses it: a chip's click. */
-  open: (target: ViewTarget) => void;
+  open: (record: Openable) => void;
   /** Opens the items a question just sent (`openSent` in record-panel.ts). */
   openSent: (attached: readonly AttachedConnection[]) => void;
   /** Shows a view, or with none the Attached tab. */
@@ -126,7 +139,7 @@ export function RecordPanelProvider({
       wide,
       store,
       ensure: (hasAttached) => update((current) => current, hasAttached),
-      open: (target) => update((current) => openView(current, target)),
+      open: (record) => update((current) => openView(current, targetOf(record))),
       openSent: (attached) =>
         update((current) => openSent(current, targetsOf(attached), { wide })),
       focus: (id) => update((current) => focusView(current, id)),

@@ -19,6 +19,7 @@ const BETA = "2c6d1e0b-7f41-4b9d-8f0e-1c5a4e2f9a37";
 /** An attached item of acme's GitHub connection, `web#<number>`. */
 function issue(number: number, connectionId = ACME): ViewTarget {
   return {
+    kind: "github.issue-view",
     connection: { connectionId, provider: "github", label: "@acme" },
     item: {
       type: "issue",
@@ -29,7 +30,7 @@ function issue(number: number, connectionId = ACME): ViewTarget {
 }
 
 const idOf = (target: ViewTarget) =>
-  viewIdOf(target.connection.provider, target.item.type, target.connection.connectionId, target.item.key);
+  viewIdOf(target.kind, target.connection.connectionId, target.item.key);
 
 const EMPTY: PanelState = { views: [], activeId: null, shown: true, rearranged: false };
 

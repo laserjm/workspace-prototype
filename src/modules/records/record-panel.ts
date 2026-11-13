@@ -1,12 +1,16 @@
 // The record panel's state for one thread (ADR 0003 §2, #40, #51): which record views are open,
 // which one is shown, whether the panel is, and whether the user rearranged it since their last
 // question. Browser-safe and pure; `RecordPanelProvider` keeps it per thread in `localStorage`.
+// Like the other pure rules here it imports `integrations` as types only: the view kind comes in
+// as data, derived by the components with `viewKindOf`.
 import { z } from "zod";
-import { viewKindOf } from "@/modules/integrations";
 import type { AttachedItem, ConnectionRef, ItemSnapshot } from "./contracts";
 
-/** A record to open in a view: an attached item, with its connection. */
-export type ViewTarget = { connection: ConnectionRef; item: AttachedItem };
+/**
+ * A record to open in a view: an attached item, with its connection and the view kind it opens
+ * in (`viewKindOf(provider, type)`, e.g. `github.issue-view`).
+ */
+export type ViewTarget = { kind: string; connection: ConnectionRef; item: AttachedItem };
 
 /** An open record view: enough to draw its tab without fetching. */
 export type OpenView = {
@@ -30,12 +34,12 @@ export type PanelState = {
   rearranged: boolean;
 };
 
-export const viewIdOf = (provider: string, type: string, connectionId: string, key: string) =>
-  `${viewKindOf(provider, type)}:${connectionId}:${key}`;
+export const viewIdOf = (kind: string, connectionId: string, key: string) =>
+  `${kind}:${connectionId}:${key}`;
 
-function viewOf({ connection, item }: ViewTarget): OpenView {
+function viewOf({ kind, connection, item }: ViewTarget): OpenView {
   return {
-    id: viewIdOf(connection.provider, item.type, connection.connectionId, item.key),
+    id: viewIdOf(kind, connection.connectionId, item.key),
     connectionId: connection.connectionId,
     provider: connection.provider,
     type: item.type,

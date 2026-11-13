@@ -263,7 +263,11 @@ function AttachedList({
           </div>
           <ul className="flex flex-col">
             {items.map(({ connection, item }) => {
-              const id = viewIdOf(connection.provider, item.type, connection.connectionId, item.key);
+              const id = viewIdOf(
+                viewKindOf(connection.provider, item.type),
+                connection.connectionId,
+                item.key,
+              );
               return (
                 <li key={id}>
                   <button
