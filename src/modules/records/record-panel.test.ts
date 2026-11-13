@@ -105,9 +105,12 @@ describe("sending a question", () => {
     expect(openSent(hidden, [], { wide: true }).shown).toBe(false);
   });
 
-  it("leaves a rearranged panel hidden", () => {
-    const hidden = setShown(focusView(openSent(EMPTY, [issue(1)], { wide: true }), null), false);
-    expect(openSent(hidden, [issue(2)], { wide: true }).shown).toBe(false);
+  it("leaves a panel the user hid hidden, since hiding it rearranges it", () => {
+    const hidden = setShown(openSent(EMPTY, [issue(1)], { wide: true }), false);
+    expect(hidden.rearranged).toBe(true);
+    const state = openSent(hidden, [issue(2)], { wide: true });
+    expect(state.shown).toBe(false);
+    expect(state.activeId).toBe(idOf(issue(1)));
   });
 });
 

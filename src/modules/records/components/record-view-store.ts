@@ -52,7 +52,7 @@ const fetchRecord: FetchRecord = async ({ connectionId, type, key }) => {
  */
 export class RecordViewStore {
   #loads = new Map<string, ViewLoad>();
-  #pending = new Map<string, Promise<void>>();
+  #pending = new Set<string>();
   #listeners = new Set<() => void>();
   #fetch: FetchRecord;
 
@@ -87,7 +87,8 @@ export class RecordViewStore {
       view.id,
       current?.status === "ready" ? { ...current, refreshing: true } : loading,
     );
-    const request = this.#fetch(view).then((read) => {
+    this.#pending.add(view.id);
+    void this.#fetch(view).then((read) => {
       this.#pending.delete(view.id);
       this.#set(
         view.id,
@@ -96,7 +97,6 @@ export class RecordViewStore {
           : { status: "failed", error: read.error },
       );
     });
-    this.#pending.set(view.id, request);
   }
 
   #set(id: string, state: ViewLoad) {

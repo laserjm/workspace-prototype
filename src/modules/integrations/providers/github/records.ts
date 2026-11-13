@@ -369,13 +369,14 @@ function uniqueItems(items: readonly GithubItem[]): GithubItem[] {
 const COMMENT_LIMIT = 100;
 
 /**
- * Characters that draw nothing or reorder what follows: zero-width spaces and marks, the
- * bidirectional embeddings, overrides and isolates, the word joiner and invisible operators, the
- * byte order mark, the soft hyphen and the tag characters. Untrusted text could hide words or
+ * Characters that draw nothing or reorder what follows: zero-width spaces and marks, the Arabic
+ * letter mark and the other bidirectional marks, embeddings, overrides and isolates, the word
+ * joiner and invisible operators, the byte order mark, the soft hyphen, the combining grapheme
+ * joiner, the Hangul fillers and the tag characters. Untrusted text could hide words or
  * show them in another order with them. The zero-width joiner stays, because emoji are built
  * with it.
  */
-const INVISIBLE = /[\u00AD\u180E\u200B\u200C\u200E\u200F\u202A-\u202E\u2060-\u2064\u2066-\u2069\uFEFF]|[\u{E0000}-\u{E007F}]/gu;
+const INVISIBLE = /[\u00AD\u034F\u061C\u115F\u1160\u180E\u200B\u200C\u200E\u200F\u202A-\u202E\u2060-\u2064\u2066-\u2069\u3164\uFEFF\uFFA0]|[\u{E0000}-\u{E007F}]/gu;
 
 /** `text` without invisible and bidirectional characters. */
 export const visibleText = (text: string) => text.replace(INVISIBLE, "");

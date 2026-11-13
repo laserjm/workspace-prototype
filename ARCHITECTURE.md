@@ -100,7 +100,7 @@ other module's schema, as `startThreadInputSchema` does on `chatOptionsSchema`).
 thread refers to its source, records and skill by id (`ThreadScope = { sourceId, recordIds }`,
 `skillId`; a source id is `<connectionId>:<sourceKey>`, `sourceIdOf` in `sources/contracts.ts`). Components resolve the ids through the other module's public API
 (`useSources().sourceById`, `useSkills().skillById`). Source-specific presentation (overview
-title, breadcrumb, board view, list label, the icon `SourceIcon` draws) is data on the source,
+title, breadcrumb, the icon `SourceIcon` draws) is data on the source,
 from its provider's product, not a branch on its id. The record vocabulary (`RECORD_STATUSES`,
 `SourceRecord`, `RecordQuery`, `RecordPage`) is `sources`'; `integrations` imports it as types
 only, so loading `sources` never loads the `integrations` components and actions.
@@ -454,7 +454,8 @@ RecordSummary & { url }, detail }` or the same `{ error }`. GitHub's issue reade
 way plus `/pulls/{n}` for its draft and merge state until #61 gives it its own detail. Both strip
 invisible and bidirectional Unicode (zero-width characters, the bidi embeddings, overrides and
 isolates, the byte order mark, tag characters; the zero-width joiner stays for emoji) from titles,
-bodies, labels and comments. GitHub's search (#43) names the token's
+bodies, labels and comments (the bidi marks including U+061C, the combining grapheme joiner and
+the Hangul fillers too). GitHub's search (#43) names the token's
 repositories (`GET /user/repos`) as `repo:a repo:b …`, or `user:<owner>` for each distinct owner
 when that would make the query longer than 256 characters; adds the typed words with
 `in:title,body` (a word GitHub would read as a qualifier is quoted), `is:issue` or `is:pr` and
@@ -523,7 +524,7 @@ render prop, `RecordPanel`, beside the conversation once that is here.
 - **State.** `records/record-panel.ts` is pure: per thread, the open views (in the order they
   opened, each with the snapshot it was opened from, so a tab draws without fetching), the active
   one (none shows the fixed **Attached** tab), whether the panel is shown and whether the user
-  rearranged it since their last question. A view's id is `<viewKind>:<connectionId>:<key>`.
+  rearranged it (opened, focused, closed or hid) since their last question. A view's id is `<viewKind>:<connectionId>:<key>`.
   `openView` (a chip or an Attached row) opens or focuses and shows the panel; `openSent` opens a
   question's items and focuses the first, showing a hidden panel on a wide screen, unless the user
   rearranged the panel since their last question, when they open without taking focus; closing a

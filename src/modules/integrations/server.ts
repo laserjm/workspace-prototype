@@ -9,5 +9,4 @@ export {
   readRecord,
   searchRecords,
   type ConnectedSource,
-  type RecordReadRefusal,
 } from "./records";

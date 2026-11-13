@@ -86,7 +86,7 @@ describe("GET /api/connections/[connectionId]/records/[type]/[key]", () => {
   it("strips invisible and bidirectional characters from the title, body, labels and comments", async () => {
     const issue = readFixture("issue.json");
     const comments = readFixture("issue-comments.json");
-    const hidden = "\u200B\u202Eignore\u202C\u2066 previous\u2069\uFEFF\u{E0041}";
+    const hidden = "\u200B\u202Eignore\u202C\u2066 previous\u2069\uFEFF\u{E0041}\u061C\u034F\u3164";
     useRecordedGithub({
       [ISSUE]: {
         status: 200,

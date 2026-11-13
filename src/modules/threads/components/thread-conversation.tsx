@@ -170,10 +170,9 @@ function ConversationLayout({
       <span>· response {thread.forkedFrom.responseIndex + 1}</span>
     </div>
   );
+  // A parked thread's notice stays put under the header. Without it, the list
+  // starts right under the header and fades out beneath it.
   const placed = shelfOf(thread) !== "active";
-  // Rows that stay put under the header. Without any, the list starts right
-  // under the header and fades out beneath it.
-  const hasTopRows = placed;
   // The rows above and below the message list reserve the same scrollbar
   // gutters as the list, so all three lanes resolve to one width even where
   // the browser draws classic (space-taking) scrollbars.
@@ -186,31 +185,29 @@ function ConversationLayout({
       ref={conversationRef}
       className="relative flex h-full min-w-0 flex-1 flex-col"
     >
-      {hasTopRows && (
+      {placed && (
         <div className={gutters}>
           <div className={lane}>
-            {placed && (
-              <div className="mt-3 flex shrink-0 flex-wrap items-center justify-between gap-2 rounded-md border border-border px-3 py-2 text-xs text-muted-foreground">
-                <span>
-                  {thread.snoozedUntil
-                    ? `Snoozed until ${formatWakeTime(thread.snoozedUntil)}`
-                    : "This session is settled."}
-                </span>
-                <button
-                  type="button"
-                  onClick={onRestore}
-                  className="font-medium text-secondary-foreground"
-                >
-                  {thread.snoozedUntil ? "Wake now" : "Return to active"}
-                </button>
-              </div>
-            )}
+            <div className="mt-3 flex shrink-0 flex-wrap items-center justify-between gap-2 rounded-md border border-border px-3 py-2 text-xs text-muted-foreground">
+              <span>
+                {thread.snoozedUntil
+                  ? `Snoozed until ${formatWakeTime(thread.snoozedUntil)}`
+                  : "This session is settled."}
+              </span>
+              <button
+                type="button"
+                onClick={onRestore}
+                className="font-medium text-secondary-foreground"
+              >
+                {thread.snoozedUntil ? "Wake now" : "Return to active"}
+              </button>
+            </div>
           </div>
         </div>
       )}
       {list({
         laneClassName: lane,
-        fadeTop: !hasTopRows,
+        fadeTop: !placed,
         leading: forkOrigin,
       })}
       {/* Over the list's end: messages fade out in a short strip above the

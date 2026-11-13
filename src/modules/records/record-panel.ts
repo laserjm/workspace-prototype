@@ -5,7 +5,7 @@ import { z } from "zod";
 import { viewKindOf } from "@/modules/integrations";
 import type { AttachedItem, ConnectionRef, ItemSnapshot } from "./contracts";
 
-/** A record to open in a view: an attached item, or a record a reply named, with its connection. */
+/** A record to open in a view: an attached item, with its connection. */
 export type ViewTarget = { connection: ConnectionRef; item: AttachedItem };
 
 /** An open record view: enough to draw its tab without fetching. */
@@ -26,7 +26,7 @@ export type PanelState = {
   /** The view shown; none shows the Attached tab. */
   activeId: string | null;
   shown: boolean;
-  /** The user opened, focused or closed something since their last question. */
+  /** The user opened, focused or closed something, or hid the panel, since their last question. */
   rearranged: boolean;
 };
 
@@ -97,8 +97,9 @@ export function closeView(state: PanelState, id: string): PanelState {
   return { ...state, views, activeId, rearranged: true };
 }
 
+/** Shows or hides the panel; hiding it rearranges it, so the next question does not show it again. */
 export function setShown(state: PanelState, shown: boolean): PanelState {
-  return { ...state, shown };
+  return { ...state, shown, rearranged: state.rearranged || !shown };
 }
 
 // --- Stored per thread in this browser ---

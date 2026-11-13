@@ -34,8 +34,8 @@ function subscribeWide(listener: () => void) {
   return () => query.removeEventListener("change", listener);
 }
 
-/** Whether the window is at least desktop width. */
-export function useWideScreen() {
+/** Whether the window is at least desktop width (`desktop:` in globals.css). */
+function useWideScreen() {
   return useSyncExternalStore(
     subscribeWide,
     () => window.matchMedia(WIDE).matches,
