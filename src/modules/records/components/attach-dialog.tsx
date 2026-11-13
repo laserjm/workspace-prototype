@@ -95,7 +95,8 @@ export function AttachDialog({
         if (!open) onClose();
       }}
     >
-      <DialogContent className="max-h-[calc(100svh-2rem)] gap-4 sm:max-w-xl">
+      {/* One column that may shrink, so a long title truncates instead of widening the grid. */}
+      <DialogContent className="max-h-[calc(100svh-2rem)] grid-cols-[minmax(0,1fr)] gap-4 sm:max-w-xl">
         {shown?.provider.records ? (
           <ConnectionSearch
             // Toggles belong to one provider's declarations; a switch starts them afresh.
@@ -264,12 +265,20 @@ function ConnectionSearch({
             autoFocus
             aria-label={`Search ${pluralLabels(records)}`}
             className="min-w-24 flex-1 bg-transparent py-0.5 text-xs text-accent-foreground outline-none placeholder:text-placeholder"
-            placeholder={picked.length ? "Add more…" : "Search by title or words…"}
+            placeholder={picked.length ? "Add more…" : "Search titles and descriptions…"}
             value={text}
             onChange={(event) => setText(event.target.value)}
             onKeyDown={onKeyDown}
           />
+          {search.loading && (
+            <LoaderCircle className="size-3.5 shrink-0 animate-spin" aria-hidden />
+          )}
         </div>
+        <p className="text-3xs text-secondary-label">
+          {text.trim()
+            ? "Matches every word in titles and descriptions, best matches first."
+            : "Most recently updated first. Type words to match titles and descriptions."}
+        </p>
         <div className="flex items-center gap-3">
           {records.filters.includes("type") && types.length > 1 && (
             <div className="inline-flex rounded-md border border-border bg-muted p-0.5">
@@ -308,10 +317,11 @@ function ConnectionSearch({
       <div className="min-h-0">
         <div className="flex justify-between text-2xs text-secondary-label">
           <span className="flex items-center gap-1.5">
-            {search.total === undefined ? "Searching…" : `${search.total} matching`}
-            {search.loading && search.total !== undefined && (
-              <LoaderCircle className="size-3 animate-spin" aria-label="Searching" />
-            )}
+            {search.loading
+              ? `Searching ${provider.name}…`
+              : search.total === undefined
+                ? ""
+                : `${search.total} matching`}
           </span>
           <span className={cn(count >= MAX_ATTACHED_ITEMS && "text-warning-foreground")}>
             {count} of {MAX_ATTACHED_ITEMS} picked
@@ -326,7 +336,11 @@ function ConnectionSearch({
           role="listbox"
           aria-multiselectable
           aria-label="Results"
-          className="mt-2 max-h-80 min-h-15 overflow-y-auto border-t border-border/60"
+          aria-busy={search.loading}
+          className={cn(
+            "mt-2 max-h-80 min-h-15 overflow-y-auto border-t border-border/60 transition-opacity",
+            search.loading && "opacity-50",
+          )}
           onScroll={(event) => {
             const list = event.currentTarget;
             if (list.scrollHeight - list.scrollTop - list.clientHeight < 80)
