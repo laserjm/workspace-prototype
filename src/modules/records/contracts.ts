@@ -2,6 +2,8 @@
 // and the schemas of the tools every provider answers (ADR 0003 §4).
 // Browser-safe: types, the composer's attachment rules and the tool schemas, pure.
 import { z } from "zod";
+// Types only from `integrations`: its index also loads its components, so a value import here
+// would load them (and the server's env) wherever these pure rules run.
 import type { Connection, RecordError, RecordSummary } from "@/modules/integrations";
 
 /** At most this many items, and this many connections, go on one question. */
@@ -161,6 +163,8 @@ export function defaultConnectionId(
 /** At most this many results of one search reach the model. */
 export const MAX_SEARCH_RESULTS = 20;
 
+// These copy integrations' (`recordSummarySchema`, `recordErrorSchema`), which its provider tools
+// answer in, because this file takes only types from that module (see the import above).
 const recordSummarySchema = z.object({
   connectionId: z.string(),
   type: z.string().describe("The provider's record type, e.g. issue or pull-request."),

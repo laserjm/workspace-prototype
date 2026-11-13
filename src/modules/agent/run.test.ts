@@ -269,13 +269,30 @@ describe("runAgent", () => {
     const whole = new MockLanguageModelV4({ doStream: [reply()] });
     model.current = whole;
     await run({ modelId: "mock" }, [attaching([{ ...laserjm, items: [] }])]);
-    expect(toolNames(whole, 0).sort()).toEqual(["html_render", "read_record", "search_records"]);
+    expect(toolNames(whole, 0).sort()).toEqual([
+      "github_pull_request_diff",
+      "html_render",
+      "read_record",
+      "search_records",
+    ]);
 
     await markNeedsReconnect(connectedUser, githubConnection.id);
     const broken = new MockLanguageModelV4({ doStream: [reply()] });
     model.current = broken;
     await run({ modelId: "mock" }, [attaching([{ ...laserjm, items: [] }])]);
     expect(toolNames(broken, 0)).toEqual(["html_render"]);
+  });
+
+  it("offers github_pull_request_diff only while a GitHub connection is allowed", async () => {
+    const none = new MockLanguageModelV4({ doStream: [reply()] });
+    model.current = none;
+    await run({ modelId: "mock" });
+    expect(toolNames(none, 0)).not.toContain("github_pull_request_diff");
+
+    const github = new MockLanguageModelV4({ doStream: [reply()] });
+    model.current = github;
+    await run({ modelId: "mock" }, [attaching([{ ...laserjm, items: [] }])]);
+    expect(toolNames(github, 0)).toContain("github_pull_request_diff");
   });
 
   /** A model that calls `toolName` once for each input, all in one step, then replies. */
@@ -577,6 +594,144 @@ describe("runAgent", () => {
       },
     ]);
     expect(conversation.at(-1)?.parts.at(-1)).toMatchObject({ type: "text", text: "Two are in review." });
+  });
+
+  /** The outputs of the reply's github_pull_request_diff calls, in order. */
+  const diffOutputs = (conversation: WorkspaceUIMessage[]) =>
+    conversation
+      .at(-1)
+      ?.parts.flatMap((part) =>
+        part.type === "tool-github_pull_request_diff" && part.state === "output-available"
+          ? [part.output]
+          : [],
+      ) ?? [];
+  const diffOf = (number: number, more: Record<string, unknown> = {}) => ({
+    connectionId: githubConnection.id,
+    key: `laserjm/workspace-fixtures#${number}`,
+    ...more,
+  });
+  /** The recorded merged pull request #8 and its 4 changed files with their patches. */
+  const mergedPullRequestDiff = {
+    [`${REPO}/pulls/8`]: "pull-request.json",
+    [`${REPO}/pulls/8/files?per_page=100`]: "pull-request-files.json",
+  };
+
+  it("reads the recorded merged pull request's diff, its pull request as the summary", async () => {
+    useRecordedGithub(mergedPullRequestDiff);
+    model.current = calling("github_pull_request_diff", [diffOf(8)]);
+    const conversation = await run({ modelId: "mock" }, [attaching([{ ...laserjm, items: [] }])]);
+
+    const [output] = diffOutputs(conversation);
+    expect(output).toMatchObject({
+      summary: {
+        type: "pull-request",
+        key: "laserjm/workspace-fixtures#8",
+        label: "workspace-fixtures#8",
+        state: "merged",
+        url: "https://github.com/laserjm/workspace-fixtures/pull/8",
+      },
+      fileCount: 4,
+    });
+    const files = output && "files" in output ? output.files : [];
+    expect(files.map((file) => [file.path, file.status])).toEqual([
+      ["README.md", "modified"],
+      ["status/README.md", "added"],
+      ["status/components.json", "added"],
+      ["status/incidents.md", "added"],
+    ]);
+    expect(files[1]?.patch).toMatch(/^@@ -0,0 \+1,\d+ @@/);
+    // Short enough: nothing is cut.
+    expect(output).not.toHaveProperty("note");
+    expect(JSON.stringify(output)).not.toMatch(/more characters/);
+  });
+
+  it("cuts each file's diff at 4,000 characters and the answer's at 40,000, saying so", async () => {
+    const [recorded] = fixture("pull-request-files.json");
+    // 12 files of 5,000 characters each, in a pull request of 112 changed files.
+    const files = Array.from({ length: 12 }, (_, index) => ({
+      ...recorded,
+      filename: `src/file-${index + 1}.ts`,
+      patch: "+".repeat(5_000),
+    }));
+    useRecordedGithub({
+      [`${REPO}/pulls/8`]: {
+        status: 200,
+        body: { ...fixture("pull-request.json"), changed_files: 112 },
+      },
+      [`${REPO}/pulls/8/files?per_page=100`]: { status: 200, body: files },
+    });
+    model.current = calling("github_pull_request_diff", [diffOf(8)]);
+    const conversation = await run({ modelId: "mock" }, [attaching([{ ...laserjm, items: [] }])]);
+
+    const [output] = diffOutputs(conversation);
+    const read = output && "files" in output ? output : undefined;
+    expect(read?.fileCount).toBe(112);
+    expect(read?.files).toHaveLength(12);
+    expect(read?.files[0]?.patch).toBe(
+      `${"+".repeat(4_000)}\n\n[… 1,000 more characters, the rest is on GitHub]`,
+    );
+    // Ten files fill the 40,000 characters; the last two are listed by name only.
+    expect(read?.files.filter((file) => file.patch)).toHaveLength(10);
+    expect(read?.files[10]).toEqual({
+      path: "src/file-11.ts",
+      status: "modified",
+      additions: recorded.additions,
+      deletions: recorded.deletions,
+      note: "Diff left out: past the 40,000 characters of this answer.",
+    });
+    expect(read?.note).toBe(
+      "2 files are listed without their diff, past the 40,000 characters of this answer: ask for one by its path. 100 more changed files were not read: the rest is on GitHub.",
+    );
+  });
+
+  it("shows invisible and bidirectional characters in a diff as their code points, so none hides a change", async () => {
+    const [recorded] = fixture("pull-request-files.json");
+    useRecordedGithub({
+      ...mergedPullRequestDiff,
+      [`${REPO}/pulls/8/files?per_page=100`]: {
+        status: 200,
+        body: [{ ...recorded, filename: "src/a​.ts", patch: "+if (admin‮) {}\u{E0041}" }],
+      },
+    });
+    model.current = calling("github_pull_request_diff", [diffOf(8)]);
+    const conversation = await run({ modelId: "mock" }, [attaching([{ ...laserjm, items: [] }])]);
+
+    const [output] = diffOutputs(conversation);
+    expect(output && "files" in output && output.files[0]).toMatchObject({
+      path: "src/a.ts",
+      patch: "+if (admin<U+202E>) {}<U+E0041>",
+    });
+  });
+
+  it("narrows the diff to one file by its path, and says when no changed file is there", async () => {
+    useRecordedGithub(mergedPullRequestDiff);
+    model.current = calling("github_pull_request_diff", [
+      diffOf(8, { path: "status/components.json" }),
+      diffOf(8, { path: "status/missing.md" }),
+    ]);
+    const conversation = await run({ modelId: "mock" }, [attaching([{ ...laserjm, items: [] }])]);
+
+    const [one, none] = diffOutputs(conversation);
+    expect(one && "files" in one && one.files.map((file) => file.path)).toEqual([
+      "status/components.json",
+    ]);
+    expect(one && "files" in one && one.files[0]?.patch).toMatch(/^@@/);
+    expect(one).not.toHaveProperty("note");
+    expect(none).toMatchObject({
+      fileCount: 4,
+      files: [],
+      note: "No changed file is at status/missing.md among the 4 read.",
+    });
+  });
+
+  it("answers no_access for a pull request of a connection the thread did not attach, without asking GitHub", async () => {
+    const { requests } = useRecordedGithub({});
+    model.current = calling("github_pull_request_diff", [
+      { ...diffOf(8), connectionId: "00000000-0000-4000-8000-000000000009" },
+    ]);
+    const conversation = await run({ modelId: "mock" }, [attaching([{ ...laserjm, items: [] }])]);
+    expect(requests).toEqual([]);
+    expect(diffOutputs(conversation)).toEqual([{ error: { kind: "no_access" } }]);
   });
 
   it("says nothing of connections when the thread attached none", async () => {

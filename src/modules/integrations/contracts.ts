@@ -168,6 +168,38 @@ export type RecordError =
   | { kind: "unreachable" }
   | { kind: "invalid_query"; message: string };
 
+/** A `RecordSummary` as a tool answers it: the model reads each field's meaning. */
+export const recordSummarySchema = z.object({
+  connectionId: z.string(),
+  type: z.string().describe("The provider's record type, e.g. issue or pull-request."),
+  key: z
+    .string()
+    .describe("The record's reference within its connection, as the provider's guide writes keys."),
+  label: z.string().describe("A short name to cite it by."),
+  title: z.string(),
+  state: z.string().describe("Its state now, as the provider's guide names them."),
+  updatedAt: z.string().describe("When it last changed, ISO 8601."),
+  where: z.string().describe("Where it lives, such as its repository and number."),
+}) satisfies z.ZodType<RecordSummary>;
+
+/** A `RecordError` as a tool answers it, as data. */
+export const recordErrorSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("not_found") }),
+  z.object({ kind: z.literal("no_access") }),
+  z.object({ kind: z.literal("needs_reconnect") }),
+  z.object({ kind: z.literal("rate_limited"), retryAt: z.string() }),
+  z.object({ kind: z.literal("unreachable") }),
+  z.object({ kind: z.literal("invalid_query"), message: z.string() }),
+]) satisfies z.ZodType<RecordError>;
+
+/** A refusal to read a record, with the record's page when the provider can say where it is. */
+export type RecordReadRefusal = RecordError & { url?: string };
+
+/** A `RecordReadRefusal` as a tool answers it. */
+export const recordReadRefusalSchema = recordErrorSchema.and(
+  z.object({ url: z.string().optional().describe("The record's page, to point the user to.") }),
+);
+
 export type RecordStateDeclaration = { label: string; tone: RecordTone };
 
 /** One kind of record a provider holds, e.g. GitHub's pull requests. */
@@ -209,18 +241,22 @@ export const MODEL_LIMITS = {
   comments: 30,
   /** Each kept comment: its first characters. */
   commentCharacters: 2_000,
+  /** Each changed file's diff (a provider tool's, such as GitHub's): its first characters. */
+  diffFileCharacters: 4_000,
+  /** All the diffs of one answer; the files past it are listed without theirs. */
+  diffCharacters: 40_000,
 } as const;
 
 /**
- * `text` cut to its first `max` characters, ending with what was cut:
+ * `text` cut to its first `max` characters, ending with what was cut and where the rest is:
  * `[… 32,000 more characters, open the view]`. A character is never split in two.
  */
-export function cutText(text: string, max: number): string {
+export function cutText(text: string, max: number, rest = "open the view"): string {
   if (text.length <= max) return text;
   const lead = text.charCodeAt(max - 1);
   const end = lead >= 0xd800 && lead <= 0xdbff ? max - 1 : max;
   const more = (text.length - end).toLocaleString("en-US");
-  return `${text.slice(0, end)}\n\n[… ${more} more characters, open the view]`;
+  return `${text.slice(0, end)}\n\n[… ${more} more characters, ${rest}]`;
 }
 
 /**

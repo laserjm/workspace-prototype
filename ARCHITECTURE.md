@@ -110,7 +110,10 @@ records: what it is about is its questions' attached items (`threadAttachedItems
 resolve the ids through the other module's public API (`useIntegrations().connections`,
 `useSkills().skillById`). Provider-specific presentation (the provider mark, a type's kind mark,
 a state's label and tone) is data the provider declares, not a branch on its id. The record
-vocabulary (`RecordSummary`, `RecordError`, the tones) is `integrations`'; `records` builds on it.
+vocabulary (`RecordSummary`, `RecordError`, the tones, their tool schemas and `recordErrorWords`)
+is `integrations`'; `records` builds on it. `records/contracts.ts` imports only types from
+`integrations`, because its index also loads its components and so the server's env: it keeps its
+own copy of the two tool schemas.
 **Enforced by.** Review.
 **Recorded in.** This entry.
 
@@ -322,8 +325,8 @@ The `agent` module is the runtime AI, flat by file:
   the user", tool results are third-party data), the allowed connections ("None." when every one
   is gone) and each allowed provider's guide once. The connections stay TypeScript, because
   they are built from data; all of it is text the server wrote.
-- `tools.ts`: the registry. `tools` is every tool the agent knows, its own and the modules'
-  (see "Agent tools live in their module"); `toolsFor(context)` picks the ones one answer may
+- `tools.ts`: the registry. `tools` is every tool the agent knows, its own, the modules' and the
+  providers' (`integrationTools`; see "Agent tools live in their module"); `toolsFor(context)` picks the ones one answer may
   call and what each knows of the thread. Stored conversations hold the tool names and every
   send validates the whole conversation against all of `tools`, so a tool is never renamed and a
   removed one keeps a stub under its name (one exception, #62: see "Agent tools live in their
@@ -359,7 +362,8 @@ the module it acts on and is a thin wrapper over that module's queries (or, for 
 actions). `records/tools.ts` is the pattern: `search_records` searches one of the connections the
 thread attached, through the provider's own search, the same code the attach dialog runs (ADR 0003
 §4), and `read_record` reads one record through the same reader its view uses; `skills/tools.ts`
-(`load_skill`, see "Skills are SKILL.md files") follows it.
+(`load_skill`, see "Skills are SKILL.md files") follows it. A tool only one provider can answer
+lives in that provider's folder instead (see **Provider tools**).
 - **Files.** The tool's input and output schemas are in the module's `contracts.ts`, so the
   browser can type the tool's parts; field meanings are in their `.describe()`, and the tool's
   description says that its results are third-party data. The tool is in `<module>/tools.ts`
@@ -398,8 +402,37 @@ thread attached, through the provider's own search, the same code the attach dia
   description asks for one call per record in the same step. Its card is one quiet line ("Read"
   and the record as an `AttachedItemChip`, or "Could not read acme/web#482: …"); the chip opens
   the record's view as a tab, never under Attached.
-- **Registration.** `agent/tools.ts` spreads the module's tools into `tools`, adds the tool's
-  context to `toolsFor`, and `WorkspaceUITools` in `agent/contracts.ts` gets its types.
+- **Provider tools.** A tool only one provider answers (GitHub's `github_pull_request_diff`, #65)
+  is named after the provider and lives in its folder: its schemas beside its reader (browser-safe,
+  `providers/github/diff.ts`), the tool in `providers/<id>/tools.ts` (`server-only`), its card in
+  `providers/<id>/views/` (`GithubPullRequestDiffCall`, exported from `integrations/index.ts`).
+  `integrations/tools.ts` gathers them by provider as `integrationTools`, exported from
+  `integrations/server.ts`, and `integrationToolsFor(user, connections)` offers a provider's tools
+  only while one of its connections is allowed, each seeing only those (context `{ user?,
+  connectionIds }`, `connectionToolContextSchema`). Each runs through `readWithConnection`
+  (`integrations/connection-tool.ts`): a `connectionId` outside them is `no_access` and nothing is
+  read, one that is gone or of another provider `not_found`, a refused credential marks the
+  connection `needs_reconnect`; the provider's code is handed only a `ConnectionAccess`. Since
+  `integrations` cannot import `records`, the card draws the record through a slot, and the chat
+  passes `RecordChip` (`records`), which opens the record's view.
+- **`github_pull_request_diff`.** `{ connectionId, key, path? }` answers `{ summary: RecordSummary
+  & { url }, fileCount, files: [{ path, previousPath?, status, additions, deletions, patch?, note?
+  }], note? }` or `{ error: RecordError & { url? } }`, as data. It reads `/pulls/{n}` and the first
+  100 changed files with their patches (`/pulls/{n}/files`) in parallel. Invisible and
+  bidirectional characters are stripped from paths as the readers do, but shown in a patch as their
+  code points (`<U+202E>`, `codePointsShown`), since in code such a character may be the change
+  itself (a Trojan Source edit). `path` keeps only the file at that path. The
+  limits are `MODEL_LIMITS`' `diffFileCharacters` (4,000 per file, `cutText`: `[… 1,000 more
+  characters, the rest is on GitHub]`) and `diffCharacters` (40,000 diff characters in all, the cut notes aside): the file whose diff would
+  pass the total, and every later one, is listed without its diff and says so. The answer's
+  `note` says how many were listed so ("ask for one by its path"), how many changed files were not
+  read, or that no changed file is at `path`; a file GitHub shows no diff for (binary, too large)
+  says that. Its card is one quiet line, "Read the diff of" the pull request as a chip "(12
+  files)" (with `path`, "Read the diff of src/a.ts in" it, or "Found no changed file at src/a.ts
+  in" it), or the error in words.
+- **Registration.** `agent/tools.ts` spreads the module's tools (and `integrationTools`) into
+  `tools`, adds the tool's context to `toolsFor` (`integrationToolsFor`'s for provider tools), and
+  `WorkspaceUITools` in `agent/contracts.ts` gets its types.
 - **Behaviour.** The tools only read. Record bodies never reach the prompt: the model reads
   records through tools.
 - **Names.** A stored conversation holds tool names, so a removed tool keeps a stub under its
@@ -407,7 +440,8 @@ thread attached, through the provider's own search, the same code the attach dia
   name was reused with the new schema, because the database is reset with that change
   (`pnpm stack:reset`), so no stored conversation holds the old parts.
 **Enforced by.** `agent/tools.test.ts` (the tool names, the new `search_records` schema, the
-`read_record` schema, what `toolsFor` offers); `agent/run.test.ts` (on a mock model over recorded GitHub answers:
+`read_record` and `github_pull_request_diff` schemas, what `toolsFor` offers, a provider's tools
+only over its connections); `agent/run.test.ts` (on a mock model over recorded GitHub answers:
 `search_records` offered for a connection attached whole and not without one or for one needing
 reconnecting, the call reaching GitHub with the token's scope and an outside `repo:` or `user:`
 dropped, results kept to the token's repositories when the scope names their owners, no number
@@ -415,8 +449,11 @@ read directly when a qualifier passes through, a foreign `connectionId` answerin
 422 answering `invalid_query`; `read_record` offered beside it, the recorded issue and pull
 request read with long bodies and comment and review lists cut with their notes, two records read
 in one step with nothing cut, a foreign `connectionId` answering `no_access`, a 404 answering
-`not_found` with the record's page); `integrations/providers.test.ts` (every declared type has a
-`trim`); `tsc`
+`not_found` with the record's page; `github_pull_request_diff` offered with a GitHub connection and
+not without one, the recorded merged pull request's files and patches, invisible characters shown as code points
+in a patch, each file cut at 4,000 characters and the answer at 40,000 with their notes, `path` narrowing to one file or saying none
+is there, a foreign `connectionId` answering `no_access`); `integrations/providers.test.ts` (every
+declared type has a `trim`); `tsc`
 (`WorkspaceUITools`, `toolsContext`).
 **Recorded in.** This entry; `docs/adr/0003-attached-items-and-record-views.md`.
 
@@ -434,8 +471,9 @@ mark and each type's record view and kind mark; ADR 0003 §3), an optional `guid
 its connections (what its records and states mean, how its search reads), imported as text,
 declared as the manifest's `guide`, kept server-side (never on `ProviderChoice`) and in the system
 prompt while one of its connections is allowed (`providerForPrompt`, `integrations/server.ts`;
-`providers.test.ts` caps its length), and an optional `tools.ts` for agent tools of its own (none
-has any yet; the record tools are `records`'). A provider's code is handed a `ProviderAccess` (the
+`providers.test.ts` caps its length), and an optional `tools.ts` for agent tools of its own, with
+their readers and schemas beside it (GitHub's `github_pull_request_diff` and `diff.ts`; see "Agent
+tools live in their module"; the record tools are `records`'). A provider's code is handed a `ProviderAccess` (the
 API address and the `Authorization` header value) and never reads a secret, an env var or the
 database. `auth` lists how a user connects: `token` (sent as `Bearer`) or `basic` (username and
 password, or an email and API token, sent as HTTP Basic); `verify` checks a credential and names

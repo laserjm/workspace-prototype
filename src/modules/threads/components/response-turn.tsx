@@ -1,7 +1,7 @@
 "use client";
 
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
-import { Check, ChevronRight, Copy, GitFork } from "lucide-react";
+import { Brain, Check, ChevronRight, Copy, GitFork } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -28,6 +28,33 @@ const metaButton =
 export const preparingDotClassName =
   "size-1.25 shrink-0 rounded-full bg-slate-400 dark:bg-slate-500";
 
+/**
+ * "Thinking…" with a brain, a bright window sweeping across it (`activity-shimmer`, as in T3
+ * Code): the reply is working and nothing else on screen moves.
+ */
+function ThinkingIndicator() {
+  const label = (
+    <>
+      <Brain aria-hidden className="size-3.5 shrink-0" />
+      Thinking…
+    </>
+  );
+  return (
+    <div className="flex pt-px pb-3" role="status">
+      <span className="relative inline-flex items-center gap-1.5 overflow-hidden text-2xs whitespace-nowrap text-secondary-label">
+        {label}
+        <span aria-hidden className="activity-shimmer pointer-events-none absolute inset-y-0 select-none">
+          <span className="activity-shimmer-counter block h-full">
+            <span className="activity-shimmer-aligned flex h-full items-center gap-1.5 text-foreground">
+              {label}
+            </span>
+          </span>
+        </span>
+      </span>
+    </div>
+  );
+}
+
 export function ResponseTurn({
   timing,
   continuation,
@@ -36,8 +63,8 @@ export function ResponseTurn({
   label = "Assistant response",
   details = [],
   note,
-  preparingLabel,
   streaming = false,
+  waiting = false,
   copyText,
 }: {
   timing: ResponseTiming;
@@ -48,9 +75,13 @@ export function ResponseTurn({
   /** Rows shown above Started/Finished in the expanded work details. */
   details?: { label: string; value: string }[];
   note?: string;
-  preparingLabel: string;
   /** While working, show the partial response instead of the placeholder. */
   streaming?: boolean;
+  /**
+   * While working, nothing in the partial response moves (a tool has answered and the model reads
+   * its result): "Thinking…" follows it.
+   */
+  waiting?: boolean;
   /** What Copy copies; without it, the response's visible text. */
   copyText?: string;
 }) {
@@ -163,15 +194,10 @@ export function ResponseTurn({
       {working && streaming ? (
         <div className="group/message">
           <div ref={bodyRef}>{children}</div>
+          {waiting && <ThinkingIndicator />}
         </div>
       ) : working ? (
-        <div
-          className="flex items-center gap-2 pt-px pb-3 text-2xs text-secondary-label"
-          role="status"
-        >
-          <span className={preparingDotClassName} />
-          {preparingLabel}
-        </div>
+        <ThinkingIndicator />
       ) : (
         <div className="group/message">
           <div ref={bodyRef}>{children}</div>

@@ -4,6 +4,7 @@ import { accessFor } from "./access";
 import type {
   RecordError,
   RecordRead,
+  RecordReadRefusal,
   RecordSearchPage,
   RecordSearchQuery,
   RecordType,
@@ -21,9 +22,6 @@ async function recordsConnection(user: User, connectionId: string) {
   const access = records && (await accessFor(user, connection));
   return records && access ? { records, access } : undefined;
 }
-
-/** A refusal to read a record, with the record's page when the provider can say where it is. */
-export type RecordReadRefusal = RecordError & { url?: string };
 
 /**
  * Reads one record of one of the user's connections for its view (ADR 0003 §3): the provider's

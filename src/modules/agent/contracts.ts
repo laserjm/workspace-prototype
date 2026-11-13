@@ -13,6 +13,10 @@ import type {
   SearchRecordsInput,
   SearchRecordsOutput,
 } from "@/modules/records";
+import type {
+  GithubPullRequestDiffInput,
+  GithubPullRequestDiffOutput,
+} from "@/modules/integrations";
 import type { LoadSkillInput, LoadSkillOutput } from "@/modules/skills";
 
 export const MODEL_PROVIDERS = ["claude", "openai"] as const;
@@ -87,6 +91,10 @@ export type WorkspaceUITools = {
   html_render: { input: HtmlRenderInput; output: HtmlRenderOutput };
   search_records: { input: SearchRecordsInput; output: SearchRecordsOutput };
   read_record: { input: ReadRecordInput; output: ReadRecordOutput };
+  github_pull_request_diff: {
+    input: GithubPullRequestDiffInput;
+    output: GithubPullRequestDiffOutput;
+  };
   load_skill: { input: LoadSkillInput; output: LoadSkillOutput };
 };
 

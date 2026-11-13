@@ -59,7 +59,7 @@ const QUALIFIER: Record<GithubRecordType, string> = {
 };
 
 /** Asks GitHub and parses the answer with `schema`. */
-async function getJson<T>(
+export async function getJson<T>(
   path: string,
   access: ConnectionAccess,
   schema: z.ZodType<T>,
@@ -525,6 +525,17 @@ const INVISIBLE = /[\u00AD\u034F\u061C\u115F\u1160\u180E\u200B\u200C\u200E\u200F
 /** `text` without invisible and bidirectional characters. */
 export const visibleText = (text: string) => text.replace(INVISIBLE, "");
 
+/**
+ * `text` with each invisible or bidirectional character written as its code point (`<U+202E>`):
+ * for code, where such a character may be the change itself (a Trojan Source edit), so it is shown
+ * rather than dropped.
+ */
+export const codePointsShown = (text: string) =>
+  text.replace(
+    INVISIBLE,
+    (character) => `<U+${character.codePointAt(0)!.toString(16).toUpperCase().padStart(4, "0")}>`,
+  );
+
 /** An issue's or pull request's text and comments, as its view shows them. Markdown bodies. */
 export const githubIssueDetailSchema = z.object({
   number: z.number(),
@@ -661,7 +672,7 @@ export const githubPullRequestDetailSchema = githubIssueDetailSchema.extend({
 export type GithubPullRequestDetail = z.infer<typeof githubPullRequestDetailSchema>;
 
 /** `acme/web#482`: the repository and the number. */
-function parseKey(key: string) {
+export function parseKey(key: string) {
   const match = /^([\w.-]+\/[\w.-]+)#(\d{1,9})$/.exec(key);
   return match ? { repository: match[1]!, number: Number(match[2]) } : undefined;
 }
@@ -691,8 +702,8 @@ type GithubConversation = z.infer<z.ZodObject<typeof conversationFields>> & { nu
 /** The parts of `GET /repos/{o}/{r}/issues/{n}` a view shows. */
 const issueSchema = itemSchema.extend(conversationFields);
 
-/** The parts of `GET /repos/{o}/{r}/pulls/{n}` a view shows. */
-const pullSchema = itemSchema.omit({ repository_url: true, pull_request: true }).extend({
+/** The parts of `GET /repos/{o}/{r}/pulls/{n}` a view and the diff tool read. */
+export const pullSchema = itemSchema.omit({ repository_url: true, pull_request: true }).extend({
   ...conversationFields,
   merged_at: z.string().nullable(),
   merged: z.boolean().nullish(),
@@ -707,6 +718,13 @@ const pullSchema = itemSchema.omit({ repository_url: true, pull_request: true })
   changed_files: z.number(),
 });
 type GithubPull = z.infer<typeof pullSchema>;
+
+/** The summary of a pull request of `repository` (`acme/web`), as `/pulls/{n}` answers it. */
+export const pullSummary = (connectionId: string, repository: string, pull: GithubPull) =>
+  summaryInRepository(connectionId, repository, {
+    ...pull,
+    pull_request: { merged_at: pull.merged_at },
+  });
 
 const commentsSchema = z.array(
   z.object({ id: z.number(), user: userSchema, created_at: z.string(), body: z.string().nullish() }),
@@ -972,7 +990,6 @@ const readPullRequest: Reader<GithubPullRequestDetail> = async (access, key) => 
   if (!reviewComments.ok) return reviewComments;
   if (!files.ok) return files;
   if (!ci.ok) return ci;
-  const item = { ...pull.value, pull_request: { merged_at: pull.value.merged_at } };
   const detail: GithubPullRequestDetail = {
     ...detailOf(pull.value, comments.value),
     merge: mergeOf(pull.value),
@@ -982,7 +999,7 @@ const readPullRequest: Reader<GithubPullRequestDetail> = async (access, key) => 
     files: filesOf(files.value),
     ci: ci.value,
   };
-  return ok({ summary: summaryInRepository(access.connectionId, parsed.repository, item), detail });
+  return ok({ summary: pullSummary(access.connectionId, parsed.repository, pull.value), detail });
 };
 
 // --- Trimming a read for the model (`read_record`), within `MODEL_LIMITS`. ---

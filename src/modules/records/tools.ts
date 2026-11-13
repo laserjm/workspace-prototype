@@ -1,8 +1,10 @@
 import "server-only";
 import { tool } from "ai";
-import { z } from "zod";
-import type { User } from "@/lib/auth/user";
-import { readRecordForModel, searchRecords } from "@/modules/integrations/server";
+import {
+  connectionToolContextSchema as contextSchema,
+  readRecordForModel,
+  searchRecords,
+} from "@/modules/integrations/server";
 import {
   MAX_SEARCH_RESULTS,
   readRecordInputSchema,
@@ -10,12 +12,6 @@ import {
   searchRecordsInputSchema,
   searchRecordsOutputSchema,
 } from "./contracts";
-
-/** What a record tool may see: the user and the connections the server allowed for this answer. */
-const contextSchema = z.object({
-  user: z.custom<User>().optional(),
-  connectionIds: z.array(z.string()),
-});
 
 /**
  * The tools every provider answers (ADR 0003 §4): thin wrappers over the provider's own search and

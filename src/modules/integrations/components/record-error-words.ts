@@ -1,4 +1,4 @@
-import { waitLabel, type RecordError } from "@/modules/integrations";
+import { waitLabel, type RecordError } from "../contracts";
 
 /**
  * Why a record tool found nothing, in words, after "Could not …:". `notFound` says what was not

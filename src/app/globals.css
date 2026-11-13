@@ -48,6 +48,67 @@
   mask-repeat: no-repeat;
 }
 
+/* A soft bright window that sweeps across a busy label ("Thinking…"), as in T3 Code's
+   live-activity-focus. The label is drawn twice: muted, and over it a bright copy that only
+   shows through the moving mask. The mask moves right while its content moves back left, so
+   the bright copy stays aligned with the label beneath it. Still under reduced motion. */
+@keyframes activity-shimmer {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes activity-shimmer-counter {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+@utility activity-shimmer {
+  --activity-shimmer-width: 4.5rem;
+
+  left: calc(-1 * var(--activity-shimmer-width));
+  width: calc(100% + 2 * var(--activity-shimmer-width));
+  mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    rgb(0 0 0 / 12%) 0.675rem,
+    rgb(0 0 0 / 55%) 1.575rem,
+    black 2.25rem,
+    rgb(0 0 0 / 55%) 2.925rem,
+    rgb(0 0 0 / 12%) 3.825rem,
+    transparent var(--activity-shimmer-width),
+    transparent 100%
+  );
+  mask-repeat: no-repeat;
+  animation: activity-shimmer 2.2s steps(30) infinite;
+
+  @media (prefers-reduced-motion: reduce), (forced-colors: active) {
+    animation: none;
+    opacity: 0;
+  }
+}
+
+@utility activity-shimmer-counter {
+  width: 100%;
+  animation: activity-shimmer-counter 2.2s steps(30) infinite;
+
+  @media (prefers-reduced-motion: reduce), (forced-colors: active) {
+    animation: none;
+  }
+}
+
+@utility activity-shimmer-aligned {
+  width: calc(100% - 2 * var(--activity-shimmer-width));
+  margin-left: var(--activity-shimmer-width);
+}
+
 /*
  * Moving colours out of workspace.css. Each hex value becomes the token of its
  * role; the lightness bands are the default when the role is unclear.
