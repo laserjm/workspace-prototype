@@ -15,7 +15,7 @@ const STATUS: Record<RecordError["kind"], number> = {
 const MESSAGE: Record<Exclude<RecordError["kind"], "invalid_query">, string> = {
   not_found: "That is not there, or this connection cannot see it.",
   no_access: "This connection's token is not allowed to read that.",
-  needs_reconnect: "The token was refused. Reconnect it in Settings → Data sources.",
+  needs_reconnect: "The token was refused. Connect it again in Settings.",
   rate_limited: "The search limit is reached. Try again shortly.",
   unreachable: "The provider could not be reached. Try again.",
 };

@@ -204,7 +204,7 @@ function ConnectionSearch({
             {provider.name} · {connection.accountLabel}
           </strong>
           <small className="mt-1 block truncate text-3xs text-secondary-label">
-            {search.reach ?? "Reading what this connection reaches…"}
+            {search.reach ?? (search.error ? "" : "Reading what this connection reaches…")}
           </small>
         </div>
         {searchable.length > 1 && (

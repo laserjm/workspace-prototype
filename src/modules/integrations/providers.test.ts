@@ -3,6 +3,7 @@
 import { describe, expect, it } from "vitest";
 import { RECORD_TONES } from "./contracts";
 import { providers } from "./providers";
+import { recordMarks } from "./record-views";
 
 const access = { connectionId: "test", baseUrl: "" };
 
@@ -40,6 +41,21 @@ describe("providers", () => {
           expect(RECORD_TONES, `${provider.id} ${type} ${state}`).toContain(tone);
       }
     }
+  });
+
+  it("have a mark for each declared record type, and none for a type they do not declare", () => {
+    for (const provider of providers) {
+      const declared = Object.keys(provider.records?.types ?? {}).toSorted();
+      const marks = recordMarks[provider.id];
+      if (!provider.records) {
+        expect(marks, provider.id).toBeUndefined();
+        continue;
+      }
+      expect(marks?.provider, provider.id).toBeDefined();
+      expect(Object.keys(marks?.types ?? {}).toSorted(), provider.id).toEqual(declared);
+    }
+    for (const id of Object.keys(recordMarks))
+      expect(providers.map((provider) => provider.id)).toContain(id);
   });
 });
 

@@ -336,9 +336,10 @@ model, the call offers the tools and `execute` sees the thread's scope); `tsc`
 provider: a system the workspace connects to (`providers/sample/` and `providers/github/` today;
 Atlassian, codebeamer, PostHog, Stripe and Supabase are planned). A provider is
 `defineProvider({ id, name, description, auth, baseUrl?, verify?, records? })` (`contracts.ts`),
-registered by one line in `providers.ts`, and written in at most three files: `index.ts` (the
-manifest), `api.ts` (its HTTP calls, every response parsed with zod) and `records.ts` (its
-`RecordReader`, only with records). A provider's code is handed a `ProviderAccess` (the API
+registered by one line in `providers.ts`, and written in its folder: `index.ts` (the
+manifest), `api.ts` (its HTTP calls, every response parsed with zod), `records.ts` (its record
+types, states and search, only with records) and `views/` (its marks in the browser, and with
+#60 its record views; ADR 0003 §3). A provider's code is handed a `ProviderAccess` (the API
 address and the `Authorization` header value) and never reads a secret, an env var or the
 database. `auth` lists how a user connects: `none` (the sample), `token` (sent as `Bearer`) or
 `basic` (username and password, or an email and API token, sent as HTTP Basic); `verify` checks a
@@ -407,8 +408,9 @@ seeded case found by its label, CI on the merged pull request's head, no token o
 way to connect, a base URL and `verify` when it takes a credential, declared record types whose
 states' tones are in the set, sources in a declared product, records read back by id in order, nothing for an unknown key);
 `integrations/actions.integration.test.ts` (connect, reconnect, refusals including each internal
-address kind with name resolution stubbed, test, disconnect, a
-visitor, `assertIsolation()`); `providers/github/api.test.ts`;
+address kind with name resolution stubbed, test, disconnect, a search marking only its user's
+connection `needs_reconnect`, a visitor, `assertIsolation()`); the marks registry in
+`providers.test.ts` (a mark for each declared type, none for another); `providers/github/api.test.ts`;
 `app/api/connections/[connectionId]/records/route.test.ts` (the scoped query, the toggles and
 the cursor, the computed states, another user's connection, each classifier case and a 401
 marking the connection); `sources/queries.test.ts`; `tsc`.
@@ -521,8 +523,10 @@ in `modules/*/actions.ts`, ACTION-02 every export of it is `action(…)` or `pub
 ### Module shape
 
 **Decision.** A module is flat: `contracts.ts` (types, errors, rules, input schemas),
-`queries.ts` (reads, each taking the user first), `actions.ts` (writes: `action(…)` signs the
-caller in and validates, and the handler queries Drizzle), `components/`, `index.ts` and
+`queries.ts` (reads, each taking the user first; the one write there is
+`integrations`' `markNeedsReconnect`, because a read is what finds a refused credential),
+`actions.ts` (writes: `action(…)` signs the caller in and validates, and the handler queries
+Drizzle), `components/`, `index.ts` and
 `server.ts`. `server.ts` re-exports what pages, routes and other modules' tests need. Every
 query names `user.id`, and the integration test calls `assertIsolation()`. A handler reads a
 refused constraint with `violatedConstraint` (`lib/db/errors.ts`) and returns

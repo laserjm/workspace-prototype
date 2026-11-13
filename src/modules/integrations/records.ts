@@ -85,7 +85,7 @@ export async function searchRecords(
   query: RecordSearchQuery,
 ): Promise<Result<RecordSearchPage, RecordError>> {
   const connection = (await listConnections(user)).find(
-    (item) => item.id === connectionId,
+    (candidate) => candidate.id === connectionId,
   );
   const records = connection && findProvider(connection.providerId)?.records;
   const access = records && (await accessFor(user, connection));
