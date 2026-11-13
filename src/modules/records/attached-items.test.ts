@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  attachedByQuestion,
   attachedItemsText,
   threadAttachedItems,
   type ThreadAttachedItem,
@@ -127,5 +128,27 @@ describe("the attached items as the model reads them", () => {
 
   it("are nothing for another data part", () => {
     expect(attachedItemsText({ type: "data-other", data: {} })).toBeUndefined();
+  });
+});
+
+describe("a thread's attached items by question", () => {
+  it("group each question's new items under its text, and leave out questions with none", () => {
+    const messages = [
+      question("u1", [{ ...acme, items: [issue(1), issue(2)] }]),
+      answer("a1"),
+      question("u2", [{ ...acme, items: [issue(1)] }]),
+      answer("a2"),
+      question("u3", [{ ...beta, items: [issue(7)] }, { ...acme, items: [] }]),
+    ];
+    expect(
+      attachedByQuestion(messages).map(({ message, question: text, items }) => ({
+        id: message.id,
+        text,
+        keys: items.map(({ connection, item }) => `${connection.label} ${item.key}`),
+      })),
+    ).toEqual([
+      { id: "u1", text: "What about these?", keys: ["@acme acme/web#1", "@acme acme/web#2"] },
+      { id: "u3", text: "What about these?", keys: ["@beta acme/web#7"] },
+    ]);
   });
 });

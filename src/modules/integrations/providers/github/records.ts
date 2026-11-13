@@ -6,10 +6,12 @@ import { err, ok, type Result } from "@/lib/result";
 import type {
   ConnectionAccess,
   ProviderRecords,
+  RecordDetail,
   RecordError,
   RecordSearchPage,
   RecordSearchQuery,
   RecordSummary,
+  RecordTypeDeclaration,
 } from "../../contracts";
 import { classifyGithubAnswer, githubGet } from "./api";
 
@@ -17,7 +19,8 @@ const PAGE_SIZE = 20;
 /** GitHub's search answers at most the first 1,000 results of a query. */
 const SEARCH_LIMIT = 1000;
 
-export const githubRecordTypes = {
+/** The declared types; `githubRecordTypes` adds a reader to each. */
+const declaredTypes = {
   issue: {
     singular: "issue",
     plural: "issues",
@@ -37,14 +40,14 @@ export const githubRecordTypes = {
       closed: { label: "Closed", tone: "closed" },
     },
   },
-} as const satisfies ProviderRecords["types"];
+} as const satisfies Record<string, RecordTypeDeclaration>;
 
-type GithubRecordType = keyof typeof githubRecordTypes;
+type GithubRecordType = keyof typeof declaredTypes;
 
-const RECORD_TYPES = Object.keys(githubRecordTypes) as GithubRecordType[];
+const RECORD_TYPES = Object.keys(declaredTypes) as GithubRecordType[];
 
 const isRecordType = (type: string): type is GithubRecordType =>
-  Object.hasOwn(githubRecordTypes, type);
+  Object.hasOwn(declaredTypes, type);
 
 const QUALIFIER: Record<GithubRecordType, string> = {
   issue: "is:issue",
@@ -252,7 +255,7 @@ function summaryOf(connectionId: string, item: GithubItem): RecordSummary {
     type: typeOf(item),
     key: `${repository}#${item.number}`,
     label: `${name}#${item.number}`,
-    title: item.title,
+    title: visibleText(item.title),
     state: stateOf(item),
     updatedAt: item.updated_at,
     where: `${repository} #${item.number}`,
@@ -358,4 +361,151 @@ function uniqueItems(items: readonly GithubItem[]): GithubItem[] {
     seen.add(id);
     return true;
   });
+}
+
+// --- Reading one record (ADR 0003 §3): what its record view shows. ---
+
+/** How many comments a view shows: GitHub's largest page. */
+const COMMENT_LIMIT = 100;
+
+/**
+ * Characters that draw nothing or reorder what follows: zero-width spaces and marks, the Arabic
+ * letter mark and the other bidirectional marks, embeddings, overrides and isolates, the word
+ * joiner and invisible operators, the byte order mark, the soft hyphen, the combining grapheme
+ * joiner, the Hangul fillers and the tag characters. Untrusted text could hide words or
+ * show them in another order with them. The zero-width joiner stays, because emoji are built
+ * with it.
+ */
+const INVISIBLE = /[\u00AD\u034F\u061C\u115F\u1160\u180E\u200B\u200C\u200E\u200F\u202A-\u202E\u2060-\u2064\u2066-\u2069\u3164\uFEFF\uFFA0]|[\u{E0000}-\u{E007F}]/gu;
+
+/** `text` without invisible and bidirectional characters. */
+export const visibleText = (text: string) => text.replace(INVISIBLE, "");
+
+/** An issue's or pull request's text and comments, as its view shows them. Markdown bodies. */
+export const githubIssueDetailSchema = z.object({
+  number: z.number(),
+  author: z.string(),
+  /** ISO 8601. */
+  createdAt: z.string(),
+  labels: z.array(z.object({ name: z.string(), color: z.string().optional() })),
+  assignees: z.array(z.string()),
+  body: z.string(),
+  /** All of them; `comments` holds the first 100. */
+  commentCount: z.number(),
+  comments: z.array(
+    z.object({ id: z.number(), author: z.string(), createdAt: z.string(), body: z.string() }),
+  ),
+});
+export type GithubIssueDetail = z.infer<typeof githubIssueDetailSchema>;
+
+/** `acme/web#482`: the repository and the number. */
+function parseKey(key: string) {
+  const match = /^([\w.-]+\/[\w.-]+)#(\d{1,9})$/.exec(key);
+  return match ? { repository: match[1]!, number: Number(match[2]) } : undefined;
+}
+
+const userSchema = z.object({ login: z.string() }).nullable();
+const login = (user: z.infer<typeof userSchema>) => user?.login ?? "ghost";
+
+/** The parts of `GET /repos/{o}/{r}/issues/{n}` (and of `/pulls/{n}`) a view shows. */
+const issueSchema = itemSchema.extend({
+  user: userSchema,
+  labels: z.array(
+    z.union([
+      z.string().transform((name) => ({ name, color: undefined })),
+      z.object({ name: z.string(), color: z.string().nullish() }),
+    ]),
+  ),
+  assignees: z.array(z.object({ login: z.string() })).nullish(),
+  body: z.string().nullish(),
+  comments: z.number(),
+  created_at: z.string(),
+});
+type GithubIssue = z.infer<typeof issueSchema>;
+
+const commentsSchema = z.array(
+  z.object({ id: z.number(), user: userSchema, created_at: z.string(), body: z.string().nullish() }),
+);
+
+/** What a view shows of an issue (or a pull request's conversation) and its first comments. */
+function detailOf(issue: GithubIssue, comments: z.infer<typeof commentsSchema>): GithubIssueDetail {
+  return {
+    number: issue.number,
+    author: login(issue.user),
+    createdAt: issue.created_at,
+    labels: issue.labels.map(({ name, color }) => ({
+      name: visibleText(name),
+      ...(color ? { color } : {}),
+    })),
+    assignees: (issue.assignees ?? []).map((assignee) => assignee.login),
+    body: visibleText(issue.body ?? ""),
+    commentCount: issue.comments,
+    comments: comments.map((comment) => ({
+      id: comment.id,
+      author: login(comment.user),
+      createdAt: comment.created_at,
+      body: visibleText(comment.body ?? ""),
+    })),
+  };
+}
+
+/** The pull request fields `/issues/{n}` leaves out, which its state needs. */
+const pullSchema = z.object({
+  draft: z.boolean().nullish(),
+  merged_at: z.string().nullable(),
+});
+
+/**
+ * Reads an issue, or a pull request's description and conversation, with its first 100 comments,
+ * in parallel. A key of the other type is `not_found`, as GitHub answers a missing number.
+ */
+function readerOf(type: GithubRecordType) {
+  return async (access: ConnectionAccess, key: string): Promise<Result<RecordDetail, RecordError>> => {
+    const parsed = parseKey(key);
+    if (!parsed) return err({ kind: "not_found" });
+    const base = `/repos/${parsed.repository}`;
+    const [issue, comments, pull] = await Promise.all([
+      getJson(`${base}/issues/${parsed.number}`, access, issueSchema),
+      getJson(`${base}/issues/${parsed.number}/comments?per_page=${COMMENT_LIMIT}`, access, commentsSchema),
+      type === "pull-request"
+        ? getJson(`${base}/pulls/${parsed.number}`, access, pullSchema)
+        : undefined,
+    ]);
+    if (!issue.ok) return issue;
+    if (typeOf(issue.value) !== type) return err({ kind: "not_found" });
+    if (!comments.ok) return comments;
+    if (pull && !pull.ok) return pull;
+    // `/issues/{n}` says whether a pull request was merged, but not whether it is a draft.
+    const item: GithubItem = pull
+      ? {
+          ...issue.value,
+          draft: pull.value.draft,
+          pull_request: { merged_at: pull.value.merged_at },
+        }
+      : issue.value;
+    return ok({
+      summary: summaryOf(access.connectionId, item),
+      detail: detailOf(issue.value, comments.value),
+    });
+  };
+}
+
+/** The declared types, each with its reader. */
+export const githubRecordTypes = {
+  issue: { ...declaredTypes.issue, read: readerOf("issue") },
+  "pull-request": { ...declaredTypes["pull-request"], read: readerOf("pull-request") },
+} satisfies ProviderRecords["types"];
+
+/**
+ * The record's page on GitHub: the API's address without `api.` or `/api/v3` (GitHub Enterprise),
+ * then the repository and the number.
+ */
+export function githubRecordUrl(baseUrl: string, type: string, key: string): string | undefined {
+  const parsed = parseKey(key);
+  if (!parsed || !isRecordType(type)) return undefined;
+  const site = new URL(baseUrl);
+  if (site.hostname.startsWith("api.")) site.hostname = site.hostname.slice("api.".length);
+  const root = site.origin + site.pathname.replace(/\/api\/v3\/?$/, "").replace(/\/$/, "");
+  const page = type === "issue" ? "issues" : "pull";
+  return `${root}/${parsed.repository}/${page}/${parsed.number}`;
 }

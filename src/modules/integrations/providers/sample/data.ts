@@ -19,8 +19,6 @@ export const sampleSources: SampleSource[] = [
     plural: "tickets",
     collectionPath: "PROJECT / PLATFORM",
     overviewTitle: "Sprint 24 at a glance",
-    listLabel: "List",
-    hasBoard: true,
     records: [
       {
         id: "PLAT-124",
@@ -112,8 +110,6 @@ export const sampleSources: SampleSource[] = [
     plural: "pages",
     collectionPath: "SPACE / PLATFORM",
     overviewTitle: "Platform knowledge at a glance",
-    listLabel: "Pages",
-    hasBoard: false,
     records: [
       {
         id: "DOC-201",
@@ -173,8 +169,6 @@ export const sampleSources: SampleSource[] = [
     plural: "items",
     collectionPath: "PROJECT / BATTERY MANAGEMENT",
     overviewTitle: "Release 2.4 at a glance",
-    listLabel: "List",
-    hasBoard: false,
     records: [
       {
         id: "REQ-401",

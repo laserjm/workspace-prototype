@@ -47,8 +47,6 @@ export const sample = defineProvider({
           icon: source.id,
           singular: source.singular,
           plural: source.plural,
-          listLabel: source.listLabel,
-          hasBoard: source.hasBoard,
         },
       ]),
     ),

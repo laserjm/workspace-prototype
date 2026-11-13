@@ -27,7 +27,6 @@ describe("listSources", () => {
       name: "Jira",
       singular: "ticket",
       plural: "tickets",
-      hasBoard: true,
     });
     expect(sources[0]).not.toHaveProperty("records");
   });

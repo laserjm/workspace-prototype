@@ -126,8 +126,8 @@ export function WorkspaceSettings({
           </Button>
           <p className={settingsNoteClassName}>
             Conversations stay in this session. The appearance, skill
-            activation and the source panel width are remembered in this
-            browser.
+            activation, the record panel’s width and each thread’s open
+            record views are remembered in this browser.
           </p>
         </section>
       ) : section === "sources" ? (

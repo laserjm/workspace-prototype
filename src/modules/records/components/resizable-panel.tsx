@@ -8,11 +8,11 @@ import {
   type ReactNode,
 } from "react";
 
-const STORAGE_KEY = "workspace:source-panel-width";
+const STORAGE_KEY = "workspace:record-panel-width";
 const DEFAULT_WIDTH = 400;
 const MIN_WIDTH = 320;
 const MIN_CONVERSATION_WIDTH = 440;
-// While dragging, <html data-resizing="source-panel"> keeps the col-resize
+// While dragging, <html data-resizing="record-panel"> keeps the col-resize
 // cursor everywhere (a base rule in globals.css) and lights the handle.
 
 function readWidth() {
@@ -35,7 +35,8 @@ function saveWidth(width: number) {
   }
 }
 
-export function ResizableSourcePanel({ children }: { children: ReactNode }) {
+/** The record panel on a wide screen: a fixed width the user drags, remembered in this browser. */
+export function ResizablePanel({ children }: { children: ReactNode }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const drag = useRef<{
     target: HTMLDivElement;
@@ -107,15 +108,15 @@ export function ResizableSourcePanel({ children }: { children: ReactNode }) {
     >
       <div
         role="separator"
-        aria-label="Resize source explorer"
-        aria-controls="source-explorer"
+        aria-label="Resize record panel"
+        aria-controls="record-panel"
         aria-orientation="vertical"
         aria-valuemin={MIN_WIDTH}
         aria-valuemax={maxWidth}
         aria-valuenow={Math.round(displayedWidth)}
         aria-valuetext={`${Math.round(displayedWidth)} pixels wide`}
         tabIndex={0}
-        className="absolute inset-y-0 -left-1 z-20 w-2 cursor-col-resize touch-none outline-none select-none after:absolute after:inset-y-0 after:left-1 after:w-0.5 after:bg-transparent after:transition-colors after:duration-150 hover:after:bg-ring focus-visible:after:bg-muted-foreground active:after:bg-ring in-data-[resizing=source-panel]:after:bg-ring"
+        className="absolute inset-y-0 -left-1 z-20 w-2 cursor-col-resize touch-none outline-none select-none after:absolute after:inset-y-0 after:left-1 after:w-0.5 after:bg-transparent after:transition-colors after:duration-150 hover:after:bg-ring focus-visible:after:bg-muted-foreground active:after:bg-ring in-data-[resizing=record-panel]:after:bg-ring"
         title="Drag to resize · Double-click to reset"
         onPointerDown={(event) => {
           if (event.button !== 0 || drag.current) return;
@@ -129,7 +130,7 @@ export function ResizableSourcePanel({ children }: { children: ReactNode }) {
             startWidth: displayedWidth,
             width: displayedWidth,
           };
-          document.documentElement.dataset.resizing = "source-panel";
+          document.documentElement.dataset.resizing = "record-panel";
         }}
         onPointerMove={(event) => {
           const active = drag.current;

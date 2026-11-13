@@ -15,6 +15,7 @@ export type {
   RecordDeclarations,
   RecordError,
   RecordFilter,
+  RecordRead,
   RecordReader,
   RecordSearchHint,
   RecordSearchPage,
@@ -31,9 +32,11 @@ export {
   pluralLabels,
   RECORD_TONES,
   toneOf,
+  viewKindOf,
   waitLabel,
 } from "./contracts";
 export { IntegrationsProvider } from "./components/integrations-provider";
-export { ProviderMark, RecordKindMark } from "./components/record-marks";
+export { ProviderMark, RecordKindMark, RecordStateBadge } from "./components/record-marks";
+export { RecordViewBody } from "./components/record-view-body";
 export { SourcesSettingsPanel } from "./components/sources-settings-panel";
 export { useIntegrations } from "./components/use-integrations";

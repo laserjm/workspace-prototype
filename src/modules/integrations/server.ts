@@ -6,6 +6,7 @@ export {
   getConnectionRecords,
   listConnectedSources,
   searchConnectionRecords,
+  readRecord,
   searchRecords,
   type ConnectedSource,
 } from "./records";

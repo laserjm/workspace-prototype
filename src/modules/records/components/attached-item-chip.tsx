@@ -12,16 +12,18 @@ const chipClassName =
 /**
  * An attached item, drawn from its snapshot (kind mark, `web#482`, title), or with no item a
  * whole connection, dashed. It never fetches. Once its connection is removed, it is muted and
- * says so.
+ * says so. With `onOpen`, an item's chip opens or focuses its record view.
  */
 export function AttachedItemChip({
   connection,
   item,
   onRemove,
+  onOpen,
 }: {
   connection: ConnectionRef;
   item?: AttachedItem;
   onRemove?: () => void;
+  onOpen?: () => void;
 }) {
   const { providers, connections } = useIntegrations();
   const removed = !connections.some((candidate) => candidate.id === connection.connectionId);
@@ -29,17 +31,8 @@ export function AttachedItemChip({
     providers.find((provider) => provider.id === connection.provider)?.name ??
     connection.provider;
   const name = item ? item.snapshot.label : `${providerName} · ${connection.label}`;
-  return (
-    <span
-      className={cn(chipClassName, !item && "border-dashed", removed && "opacity-60")}
-      title={
-        removed
-          ? `${name}: connection removed`
-          : item
-            ? item.snapshot.title
-            : `${name}: the agent may search it`
-      }
-    >
+  const label = (
+    <>
       {item ? (
         <RecordKindMark
           providerId={connection.provider}
@@ -53,6 +46,30 @@ export function AttachedItemChip({
       <span className="truncate">{item ? item.snapshot.title : "· whole connection"}</span>
       {removed && (
         <span className="shrink-0 text-3xs text-secondary-label">Connection removed</span>
+      )}
+    </>
+  );
+  return (
+    <span
+      className={cn(chipClassName, !item && "border-dashed", removed && "opacity-60")}
+      title={
+        removed
+          ? `${name}: connection removed`
+          : item
+            ? item.snapshot.title
+            : `${name}: the agent may search it`
+      }
+    >
+      {item && onOpen ? (
+        <button
+          type="button"
+          className="flex min-w-0 items-center gap-1.5 rounded-xs text-left hover:text-secondary-foreground"
+          onClick={onOpen}
+        >
+          {label}
+        </button>
+      ) : (
+        label
       )}
       {onRemove && (
         <button

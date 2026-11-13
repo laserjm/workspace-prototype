@@ -8,6 +8,7 @@ import type { ModelChoice, WorkspaceUIMessage } from "@/modules/agent";
 import {
   AttachedItemChip,
   attachedConnectionsOf,
+  useRecordPanel,
   type AttachedConnection,
 } from "@/modules/records";
 import type { Thread } from "../contracts";
@@ -210,6 +211,7 @@ function UserMessage({
   attached: readonly AttachedConnection[];
   inSession: boolean;
 }) {
+  const panel = useRecordPanel();
   return (
     <div
       className={cn(
@@ -236,6 +238,7 @@ function UserMessage({
                   key={`${connection.connectionId}:${item.type}:${item.key}`}
                   connection={connection}
                   item={item}
+                  onOpen={() => panel.open({ connection, item })}
                 />
               ))
             ) : (

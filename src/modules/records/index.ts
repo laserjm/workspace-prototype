@@ -26,3 +26,5 @@ export {
 } from "./attached-items";
 export { AttachDialog } from "./components/attach-dialog";
 export { AttachedItemChip } from "./components/attached-item-chip";
+export { RecordPanel, RecordPanelToggle } from "./components/record-panel";
+export { RecordPanelProvider, useRecordPanel } from "./components/record-panel-provider";

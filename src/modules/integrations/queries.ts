@@ -3,7 +3,12 @@ import { and, asc, eq } from "drizzle-orm";
 import type { User } from "@/lib/auth/user";
 import { db } from "@/lib/db/client";
 import { connectionsTable } from "@/lib/db/schema";
-import type { Connection, ProviderChoice } from "./contracts";
+import type {
+  Connection,
+  ProviderChoice,
+  ProviderRecords,
+  RecordDeclarations,
+} from "./contracts";
 import { providers } from "./providers";
 import { sampleConnection } from "./providers/sample";
 
@@ -77,6 +82,20 @@ export async function listProviderChoices(): Promise<ProviderChoice[]> {
     description,
     auth,
     ...(baseUrl ? { baseUrl } : {}),
-    ...(records ? { records: { types: records.types, filters: records.filters, hint: records.hint } } : {}),
+    ...(records ? { records: declarationsOf(records) } : {}),
   }));
+}
+
+/** A provider's records as the browser gets them: its types without their readers. */
+function declarationsOf({ types, filters, hint }: ProviderRecords): RecordDeclarations {
+  return {
+    types: Object.fromEntries(
+      Object.entries(types).map(([type, { singular, plural, states }]) => [
+        type,
+        { singular, plural, states },
+      ]),
+    ),
+    filters,
+    hint,
+  };
 }
