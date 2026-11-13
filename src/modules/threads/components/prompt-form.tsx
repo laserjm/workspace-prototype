@@ -26,7 +26,6 @@ import { IconButton, iconButtonClassName } from "@/components/ui/icon-button";
 import { inlineTriggerClassName } from "@/components/ui/inline-trigger";
 import { cn } from "@/lib/utils";
 import { SkillPicker, useSkills } from "@/modules/skills";
-import { SourcePicker, SourceScopeSummary } from "@/modules/sources";
 import {
   AttachDialog,
   AttachedItemChip,
@@ -37,7 +36,6 @@ import {
   type AttachedConnection,
 } from "@/modules/records";
 import type { ModelChoice } from "@/modules/agent";
-import type { ThreadScope } from "../contracts";
 import { attachmentChipClassName } from "./attachment-chip";
 import { ProviderIcon } from "./provider-icon";
 import type { Question } from "./use-thread-chat";
@@ -48,19 +46,12 @@ const sendButton =
 const sendReady =
   "bg-primary text-primary-foreground hover:bg-primary/85 hover:text-primary-foreground";
 
-// In a source session (`data-session` on <main>, read through group/main)
-// the composer is a step denser.
-
-/** The message composer: source and scope, attachments, model, skill and permissions. */
+/** The message composer: attached items, files, model, skill and permissions. */
 export function PromptForm({
   models,
   onSend,
   onSources,
   compact = false,
-  scope,
-  onScope,
-  onChooseSource,
-  onClearSource,
   enabledSkills,
   onManageSkills,
   initialSkill,
@@ -74,10 +65,6 @@ export function PromptForm({
   onSend: (question: Question, modelId: string, skillId?: string) => Promise<boolean>;
   onSources: () => void;
   compact?: boolean;
-  scope?: ThreadScope;
-  onScope?: () => void;
-  onChooseSource?: (id: string) => void;
-  onClearSource?: () => void;
   enabledSkills: string[];
   onManageSkills: () => void;
   initialSkill?: string;
@@ -168,27 +155,9 @@ export function PromptForm({
             {attached.length ? "Change data sources" : "Choose a data source"}
           </span>
         </button>
-        {onChooseSource && onClearSource && (
-          <SourcePicker
-            selected={scope?.sourceId}
-            onSelect={onChooseSource}
-            onClear={onClearSource}
-          />
-        )}
-        {scope && onScope && (
-          <SourceScopeSummary
-            sourceId={scope.sourceId}
-            recordCount={scope.recordIds.length}
-            onClick={onScope}
-            showSource={!onChooseSource}
-          />
-        )}
       </div>
       <form
-        className={cn(
-          "w-full rounded-2xl border border-border bg-card px-2.5 pt-4.5 pb-2 shadow-composer focus-within:border-ring/50 max-md:pt-3.5",
-          "group-data-[session=source]/main:rounded-xl",
-        )}
+        className="w-full rounded-2xl border border-border bg-card px-2.5 pt-4.5 pb-2 shadow-composer focus-within:border-ring/50 max-md:pt-3.5"
         aria-busy={busy}
         onSubmit={(event) => {
           event.preventDefault();
@@ -252,7 +221,6 @@ export function PromptForm({
           className={cn(
             "block max-h-50 w-full resize-none border-none bg-transparent px-2 text-sm leading-relaxed text-secondary-foreground outline-none [field-sizing:content] placeholder:text-placeholder max-md:text-base",
             compact ? "min-h-12" : "min-h-14.5 max-md:min-h-15.5 4xl:min-h-15",
-            "group-data-[session=source]/main:leading-5 max-md:group-data-[session=source]/main:leading-6",
           )}
           aria-label="Message"
           placeholder={
@@ -328,20 +296,14 @@ export function PromptForm({
                 <Button
                   variant="ghost"
                   type="button"
-                  className={cn(
-                    "h-8 gap-1.5 rounded-md px-2 text-sm font-normal text-accent-foreground max-md:gap-1 max-md:pr-1",
-                    "group-data-[session=source]/main:text-xs",
-                  )}
+                  className="h-8 gap-1.5 rounded-md px-2 text-sm font-normal text-accent-foreground max-md:gap-1 max-md:pr-1"
                   aria-label={`Choose model, ${model.label} ${model.effort}`}
                 />
               }
             >
               <ProviderIcon
                 provider={model.provider}
-                className={cn(
-                  "size-5 max-md:size-4.5",
-                  "group-data-[session=source]/main:size-4 max-md:group-data-[session=source]/main:size-4",
-                )}
+                className="size-5 max-md:size-4.5"
               />
               <span>
                 {model.label}{" "}

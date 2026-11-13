@@ -1,9 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { aSkill } from "@/tests/factories/skill";
-import { aSource, aSourceRecord } from "@/tests/factories/source";
 import { aUser } from "@/tests/factories/user";
 import type { AgentModel } from "./models";
 import { tools, toolsFor } from "./tools";
+
+/** Whether `input` is a valid call of the tool, as the stored conversation is validated. */
+async function accepts(name: keyof typeof tools, input: unknown) {
+  const schema = tools[name].inputSchema as { "~standard": { validate(value: unknown): unknown } };
+  const result = (await schema["~standard"].validate(input)) as { issues?: unknown };
+  return !result.issues;
+}
 
 const opus: AgentModel = {
   id: "opus",
@@ -24,14 +30,20 @@ describe("tools", () => {
       "search_records",
     ]);
   });
+
+  // The name was reused with a new schema (#62): the scope's filters are gone.
+  it("searches one connection with a query, not the old scope's filters", async () => {
+    expect(await accepts("search_records", { connectionId: "c1", query: "label:bug" })).toBe(true);
+    expect(await accepts("search_records", { status: "In review" })).toBe(false);
+  });
 });
 
 describe("toolsFor", () => {
-  it("offers only html_render without attached records or skills to load", () => {
+  it("offers only html_render without allowed connections or skills to load", () => {
     expect(toolsFor({ user, model: opus, offeredSkills: [] })).toEqual({
       activeTools: ["html_render"],
       toolsContext: {
-        search_records: { user, scope: undefined },
+        search_records: { user, connectionIds: [] },
         load_skill: { skillIds: [] },
       },
     });
@@ -45,24 +57,29 @@ describe("toolsFor", () => {
     });
   });
 
-  it("offers search_records over the attached records", () => {
-    const records = [aSourceRecord({ id: "PLAT-124" }), aSourceRecord({ id: "PLAT-126" })];
-    const source = aSource({ id: "sample:jira" });
+  it("offers search_records over the connections the server allowed", () => {
+    const connection = (connectionId: string) => ({
+      connectionId,
+      provider: "github",
+      providerName: "GitHub",
+      account: "@acme",
+    });
     expect(
       toolsFor({
         user,
         model: opus,
         offeredSkills: [],
-        attached: { source, records, recordCount: 3 },
+        connections: [connection("c1"), connection("c2")],
       }),
     ).toMatchObject({
       activeTools: ["html_render", "search_records"],
-      toolsContext: {
-        search_records: {
-          user,
-          scope: { sourceId: "sample:jira", recordIds: ["PLAT-124", "PLAT-126"] },
-        },
-      },
+      toolsContext: { search_records: { user, connectionIds: ["c1", "c2"] } },
     });
+  });
+
+  it("offers no record tool when every attached connection is gone", () => {
+    expect(
+      toolsFor({ user, model: opus, offeredSkills: [], connections: [] }).activeTools,
+    ).toEqual(["html_render"]);
   });
 });

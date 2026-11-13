@@ -1,9 +1,7 @@
 "use client";
 
 import { findSkill, useSkills } from "@/modules/skills";
-import { findSource, recordCountLabel, useSources } from "@/modules/sources";
 import type { ModelChoice, WorkspaceUIMessage } from "@/modules/agent";
-import type { ThreadScope } from "../contracts";
 import {
   hasVisibleParts,
   MessageParts,
@@ -17,7 +15,6 @@ export function LiveResponse({
   requestedAt,
   working,
   continuation,
-  scope,
   models,
   onFork,
 }: {
@@ -26,12 +23,10 @@ export function LiveResponse({
   requestedAt: string;
   working: boolean;
   continuation: boolean;
-  scope?: ThreadScope;
   models: ModelChoice[];
   onFork: () => void;
 }) {
   const { skills } = useSkills();
-  const { sources } = useSources();
   const metadata = message?.metadata;
   const startedAt = metadata?.startedAt ?? requestedAt;
   const model = metadata?.modelId
@@ -40,15 +35,9 @@ export function LiveResponse({
   const skill = metadata?.skillId
     ? findSkill(skills, metadata.skillId)
     : undefined;
-  const source = scope ? findSource(sources, scope.sourceId) : undefined;
   const details = [
     model && { label: "Model", value: model.label },
     skill && { label: "Skill", value: skill.name },
-    scope &&
-      source && {
-        label: "Source",
-        value: `${source.name} · ${recordCountLabel(source, scope.recordIds.length)}`,
-      },
   ].filter((detail) => !!detail);
 
   return (
@@ -59,11 +48,7 @@ export function LiveResponse({
       }}
       continuation={continuation}
       details={details}
-      note={
-        scope
-          ? "Answered through the Vercel AI Gateway from the selected read-only records."
-          : "Answered through the Vercel AI Gateway."
-      }
+      note="Answered through the Vercel AI Gateway."
       preparingLabel={model ? `${model.label} is thinking…` : "Thinking…"}
       streaming={hasVisibleParts(message)}
       copyText={message ? messageMarkdown(message) : ""}

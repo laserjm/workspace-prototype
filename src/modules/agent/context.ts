@@ -3,19 +3,10 @@ import { notFound, type NotFound } from "@/lib/errors";
 import { err, ok, type Result } from "@/lib/result";
 import type { AllowedConnection } from "@/modules/records/server";
 import type { Skill } from "@/modules/skills";
-import type { Source, SourceRecord } from "@/modules/sources";
 import type { ChatOptions } from "./contracts";
 import type { AgentModel } from "./models";
 
-/** The records a thread attached, resolved on the server from their ids. */
-export type AttachedRecords = {
-  source: Source;
-  records: SourceRecord[];
-  /** How many records the thread named; the label says "5 tickets" even if one is gone. */
-  recordCount: number;
-};
-
-/** What one answer runs with: who asks, the model, and the skill and records it is grounded in. */
+/** What one answer runs with: who asks, the model, the skills and the connections it may use. */
 export type AgentContext = {
   /** The signed-in user the answer is for; tools read only what is theirs. */
   user: User;
@@ -24,7 +15,6 @@ export type AgentContext = {
   skill?: Skill;
   /** The other skills switched on in this browser: the agent may load one (`load_skill`). */
   offeredSkills: Skill[];
-  attached?: AttachedRecords;
   /**
    * The connections the answer may use, decided by the server from what the thread's questions
    * attached. Left out when the thread attached nothing; empty when none of it is usable.
@@ -35,10 +25,6 @@ export type AgentContext = {
 export type Catalogs = {
   models: readonly AgentModel[];
   skills: readonly Skill[];
-  /** The user's sources. */
-  sources: readonly Source[];
-  /** The records of the scope's source that the scope names, read for the user. */
-  scopedRecords: readonly SourceRecord[];
 };
 
 /**
@@ -48,7 +34,7 @@ export type Catalogs = {
 export function resolveContext(
   user: User,
   options: ChatOptions,
-  { models, skills, sources, scopedRecords }: Catalogs,
+  { models, skills }: Catalogs,
 ): Result<AgentContext, NotFound> {
   const model = models.find((item) => item.id === options.modelId);
   if (!model) return err(notFound("Model", options.modelId));
@@ -64,20 +50,5 @@ export function resolveContext(
     (item) => switchedOn.includes(item.id) && item.id !== skill?.id,
   );
 
-  if (!options.scope) return ok({ user, model, skill, offeredSkills });
-  const { sourceId, recordIds } = options.scope;
-  const source = sources.find((item) => item.id === sourceId);
-  if (!source) return err(notFound("Source", sourceId));
-  const records = scopedRecords.filter((record) =>
-    recordIds.includes(record.id),
-  );
-  // A scope whose records are all gone adds no context, as if none was attached.
-  if (records.length === 0) return ok({ user, model, skill, offeredSkills });
-  return ok({
-    user,
-    model,
-    skill,
-    offeredSkills,
-    attached: { source, records, recordCount: recordIds.length },
-  });
+  return ok({ user, model, skill, offeredSkills });
 }

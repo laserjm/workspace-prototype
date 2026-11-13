@@ -24,6 +24,7 @@ import {
 import {
   applyPicks,
   canPick,
+  connectionRefOf,
   defaultConnectionId,
   isPicked,
   itemCount,
@@ -43,11 +44,7 @@ import {
 /** A connection the dialog can search: its provider declares records. */
 type Searchable = { connection: Connection; provider: ProviderChoice };
 
-const refOf = ({ connection }: Searchable): ConnectionRef => ({
-  connectionId: connection.id,
-  provider: connection.providerId,
-  label: connection.accountLabel,
-});
+const refOf = ({ connection }: Searchable): ConnectionRef => connectionRefOf(connection);
 
 const capitalized = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 

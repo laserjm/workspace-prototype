@@ -23,7 +23,6 @@ import {
 import { IconButton } from "@/components/ui/icon-button";
 import { cn } from "@/lib/utils";
 import { ProjectFilter, type Project } from "@/modules/projects";
-import { useSources } from "@/modules/sources";
 import {
   CustomSnoozeDialog,
   shelfOf,
@@ -58,7 +57,6 @@ type SidebarProps = {
 const NO_PROJECT = "none";
 
 export function WorkspaceSidebar(props: SidebarProps) {
-  const { sourceById } = useSources();
   const [query, setQuery] = useState("");
   const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
   const searchRow = useRef<HTMLDivElement>(null);
@@ -71,7 +69,7 @@ export function WorkspaceSidebar(props: SidebarProps) {
     : props.projects;
   const filteredThreads = props.threads.filter(
     (thread) =>
-      `${thread.title} ${props.projectName(thread.projectId)} ${thread.branch} ${thread.scope ? sourceById(thread.scope.sourceId).name : ""}`
+      `${thread.title} ${props.projectName(thread.projectId)} ${thread.branch}`
         .toLowerCase()
         .includes(query.toLowerCase()) &&
       (selectedProjects.length === 0 ||
@@ -313,9 +311,9 @@ export function WorkspaceSidebar(props: SidebarProps) {
       >
         <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Session context</DialogTitle>
+            <DialogTitle>About this thread</DialogTitle>
             <DialogDescription>
-              Source records included in this conversation.
+              Where the thread sits and how much its conversation holds.
             </DialogDescription>
           </DialogHeader>
           {contextThread && (

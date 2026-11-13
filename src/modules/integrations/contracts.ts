@@ -173,7 +173,7 @@ export type Provider = {
   ) => Promise<
     Result<VerifiedAccount, CredentialRejected | ProviderUnreachable | RateLimited>
   >;
-  /** Sources a thread can browse and fix as its scope (ADR 0002; ADR 0003 retires them). */
+  /** The sample's sources (ADR 0002), which nothing attaches since the scope went (ADR 0003, #63). */
   sources?: {
     /** Each product's presentation, by the `product` its sources name. */
     products: Readonly<Record<string, ProductPresentation>>;
@@ -255,6 +255,11 @@ export type RecordFilter = "type" | "includeClosed";
 export type RecordSearchQuery = {
   /** The words typed; none before typing. */
   text?: string;
+  /**
+   * The text may hold the provider's own qualifiers, which pass through (the agent's search).
+   * Otherwise every word is searched as text (the attach dialog's).
+   */
+  qualifiers?: boolean;
   /** One declared type; all of them when left out. */
   type?: string;
   includeClosed?: boolean;

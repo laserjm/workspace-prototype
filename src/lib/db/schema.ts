@@ -173,8 +173,6 @@ export const threadsTable = pgTable(
     projectId: uuid("project_id"),
     title: text("title").notNull(),
     provider: text("provider").notNull(),
-    sourceId: text("source_id"),
-    recordIds: text("record_ids").array(),
     forkedFromThreadId: uuid("forked_from_thread_id"),
     forkedFromTitle: text("forked_from_title"),
     forkedFromResponseIndex: integer("forked_from_response_index"),

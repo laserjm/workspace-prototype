@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { aUser } from "@/tests/factories/user";
 import {
-  listScopedRecords,
   listSources,
   searchSourceRecords,
 } from "./queries";
@@ -51,26 +50,4 @@ describe("searchSourceRecords", () => {
       expect(await searchSourceRecords(user, sourceId, {})).toBeUndefined();
     },
   );
-});
-
-describe("listScopedRecords", () => {
-  it("returns the named records that exist, in the source's order", async () => {
-    const records = await listScopedRecords(user, {
-      sourceId: "sample:jira",
-      recordIds: ["PLAT-126", "GONE-1", "PLAT-124"],
-    });
-    expect(records.map((record) => record.id)).toEqual([
-      "PLAT-124",
-      "PLAT-126",
-    ]);
-  });
-
-  it("returns none for a source the user does not have", async () => {
-    expect(
-      await listScopedRecords(user, {
-        sourceId: "github:acme/web",
-        recordIds: ["1"],
-      }),
-    ).toEqual([]);
-  });
 });

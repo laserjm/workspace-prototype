@@ -1,6 +1,8 @@
-// What a question is about: the records the user attached, grouped by connection (ADR 0003 §1).
-// Browser-safe: types and the composer's attachment rules, pure.
-import type { Connection, RecordSummary } from "@/modules/integrations";
+// What a question is about: the records the user attached, grouped by connection (ADR 0003 §1),
+// and the schemas of the tools every provider answers (ADR 0003 §4).
+// Browser-safe: types, the composer's attachment rules and the tool schemas, pure.
+import { z } from "zod";
+import type { Connection, RecordError, RecordSummary } from "@/modules/integrations";
 
 /** At most this many items, and this many connections, go on one question. */
 export const MAX_ATTACHED_ITEMS = 10;
@@ -28,6 +30,13 @@ export type AttachedConnection = {
 
 /** The connection an item or a whole-connection attachment comes from. */
 export type ConnectionRef = Omit<AttachedConnection, "items">;
+
+/** How an attachment names one of the user's connections. */
+export const connectionRefOf = (connection: Connection): ConnectionRef => ({
+  connectionId: connection.id,
+  provider: connection.providerId,
+  label: connection.accountLabel,
+});
 
 export function itemCount(attached: readonly AttachedConnection[]): number {
   return attached.reduce((sum, connection) => sum + connection.items.length, 0);
@@ -145,3 +154,69 @@ export function defaultConnectionId(
     ) ?? candidates[0]
   )?.id;
 }
+
+// The tools every provider answers (ADR 0003 §4). Their schemas are here, so the chat can type
+// their parts; `tools.ts` runs them on the server.
+
+/** At most this many results of one search reach the model. */
+export const MAX_SEARCH_RESULTS = 20;
+
+const recordSummarySchema = z.object({
+  connectionId: z.string(),
+  type: z.string().describe("The provider's record type, e.g. issue or pull-request."),
+  key: z
+    .string()
+    .describe("The record's reference within its connection, as the provider's guide writes keys."),
+  label: z.string().describe("A short name to cite it by."),
+  title: z.string(),
+  state: z.string().describe("Its state now, as the provider's guide names them."),
+  updatedAt: z.string().describe("When it last changed, ISO 8601."),
+  where: z.string().describe("Where it lives, such as its repository and number."),
+}) satisfies z.ZodType<RecordSummary>;
+
+const recordErrorSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("not_found") }),
+  z.object({ kind: z.literal("no_access") }),
+  z.object({ kind: z.literal("needs_reconnect") }),
+  z.object({ kind: z.literal("rate_limited"), retryAt: z.string() }),
+  z.object({ kind: z.literal("unreachable") }),
+  z.object({ kind: z.literal("invalid_query"), message: z.string() }),
+]) satisfies z.ZodType<RecordError>;
+
+/** What the model may ask `search_records` for. */
+export const searchRecordsInputSchema = z.object({
+  connectionId: z
+    .string()
+    .min(1)
+    .max(100)
+    .describe("The connection to search: a connectionId from the connections you may use."),
+  query: z
+    .string()
+    .max(256)
+    .describe(
+      "The search, in the provider's own syntax as its guide explains it: words, and the provider's qualifiers. Empty lists what involves the user first, then the most recently updated.",
+    ),
+  type: z
+    .string()
+    .min(1)
+    .max(50)
+    .optional()
+    .describe("Only records of this type, e.g. issue or pull-request. Every type when left out."),
+  includeClosed: z
+    .boolean()
+    .optional()
+    .describe(
+      "Also find closed records (closed, merged, not planned). Only open ones when left out, unless the query names a state itself.",
+    ),
+});
+export type SearchRecordsInput = z.infer<typeof searchRecordsInputSchema>;
+
+/** The best matches, at most `MAX_SEARCH_RESULTS`, and how many there are; or why there are none. */
+export const searchRecordsOutputSchema = z.union([
+  z.object({
+    results: z.array(recordSummarySchema).max(MAX_SEARCH_RESULTS),
+    total: z.number().optional().describe("How many records match, of which `results` are the first."),
+  }),
+  z.object({ error: recordErrorSchema }),
+]);
+export type SearchRecordsOutput = z.infer<typeof searchRecordsOutputSchema>;

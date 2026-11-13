@@ -4,6 +4,8 @@ export type {
   AttachedItem,
   ConnectionRef,
   ItemSnapshot,
+  SearchRecordsInput,
+  SearchRecordsOutput,
 } from "./contracts";
 export {
   attachedPhrase,
@@ -27,4 +29,5 @@ export {
 export { AttachDialog } from "./components/attach-dialog";
 export { AttachedItemChip } from "./components/attached-item-chip";
 export { RecordPanel, RecordPanelToggle } from "./components/record-panel";
+export { RecordSearchCall } from "./components/record-search-call";
 export { RecordPanelProvider, useRecordPanel } from "./components/record-panel-provider";

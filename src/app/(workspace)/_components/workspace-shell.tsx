@@ -22,20 +22,12 @@ import { cn } from "@/lib/utils";
 import { ProjectForm, ProjectIcon, type Project } from "@/modules/projects";
 import { useSkillPreferences } from "@/modules/skills";
 import {
-  allRecordIds,
-  recordCountLabel,
-  SourceChoiceList,
-  SourceScopeDialog,
-  useSources,
-} from "@/modules/sources";
-import {
   RecordPanel,
   RecordPanelProvider,
   RecordPanelToggle,
   type AttachedConnection,
 } from "@/modules/records";
 import {
-  createScope,
   placementOf,
   PromptForm,
   ThreadConversation,
@@ -47,7 +39,6 @@ import {
   type SnoozeTimeInPast,
   type Thread,
   type ThreadPlacement,
-  type ThreadScope,
   type ThreadStillWorking,
 } from "@/modules/threads";
 import type { ChatOptions, ModelChoice } from "@/modules/agent";
@@ -55,7 +46,7 @@ import { NewThreadHeading } from "./new-thread-heading";
 import { WorkspaceSettings, type SettingsSection } from "./workspace-settings";
 import { WorkspaceSidebar } from "./workspace-sidebar";
 
-type DialogKind = "project" | "settings" | "sources" | "activity" | null;
+type DialogKind = "project" | "settings" | "activity" | null;
 
 const SNOOZE_REFUSED: Record<
   (SnoozeTimeInPast | ThreadStillWorking)["_tag"],
@@ -76,7 +67,6 @@ export function WorkspaceShell({
   models: ModelChoice[];
   user: { name: string; email: string };
 }) {
-  const { sourceById, loadRecords } = useSources();
   const [threadNotice, setThreadNotice] = useState<{
     message: string;
     undo?: {
@@ -121,8 +111,6 @@ export function WorkspaceShell({
     useState<SettingsSection>("general");
   const { enabledSkills, toggleSkill } = useSkillPreferences();
   const [newProjectName, setNewProjectName] = useState("");
-  const [draftScope, setDraftScope] = useState<ThreadScope>();
-  const [editingScope, setEditingScope] = useState(false);
   // The open thread's composer draft of attached items, which the record panel adds to too.
   const [draftAttached, setDraftAttached] = useState<
     readonly AttachedConnection[]
@@ -159,7 +147,6 @@ export function WorkspaceShell({
 
   function newThread() {
     setProjectId(currentProjectId);
-    setDraftScope(undefined);
     navigate(null);
   }
 
@@ -185,7 +172,6 @@ export function WorkspaceShell({
     if (returnToThread) {
       const next = threads.find((item) => item.id === nextId);
       setProjectId(next ? next.projectId : previous.projectId);
-      setDraftScope(undefined);
       navigate(nextId ?? null);
     }
   }
@@ -231,33 +217,9 @@ export function WorkspaceShell({
     setThreadNotice(undefined);
   }
 
-  function chooseSource(sourceId: string) {
-    // A new thread starts with all of the source's records; the scope dialog narrows them.
-    loadRecords(sourceId).then(
-      (records) => {
-        const scope = createScope(sourceId, allRecordIds(records));
-        setDraftScope(scope.ok ? scope.value : undefined);
-      },
-      () => setDraftScope(undefined),
-    );
-    if (activeThread) {
-      setProjectId(currentProjectId);
-      navigate(null);
-    }
-    setDialog(null);
-  }
-
   function openSettings(section: SettingsSection = "general") {
     setSettingsSection(section);
     setDialog("settings");
-  }
-
-  function clearSource() {
-    setDraftScope(undefined);
-    if (activeThread) {
-      setProjectId(currentProjectId);
-      navigate(null);
-    }
   }
 
   async function handleFork(target: ForkTarget) {
@@ -297,12 +259,8 @@ export function WorkspaceShell({
     return () => window.removeEventListener("keydown", handleKey);
   }, []);
 
-  function chatOptions(
-    modelId: string,
-    skillId: string | undefined,
-    scope: ThreadScope | undefined,
-  ): ChatOptions {
-    return { modelId, skillId, skillIds: enabledSkills, scope };
+  function chatOptions(modelId: string, skillId: string | undefined): ChatOptions {
+    return { modelId, skillId, skillIds: enabledSkills };
   }
 
   /** Asks the open thread's chat; false keeps the draft in the composer. */
@@ -324,7 +282,7 @@ export function WorkspaceShell({
     if (!continued.ok) return false;
     if (threadNotice?.undo?.threadId === activeThread.id)
       setThreadNotice(undefined);
-    controls.send(question, chatOptions(modelId, skillId, activeThread.scope));
+    controls.send(question, chatOptions(modelId, skillId));
     countTurn(activeThread.id, question.attachments.length);
     return true;
   }
@@ -342,7 +300,6 @@ export function WorkspaceShell({
       projectId,
       prompt: question.text,
       provider: model.provider,
-      scope: draftScope,
     });
     if (!thread) {
       setThreadNotice({
@@ -353,16 +310,11 @@ export function WorkspaceShell({
     setStarted({
       threadId: thread.id,
       question,
-      options: chatOptions(modelId, skillId, thread.scope),
+      options: chatOptions(modelId, skillId),
     });
     countTurn(thread.id, question.attachments.length);
     navigate(thread.id);
     return true;
-  }
-
-  function describeScope(scope: ThreadScope) {
-    const source = sourceById(scope.sourceId);
-    return `${source.name}: ${recordCountLabel(source, scope.recordIds.length)}`;
   }
 
   return (
@@ -407,7 +359,7 @@ export function WorkspaceShell({
             onNewProject={() => setDialog("project")}
             onToggle={toggleSidebar}
             onSettings={() => openSettings()}
-            onSources={() => setDialog("sources")}
+            onSources={() => openSettings("sources")}
             onActivity={() => setDialog("activity")}
             onSettle={handleSettle}
             onSnooze={handleSnooze}
@@ -483,7 +435,6 @@ export function WorkspaceShell({
                 // A short window lets the new-thread draft scroll.
                 !activeThread && "short:overflow-y-auto",
               )}
-              data-session={activeThread?.scope ? "source" : "plain"}
               tabIndex={-1}
             >
               {!activeThread ? (
@@ -498,11 +449,7 @@ export function WorkspaceShell({
                     key={projectId ?? "no-project"}
                     models={models}
                     onSend={startNewThread}
-                    onSources={() => setDialog("sources")}
-                    scope={draftScope}
-                    onScope={() => setEditingScope(true)}
-                    onChooseSource={chooseSource}
-                    onClearSource={clearSource}
+                    onSources={() => openSettings("sources")}
                     enabledSkills={enabledSkills}
                     onManageSkills={() => openSettings("skills")}
                   />
@@ -550,13 +497,10 @@ export function WorkspaceShell({
                       onSend={(question, modelId, skillId) =>
                         askThread(controls, question, modelId, skillId)
                       }
-                      onSources={() => setDialog("sources")}
-                      scope={activeThread.scope}
+                      onSources={() => openSettings("sources")}
                       enabledSkills={enabledSkills}
                       initialSkill={controls.lastSkillId}
                       onManageSkills={() => openSettings("skills")}
-                      onChooseSource={chooseSource}
-                      onClearSource={clearSource}
                       attached={draftAttached}
                       onAttachedChange={setDraftAttached}
                     />
@@ -581,16 +525,10 @@ export function WorkspaceShell({
                 </div>
                 <div className="flex items-center justify-center gap-2.5 px-4 py-8 text-sm text-secondary-label max-md:flex-wrap max-md:p-4 max-md:text-xs">
                   <Cable className="size-4.5" />
-                  <p>
-                    {activeThread?.scope
-                      ? `${describeScope(activeThread.scope)} in this thread’s read-only snapshot.`
-                      : draftScope
-                        ? `${describeScope(draftScope)} selected for your next thread.`
-                        : "Choose a source to add context to your thread."}
-                  </p>
+                  <p>Choose a data source in the composer to add context to a question.</p>
                   <button
                     type="button"
-                    onClick={() => setDialog("sources")}
+                    onClick={() => openSettings("sources")}
                     className="inline-flex items-center gap-1 border-b border-input text-accent-foreground"
                   >
                     Explore data sources <ChevronDown className="size-3" />
@@ -621,20 +559,14 @@ export function WorkspaceShell({
                   ? "Add a project"
                   : dialog === "settings"
                     ? "Workspace settings"
-                    : dialog === "sources"
-                      ? "Choose a data source"
-                      : "Workspace activity"}
+                    : "Workspace activity"}
               </DialogTitle>
               <DialogDescription>
                 {dialog === "project"
                   ? "Give your next workspace a name."
                   : dialog === "settings"
                     ? "Make this workspace work the way you do."
-                    : dialog === "sources"
-                      ? activeThread
-                        ? "Choose a source to start a new thread. Each thread keeps its own selected records. All sources use sample data."
-                        : "Pick a sample enterprise source. You can choose which records to include before sending your first message."
-                      : "Recent conversations in this workspace."}
+                    : "Recent conversations in this workspace."}
               </DialogDescription>
             </DialogHeader>
 
@@ -654,22 +586,6 @@ export function WorkspaceShell({
                   setDialog(null);
                 }}
               />
-            )}
-
-            {dialog === "sources" && (
-              <>
-                <SourceChoiceList
-                  selected={
-                    activeThread?.scope?.sourceId ?? draftScope?.sourceId
-                  }
-                  onSelect={chooseSource}
-                />
-                <p className="text-xs leading-relaxed text-secondary-label">
-                  More enterprise systems can follow the same pattern: choose a
-                  source, scope the records, then work with a source-specific
-                  view.
-                </p>
-              </>
             )}
 
             {dialog === "settings" && (
@@ -706,18 +622,6 @@ export function WorkspaceShell({
             )}
           </DialogContent>
         </Dialog>
-        {editingScope && draftScope && (
-          <SourceScopeDialog
-            sourceId={draftScope.sourceId}
-            recordIds={draftScope.recordIds}
-            onClose={() => setEditingScope(false)}
-            onApply={(recordIds) => {
-              const scope = createScope(draftScope.sourceId, recordIds);
-              if (scope.ok) setDraftScope(scope.value);
-              setEditingScope(false);
-            }}
-          />
-        )}
       </TooltipProvider>
   );
 }

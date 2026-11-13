@@ -3,8 +3,9 @@ import { recordQuerySchema } from "@/modules/sources";
 import { searchSourceRecords } from "@/modules/sources/server";
 
 /**
- * A page of one of the user's sources' records, read with their connection: what the source
- * scope dialog shows. `?text=` searches, `?cursor=` asks for the next page.
+ * A page of one of the user's sources' records, read with their connection. `?text=` searches,
+ * `?cursor=` asks for the next page. Nothing in the app reads it since the thread scope went (#62);
+ * it goes with the sources module (#63).
  */
 export async function GET(
   req: Request,

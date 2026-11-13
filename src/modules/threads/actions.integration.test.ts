@@ -59,7 +59,6 @@ describeIntegration(
           projectId: null,
           title: "Summarize these tickets",
           provider: "claude",
-          scope: input.scope,
         }),
       });
       expect(await listThreads(ana)).toContainEqual(result.ok && result.value);
@@ -128,7 +127,6 @@ describeIntegration(
         value: expect.objectContaining({
           id,
           title: "Fork: Summarize these tickets",
-          scope: thread.scope,
           forkedFrom: {
             threadId: thread.id,
             title: thread.title,

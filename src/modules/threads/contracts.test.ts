@@ -3,7 +3,6 @@ import { aThread } from "@/tests/factories/thread";
 import {
   continueThread,
   countTurn,
-  createScope,
   forkThread,
   startThread,
 } from "./contracts";
@@ -12,33 +11,14 @@ import { shelfOf } from "./placement";
 const now = new Date("2026-11-04T10:00:00.000Z");
 const earlier = new Date("2026-11-04T09:00:00.000Z");
 
-describe("createScope", () => {
-  it("keeps the records it was given", () => {
-    expect(createScope("jira", ["PLAT-124"])).toEqual({
-      ok: true,
-      value: { sourceId: "jira", recordIds: ["PLAT-124"] },
-    });
-  });
-
-  it("refuses a scope without records", () => {
-    expect(createScope("jira", [])).toEqual({
-      ok: false,
-      error: { _tag: "ScopeHasNoRecords" },
-    });
-  });
-});
-
-
 describe("startThread", () => {
-  it("titles the thread with its first message and copies the scope", () => {
-    const scope = { sourceId: "jira", recordIds: ["PLAT-124"] };
+  it("titles the thread with its first message", () => {
     const thread = startThread(
       {
         id: "new",
         projectId: null,
         prompt: "Summarize",
         provider: "openai",
-        scope,
       },
       now,
     );
@@ -49,11 +29,9 @@ describe("startThread", () => {
       branch: "main",
       createdAt: now.toISOString(),
       provider: "openai",
-      scope,
       turnCount: 0,
       attachmentCount: 0,
     });
-    expect(thread.scope?.recordIds).not.toBe(scope.recordIds);
   });
 });
 
@@ -89,7 +67,7 @@ describe("countTurn", () => {
 
 
 describe("forkThread", () => {
-  it("copies the thread as active, keeps its project and scope, and names its origin", () => {
+  it("copies the thread as active, keeps its project, and names its origin", () => {
     const thread = aThread({
       title: "Fork: Sprint 24 summary",
       settledAt: now.toISOString(),
@@ -110,13 +88,11 @@ describe("forkThread", () => {
       createdAt: now.toISOString(),
       settledAt: undefined,
       projectId: thread.projectId,
-      scope: thread.scope,
       forkedFrom: {
         threadId: "thread-1",
         title: "Fork: Sprint 24 summary",
         responseIndex: 2,
       },
     });
-    expect(fork.scope?.recordIds).not.toBe(thread.scope?.recordIds);
   });
 });

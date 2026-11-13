@@ -10,7 +10,6 @@ export function aThread(overrides: Partial<Thread> = {}): Thread {
     branch: "main",
     createdAt: "2026-11-03T11:05:00.000Z",
     provider: "claude",
-    scope: { sourceId: "jira", recordIds: ["PLAT-124", "PLAT-125"] },
     turnCount: 0,
     attachmentCount: 0,
     ...overrides,
@@ -26,7 +25,6 @@ export function aNewThread(
     projectId: null,
     prompt: "Summarize these tickets",
     provider: "claude",
-    scope: { sourceId: "jira", recordIds: ["PLAT-124", "PLAT-125"] },
     ...overrides,
   };
 }

@@ -3,8 +3,8 @@
 import { HtmlRenderFrame } from "@/components/ui/html-render-frame";
 import { Markdown } from "@/components/ui/markdown";
 import type { WorkspaceUIMessage } from "@/modules/agent";
+import { RecordSearchCall } from "@/modules/records";
 import { SkillLoadCall } from "@/modules/skills";
-import { RecordSearchCall } from "@/modules/sources";
 import { preparingDotClassName } from "./response-turn";
 
 type MessagePart = WorkspaceUIMessage["parts"][number];
@@ -49,8 +49,7 @@ export function MessageParts({
             key={index}
             text={part.text}
             streaming={streaming}
-            // A source session (data-session on <main>) reads a step denser.
-            className="text-sm leading-relaxed text-foreground group-data-[session=source]/main:leading-5 [[data-slot=markdown]+&]:mt-3"
+            className="text-sm leading-relaxed text-foreground [[data-slot=markdown]+&]:mt-3"
           />
         ) : null;
       case "tool-html_render":

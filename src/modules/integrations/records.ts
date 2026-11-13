@@ -2,7 +2,7 @@ import "server-only";
 import { bug } from "@/lib/errors";
 import type { User } from "@/lib/auth/user";
 import { accessFor } from "./access";
-import type { RecordPage, RecordQuery, SourceRecord } from "@/modules/sources";
+import type { RecordPage, RecordQuery } from "@/modules/sources";
 import type {
   ProductPresentation,
   RecordError,
@@ -63,16 +63,6 @@ export async function searchConnectionRecords(
 ): Promise<RecordPage | undefined> {
   const records = await recordsOf(user, connectionId);
   return records?.reader.searchRecords(records.access, sourceKey, query);
-}
-
-/** The records with these ids that the source still has, in its order; none for a source the user lacks. */
-export async function getConnectionRecords(
-  user: User,
-  { connectionId, sourceKey }: SourceRef,
-  ids: readonly string[],
-): Promise<SourceRecord[]> {
-  const records = await recordsOf(user, connectionId);
-  return records ? records.reader.getRecords(records.access, sourceKey, ids) : [];
 }
 
 /** One of the user's connections whose provider holds records, with what reaches it. */

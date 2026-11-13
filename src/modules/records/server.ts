@@ -12,3 +12,4 @@ export {
   foreignConnectionIds,
   type AllowedConnection,
 } from "./queries";
+export { recordTools } from "./tools";

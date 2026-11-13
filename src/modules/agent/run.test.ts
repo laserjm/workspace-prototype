@@ -8,6 +8,7 @@ import {
   markNeedsReconnect,
   resetConnections,
 } from "@/tests/support/connections";
+import { useRecordedGithub } from "@/tests/support/recorded-github";
 import type { WorkspaceUIMessage } from "./contracts";
 import { runAgent } from "./run";
 
@@ -37,10 +38,11 @@ const reply = () =>
     finish("stop"),
   ]);
 
-// The sample connection alone, without the compose Postgres.
+// The test support's connections, without the compose Postgres, and a fake token for GitHub.
 vi.mock("@/modules/integrations/queries", () =>
   import("@/tests/support/connections"),
 );
+vi.mock("@/modules/integrations/vault", () => import("@/tests/support/connections"));
 
 const { model } = vi.hoisted(() => ({ model: { current: undefined as unknown } }));
 vi.mock("./models", () => ({
@@ -126,43 +128,11 @@ const toolNames = (mock: MockLanguageModelV4, call: number) =>
   (mock.doStreamCalls[call]?.tools ?? []).map((tool) => tool.name);
 
 describe("runAgent", () => {
-  it("offers only html_render without attached records", async () => {
+  it("offers only html_render without an attached connection", async () => {
     const mock = new MockLanguageModelV4({ doStream: [reply()] });
     model.current = mock;
     await run({ modelId: "mock" });
     expect(toolNames(mock, 0)).toEqual(["html_render"]);
-  });
-
-  it("lets the model search the attached records, and only those", async () => {
-    const scope = { sourceId: "sample:jira", recordIds: ["PLAT-124", "PLAT-125", "PLAT-127"] };
-    const mock = new MockLanguageModelV4({
-      doStream: [
-        step([
-          { type: "stream-start", warnings: [] },
-          {
-            type: "tool-call",
-            toolCallId: "call-1",
-            toolName: "search_records",
-            input: JSON.stringify({ text: "PLAT" }),
-          },
-          finish("tool-calls"),
-        ]),
-        reply(),
-      ],
-    });
-    model.current = mock;
-    const conversation = await run({ modelId: "mock", scope });
-
-    expect(toolNames(mock, 0).sort()).toEqual(["html_render", "search_records"]);
-    const search = conversation[1]?.parts.find(
-      (part) => part.type === "tool-search_records",
-    );
-    expect(search).toMatchObject({ state: "output-available", output: { searched: 3 } });
-    const found = search?.type === "tool-search_records" && search.output;
-    expect(found && found.matches.map((match) => match.id)).toEqual(scope.recordIds);
-    expect(conversation[1]?.parts).toContainEqual(
-      expect.objectContaining({ type: "text", text: "Two are in review." }),
-    );
   });
 
   it("lets the model load a switched-on skill it was offered", async () => {
@@ -283,6 +253,148 @@ describe("runAgent", () => {
     expect(system).toContain("## Connections you may use\n\nNone.");
     expect(system).not.toContain(githubConnection.id);
     expect(system).not.toContain("## GitHub");
+  });
+
+  it("offers search_records for a connection attached whole, and not for one needing reconnecting", async () => {
+    const whole = new MockLanguageModelV4({ doStream: [reply()] });
+    model.current = whole;
+    await run({ modelId: "mock" }, [attaching([{ ...laserjm, items: [] }])]);
+    expect(toolNames(whole, 0).sort()).toEqual(["html_render", "search_records"]);
+
+    await markNeedsReconnect(connectedUser, githubConnection.id);
+    const broken = new MockLanguageModelV4({ doStream: [reply()] });
+    model.current = broken;
+    await run({ modelId: "mock" }, [attaching([{ ...laserjm, items: [] }])]);
+    expect(toolNames(broken, 0)).toEqual(["html_render"]);
+  });
+
+  /** A model that calls search_records with `input`, then replies. */
+  const searching = (input: Record<string, unknown>) =>
+    new MockLanguageModelV4({
+      doStream: [
+        step([
+          { type: "stream-start", warnings: [] },
+          {
+            type: "tool-call",
+            toolCallId: "call-1",
+            toolName: "search_records",
+            input: JSON.stringify(input),
+          },
+          finish("tool-calls"),
+        ]),
+        reply(),
+      ],
+    });
+  /** The output of the reply's search_records call. */
+  const searchOutput = (conversation: WorkspaceUIMessage[]) =>
+    conversation.at(-1)?.parts.find((part) => part.type === "tool-search_records");
+  const REPOS = "GET /user/repos?per_page=100";
+  const openIssue = {
+    number: 6,
+    title: "Sample: publish a status page for the prototype",
+    state: "open",
+    repository_url: "https://api.github.com/repos/laserjm/workspace-fixtures",
+    updated_at: "2026-11-01T10:00:00Z",
+  };
+
+  it("searches an attached connection in its token's scope, dropping a repository or owner outside it", async () => {
+    const { requests } = useRecordedGithub({
+      [REPOS]: "repositories.json",
+      "GET /search/issues?q=repo:laserjm/workspace-fixtures label:bug \"OR\" status is:issue is:open&per_page=20":
+        { status: 200, body: { total_count: 1, items: [openIssue] } },
+    });
+    model.current = searching({
+      connectionId: githubConnection.id,
+      // An operator could widen the search past the scope, so it is searched as a word.
+      query: "label:bug repo:octo/secrets user:octo OR status",
+      type: "issue",
+    });
+    const conversation = await run({ modelId: "mock" }, [attaching([{ ...laserjm, items: [] }])]);
+
+    expect(requests).toHaveLength(2);
+    expect(searchOutput(conversation)).toMatchObject({
+      state: "output-available",
+      output: {
+        total: 1,
+        results: [
+          {
+            connectionId: githubConnection.id,
+            type: "issue",
+            key: "laserjm/workspace-fixtures#6",
+            label: "workspace-fixtures#6",
+            state: "open",
+          },
+        ],
+      },
+    });
+  });
+
+  it("keeps results to the token's repositories when the query names their owner instead", async () => {
+    // 6 × "repo:acme/a-repository-with-a-long-name-N" make the query longer than 256 characters.
+    const repositories = Array.from({ length: 6 }, (_, index) => ({
+      full_name: `acme/a-repository-with-a-long-name-${index}`,
+      owner: { login: "acme", type: "Organization" },
+    }));
+    const inRepository = (name: string, number: number) => ({
+      ...openIssue,
+      number,
+      repository_url: `https://api.github.com/repos/acme/${name}`,
+    });
+    useRecordedGithub({
+      [REPOS]: { status: 200, body: repositories },
+      "GET /search/issues?q=user:acme launch is:issue is:open&per_page=20": {
+        status: 200,
+        body: {
+          total_count: 2,
+          items: [inRepository("a-repository-with-a-long-name-0", 1), inRepository("not-given", 2)],
+        },
+      },
+    });
+    model.current = searching({ connectionId: githubConnection.id, query: "launch", type: "issue" });
+    const conversation = await run({ modelId: "mock" }, [attaching([{ ...laserjm, items: [] }])]);
+    const output = searchOutput(conversation);
+    const found = output?.type === "tool-search_records" && output.output;
+    expect(found && "results" in found && found.results.map((result) => result.key)).toEqual([
+      "acme/a-repository-with-a-long-name-0#1",
+    ]);
+  });
+
+  it("does not put a number on top that the query's qualifiers might not match", async () => {
+    const { requests } = useRecordedGithub({
+      [REPOS]: "repositories.json",
+      "GET /search/issues?q=repo:laserjm/workspace-fixtures label:bug 6 is:issue is:open&per_page=20":
+        { status: 200, body: { total_count: 0, items: [] } },
+    });
+    model.current = searching({ connectionId: githubConnection.id, query: "label:bug #6", type: "issue" });
+    await run({ modelId: "mock" }, [attaching([{ ...laserjm, items: [] }])]);
+    expect(requests).toHaveLength(2);
+  });
+
+  it("answers no_access for a connection the thread did not attach, without asking GitHub", async () => {
+    const { requests } = useRecordedGithub({});
+    model.current = searching({ connectionId: "00000000-0000-4000-8000-000000000009", query: "launch" });
+    const conversation = await run({ modelId: "mock" }, [attaching([{ ...laserjm, items: [] }])]);
+    expect(requests).toEqual([]);
+    expect(searchOutput(conversation)).toMatchObject({
+      state: "output-available",
+      output: { error: { kind: "no_access" } },
+    });
+  });
+
+  it("answers invalid_query, as data, for a search GitHub cannot run", async () => {
+    useRecordedGithub({
+      [REPOS]: "repositories.json",
+      "GET /search/issues?q=repo:laserjm/workspace-fixtures created:>tomorrow is:pr is:open&per_page=20":
+        { status: 422, body: { message: "Validation Failed", errors: [{ message: "The date is not valid." }] } },
+    });
+    model.current = searching({ connectionId: githubConnection.id, query: "created:>tomorrow is:pr" });
+    const conversation = await run({ modelId: "mock" }, [attaching([{ ...laserjm, items: [issue(1)] }])]);
+    expect(searchOutput(conversation)).toMatchObject({
+      state: "output-available",
+      output: {
+        error: { kind: "invalid_query", message: "Validation Failed: The date is not valid." },
+      },
+    });
   });
 
   it("says nothing of connections when the thread attached none", async () => {
