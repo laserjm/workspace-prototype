@@ -5,9 +5,12 @@ import {
   initialPanelState,
   openSent,
   openView,
+  pinView,
   restorePanel,
   setShown,
   storedPanel,
+  tabsOf,
+  unpinView,
   viewIdOf,
   type PanelState,
   type ViewTarget,
@@ -32,7 +35,13 @@ function issue(number: number, connectionId = ACME): ViewTarget {
 const idOf = (target: ViewTarget) =>
   viewIdOf(target.kind, target.connection.connectionId, target.item.key);
 
-const EMPTY: PanelState = { views: [], activeId: null, shown: true, rearranged: false };
+const EMPTY: PanelState = {
+  views: [],
+  activeId: null,
+  pinnedId: null,
+  shown: true,
+  rearranged: false,
+};
 
 const openIds = (state: PanelState) => state.views.map((view) => view.id);
 
@@ -142,6 +151,7 @@ describe("a thread's panel when it opens", () => {
     expect(initialPanelState({ stored: undefined, wide: true, hasAttached: true })).toEqual({
       views: [],
       activeId: null,
+      pinnedId: null,
       shown: true,
       rearranged: false,
     });
@@ -163,18 +173,133 @@ describe("a thread's panel when it opens", () => {
   });
 });
 
+describe("pinning a view", () => {
+  const three = openSent(EMPTY, [issue(1), issue(2), issue(3)], { wide: true });
+  const tabIds = (state: PanelState) => tabsOf(state).map((view) => view.id);
+
+  it("pins it above the tabs, which no longer list it, and keeps it open", () => {
+    const state = pinView(three, idOf(issue(3)));
+    expect(state.pinnedId).toBe(idOf(issue(3)));
+    expect(openIds(state)).toEqual([idOf(issue(1)), idOf(issue(2)), idOf(issue(3))]);
+    expect(tabIds(state)).toEqual([idOf(issue(1)), idOf(issue(2))]);
+    expect(state.activeId).toBe(idOf(issue(1)));
+    expect(state.rearranged).toBe(true);
+  });
+
+  it("shows the neighbour among the tabs below when the shown view is pinned, and Attached after the last", () => {
+    const pinned = pinView(focusView(three, idOf(issue(2))), idOf(issue(2)));
+    expect(pinned.activeId).toBe(idOf(issue(3)));
+    const alone = pinView(openView(EMPTY, issue(1)), idOf(issue(1)));
+    expect(alone.activeId).toBeNull();
+  });
+
+  it("keeps one pin: pinning another returns the old one to the tabs, shown in its place when the new one was shown", () => {
+    const first = pinView(three, idOf(issue(1)));
+    expect(first.activeId).toBe(idOf(issue(2)));
+    const second = pinView(first, idOf(issue(2)));
+    expect(second.pinnedId).toBe(idOf(issue(2)));
+    expect(tabIds(second)).toEqual([idOf(issue(1)), idOf(issue(3))]);
+    expect(second.activeId).toBe(idOf(issue(1)));
+    const third = pinView(focusView(first, idOf(issue(3))), idOf(issue(2)));
+    expect(third.activeId).toBe(idOf(issue(3)));
+  });
+
+  it("ignores a view that is not open", () => {
+    expect(pinView(three, idOf(issue(9)))).toBe(three);
+  });
+
+  it("unpins it back into the tabs, where it is shown", () => {
+    const state = unpinView(pinView(three, idOf(issue(3))));
+    expect(state.pinnedId).toBeNull();
+    expect(tabIds(state)).toEqual([idOf(issue(1)), idOf(issue(2)), idOf(issue(3))]);
+    expect(state.activeId).toBe(idOf(issue(3)));
+    expect(unpinView(three)).toBe(three);
+  });
+
+  it("unpins a pinned view that closes, and keeps the view below", () => {
+    const state = closeView(pinView(three, idOf(issue(1))), idOf(issue(1)));
+    expect(state.pinnedId).toBeNull();
+    expect(openIds(state)).toEqual([idOf(issue(2)), idOf(issue(3))]);
+    expect(state.activeId).toBe(idOf(issue(2)));
+  });
+
+  it("closes the shown view to its neighbour among the tabs, passing over the pin", () => {
+    const pinned = pinView(focusView(three, idOf(issue(1))), idOf(issue(2)));
+    expect(pinned.activeId).toBe(idOf(issue(1)));
+    expect(closeView(pinned, idOf(issue(1))).activeId).toBe(idOf(issue(3)));
+    expect(closeView(closeView(pinned, idOf(issue(1))), idOf(issue(3))).activeId).toBeNull();
+  });
+
+  it("never gives the pinned view the focus below: it is shown above already", () => {
+    const pinned = pinView(three, idOf(issue(2)));
+    expect(focusView(pinned, idOf(issue(2)))).toBe(pinned);
+    const opened = openView({ ...pinned, shown: false }, issue(2));
+    expect(opened.activeId).toBe(idOf(issue(1)));
+    expect(opened.shown).toBe(true);
+    expect(opened.pinnedId).toBe(idOf(issue(2)));
+  });
+
+  it("lets a question's first item take the focus below unless it is pinned", () => {
+    const pinned = openSent(pinView(three, idOf(issue(2))), [], { wide: true });
+    expect(openSent(pinned, [issue(2), issue(4)], { wide: true }).activeId).toBe(idOf(issue(1)));
+    expect(openSent(pinned, [issue(4), issue(2)], { wide: true }).activeId).toBe(idOf(issue(4)));
+  });
+});
+
 describe("the stored panel", () => {
   it("is versioned", () => {
-    expect(storedPanel(EMPTY)).toMatchObject({ version: 1 });
+    expect(storedPanel(EMPTY)).toMatchObject({ version: 2 });
+  });
+
+  it("keeps the pin", () => {
+    const left = pinView(openSent(EMPTY, [issue(1), issue(2)], { wide: true }), idOf(issue(2)));
+    const stored = JSON.parse(JSON.stringify(storedPanel(left)));
+    expect(initialPanelState({ stored, wide: true, hasAttached: true })).toEqual(left);
+  });
+
+  it("migrates what the version before stored, with nothing pinned", () => {
+    const view = (number: number) => ({
+      id: `github.issue-view:${ACME}:acme/web#${number}`,
+      connectionId: ACME,
+      provider: "github",
+      type: "issue",
+      key: `acme/web#${number}`,
+      snapshot: { label: `web#${number}`, title: `Issue ${number}`, state: "open" },
+    });
+    // As version 1 wrote it, before there was a pin.
+    const before = {
+      version: 1,
+      views: [view(1), view(2)],
+      activeId: view(2).id,
+      shown: true,
+      rearranged: false,
+    };
+    expect(restorePanel(before)).toEqual({
+      views: [view(1), view(2)],
+      activeId: view(2).id,
+      pinnedId: null,
+      shown: true,
+      rearranged: false,
+    });
+  });
+
+  it("drops a pin on a view it does not hold, and a focus on the pinned view", () => {
+    const stored = storedPanel(openSent(EMPTY, [issue(1), issue(2)], { wide: true }));
+    expect(restorePanel({ ...stored, pinnedId: idOf(issue(9)) })?.pinnedId).toBeNull();
+    expect(restorePanel({ ...stored, pinnedId: idOf(issue(1)) })).toMatchObject({
+      pinnedId: idOf(issue(1)),
+      activeId: null,
+    });
   });
 
   it("starts afresh from a state an older version stored, or one it cannot read", () => {
     const fromPrototype = { openIds: [idOf(issue(1))], activeId: idOf(issue(1)), pinnedId: null };
     expect(restorePanel(fromPrototype)).toBeUndefined();
     expect(restorePanel({ version: 0, views: [] })).toBeUndefined();
+    expect(restorePanel({ version: 3, views: [] })).toBeUndefined();
     expect(restorePanel("{not json")).toBeUndefined();
     expect(restorePanel(null)).toBeUndefined();
-    expect(restorePanel({ version: 1, views: "all" })).toBeUndefined();
+    expect(restorePanel({ version: 2, views: "all" })).toBeUndefined();
   });
 
   it("keeps the views it can read and drops the rest, with a focus on a view it dropped", () => {
@@ -187,6 +312,7 @@ describe("the stored panel", () => {
     expect(restorePanel(broken)).toEqual({
       views: [stored.views[1]],
       activeId: null,
+      pinnedId: null,
       shown: false,
       rearranged: false,
     });

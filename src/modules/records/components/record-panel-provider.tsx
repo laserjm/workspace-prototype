@@ -19,8 +19,10 @@ import {
   initialPanelState,
   openSent,
   openView,
+  pinView,
   setShown,
   storedPanel,
+  unpinView,
   type PanelState,
   type ViewTarget,
 } from "../record-panel";
@@ -94,6 +96,10 @@ export type RecordPanelControls = {
   /** Shows a view, or with none the Attached tab. */
   focus: (id: string | null) => void;
   close: (id: string) => void;
+  /** Pins a view to the top half, replacing the pin (`pinView` in record-panel.ts). */
+  pin: (id: string) => void;
+  /** Returns the pinned view to the tabs. */
+  unpin: () => void;
   setShown: (shown: boolean) => void;
 };
 
@@ -144,6 +150,8 @@ export function RecordPanelProvider({
         update((current) => openSent(current, targetsOf(attached), { wide })),
       focus: (id) => update((current) => focusView(current, id)),
       close: (id) => update((current) => closeView(current, id)),
+      pin: (id) => update((current) => pinView(current, id)),
+      unpin: () => update((current) => unpinView(current)),
       setShown: (shown) => update((current) => setShown(current, shown)),
     }),
     [state, wide, store, update],
