@@ -84,8 +84,8 @@ uses. Another module is reached only through its `index.ts`, which is safe to im
 browser, or its `server.ts`, which is `server-only`; inside a module, files import each other
 relatively.
 `records` builds on `integrations` alone: it imports only `@/modules/integrations` and
-`@/modules/integrations/server`. Its `server.ts` holds what the server decides about attached
-items: the allowed connections and the refusal of a foreign one.
+`@/modules/integrations/server`. Its `queries.ts` holds what the server decides about attached
+items from the user's connections: the allowed connections and the refusal of a foreign one.
 **Enforced by.** ESLint `no-restricted-imports` (`eslint.config.mjs`: `@/modules/<x>/` followed
 by anything but `index` or `server` is an error; a block for `src/modules/records/**` refuses
 any `@/modules/*` but those two); the `server-only` import in every `server.ts`.
@@ -256,7 +256,7 @@ finds the thread among the user's (another user's thread is answered with a 404 
 missing one), puts the new message after the stored conversation and hands both, with the user, to `runAgent` from
 `modules/agent/server.ts`. A **new** message (one the thread does not hold yet) that attaches a
 connection that is not the user's is refused with a 400 before the agent is asked
-(`foreignConnectionIds`, `records/server.ts`); a stored message sent again by Try again is
+(`foreignConnectionIds`, `records/queries.ts`); a stored message sent again by Try again is
 answered, and the agent leaves such a connection out. Once the agent answers, the thread returns to active and records the
 provider of the model that answered.
 
@@ -287,7 +287,7 @@ The `agent` module is the runtime AI, flat by file:
   attached") or whole connection. Browser-sent strings are quoted, so none can end a line or the
   block. Bodies are never inlined. When the thread attached anything, `run.ts` adds the
   **allowed connections** to the context it passes as `options.context`:
-  `allowedConnections(user, messages)` (`records/server.ts`) takes the connections every user
+  `allowedConnections(user, messages)` (`records/queries.ts`) takes the connections every user
   message of the thread attached, keeps those that are still the user's and do not need
   reconnecting, and answers `{ connectionId, provider, providerName, account, reach?, guide? }`
   for each. Sending fetches nothing, so `reach` is left out until something already holds it.

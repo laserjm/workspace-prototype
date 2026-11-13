@@ -34,16 +34,18 @@ export function itemCount(attached: readonly AttachedConnection[]): number {
 }
 
 /**
- * How the composer's suggestion names a draft's attachments: "these 3 items", "this item", or the
- * whole connections by name ("@acme and @beta"). Nothing when nothing is attached.
+ * How the composer names a draft's attachments: the items counted ("these 3 items", "this item"),
+ * then the whole connections by name ("these 2 items and @beta", "@acme"). Nothing when nothing
+ * is attached.
  */
 export function attachedPhrase(attached: readonly AttachedConnection[]): string | undefined {
   const count = itemCount(attached);
-  if (count === 1) return "this item";
-  if (count > 1) return `these ${count} items`;
-  const labels = attached.map((connection) => connection.label);
-  if (labels.length <= 1) return labels[0];
-  return `${labels.slice(0, -1).join(", ")} and ${labels.at(-1)}`;
+  const names = [
+    ...(count === 1 ? ["this item"] : count > 1 ? [`these ${count} items`] : []),
+    ...attached.filter((connection) => connection.items.length === 0).map((connection) => connection.label),
+  ];
+  if (names.length <= 1) return names[0];
+  return `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
 }
 
 export function isPicked(

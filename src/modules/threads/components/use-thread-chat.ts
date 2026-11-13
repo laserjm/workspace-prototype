@@ -8,7 +8,7 @@ import type {
   ModelChoice,
   WorkspaceUIMessage,
 } from "@/modules/agent";
-import { ATTACHED_ITEMS, type AttachedConnection } from "@/modules/records";
+import { ATTACHED_ITEMS_PART, type AttachedConnection } from "@/modules/records";
 import type { Thread } from "../contracts";
 import { lastRequest } from "./last-request";
 
@@ -104,7 +104,7 @@ export function useThreadChat({
     const parts: WorkspaceUIMessage["parts"] = [{ type: "text", text: question.text }];
     if (question.attached.length > 0)
       parts.push({
-        type: `data-${ATTACHED_ITEMS}`,
+        type: ATTACHED_ITEMS_PART,
         data: { connections: [...question.attached] },
       });
     void sendMessage(

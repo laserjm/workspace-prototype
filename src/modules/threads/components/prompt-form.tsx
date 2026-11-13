@@ -248,7 +248,9 @@ export function PromptForm({
           placeholder={
             itemCount(attached) > 0
               ? "Ask about these items…"
-              : "Ask anything, or choose a data source…"
+              : phrase
+                ? `Ask about ${phrase}…`
+                : "Ask anything, or choose a data source…"
           }
           value={prompt}
           rows={compact ? 2 : 3}

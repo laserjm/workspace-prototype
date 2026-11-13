@@ -147,9 +147,13 @@ describe("what the composer calls the attached items", () => {
     expect(attachedPhrase([{ ...acme, items: [] }, { ...beta, items: [] }])).toBe("@acme and @beta");
   });
 
-  it("counts the items when items and a whole connection are attached", () => {
+  it("counts the items and names the whole connections beside them", () => {
     const beta = { ...acme, connectionId: "c-beta", label: "@beta" };
-    expect(attachedPhrase([...pickMany(2), { ...beta, items: [] }])).toBe("these 2 items");
+    const gamma = { ...acme, connectionId: "c-gamma", label: "@gamma" };
+    expect(attachedPhrase([...pickMany(2), { ...beta, items: [] }])).toBe("these 2 items and @beta");
+    expect(attachedPhrase([...pickMany(1), { ...beta, items: [] }, { ...gamma, items: [] }])).toBe(
+      "this item, @beta and @gamma",
+    );
   });
 
   it("is nothing when nothing is attached", () => {

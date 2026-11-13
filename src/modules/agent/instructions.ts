@@ -57,10 +57,10 @@ function connectionLine({ connectionId, providerName, provider, account, reach }
  * each of their providers' guides, once per provider. Only server-written text.
  */
 function connectionsContext(connections: readonly AllowedConnection[]) {
-  const guides = new Map<string, string>();
-  for (const connection of connections)
-    if (connection.guide && !guides.has(connection.providerName))
-      guides.set(connection.providerName, connection.guide);
+  // By provider id: two connections of one provider share its guide.
+  const guides = new Map<string, { name: string; guide: string }>();
+  for (const { provider, providerName, guide } of connections)
+    if (guide && !guides.has(provider)) guides.set(provider, { name: providerName, guide });
   return [
     "# Attached items and connections",
     attachedItems.trim(),
@@ -68,7 +68,7 @@ function connectionsContext(connections: readonly AllowedConnection[]) {
     connections.length > 0
       ? connections.map(connectionLine).join("\n")
       : "None. The connections this thread attached were removed or need reconnecting in Settings.",
-    ...[...guides].map(([name, guide]) => `## ${name}\n\n${guide}`),
+    ...[...guides.values()].map(({ name, guide }) => `## ${name}\n\n${guide}`),
   ].join("\n\n");
 }
 

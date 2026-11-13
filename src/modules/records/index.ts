@@ -14,9 +14,8 @@ export {
   removeItem,
 } from "./contracts";
 export {
-  ATTACHED_ITEMS,
+  ATTACHED_ITEMS_PART,
   attachedConnectionsOf,
-  attachedItemsDataSchema,
   attachedItemsText,
   recordsDataSchemas,
   threadAttachedItems,

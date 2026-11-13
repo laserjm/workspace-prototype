@@ -2,6 +2,7 @@
 // message (ADR 0003 §1), and what the thread and the model make of it. Browser-safe and pure.
 import { z } from "zod";
 import {
+  itemCount,
   MAX_ATTACHED_CONNECTIONS,
   MAX_ATTACHED_ITEMS,
   type AttachedConnection,
@@ -11,6 +12,8 @@ import {
 
 /** The data part's name: permanent, like a tool name, because stored messages hold it. */
 export const ATTACHED_ITEMS = "attached-items";
+/** The part's `type` on a message. */
+export const ATTACHED_ITEMS_PART = `data-${ATTACHED_ITEMS}` as const;
 
 const text = (max: number) => z.string().min(1).max(max);
 /** A provider id or record type: printed bare in the model's text, so a slug. */
@@ -41,9 +44,7 @@ export const attachedItemsDataSchema = z.object({
     )
     .max(MAX_ATTACHED_CONNECTIONS)
     .refine(
-      (connections) =>
-        connections.reduce((sum, connection) => sum + connection.items.length, 0) <=
-        MAX_ATTACHED_ITEMS,
+      (connections) => itemCount(connections) <= MAX_ATTACHED_ITEMS,
       `At most ${MAX_ATTACHED_ITEMS} items.`,
     )
     .refine(
@@ -72,7 +73,7 @@ export type MessageWithParts = { role: string; parts?: unknown };
 const isAttachedItemsPart = (part: unknown): part is { data?: unknown } =>
   typeof part === "object" &&
   part !== null &&
-  (part as { type?: unknown }).type === `data-${ATTACHED_ITEMS}`;
+  (part as { type?: unknown }).type === ATTACHED_ITEMS_PART;
 
 /** The connections a message attached, with their items; none from a malformed part. */
 export function attachedConnectionsOf(message: MessageWithParts): AttachedConnection[] {
@@ -127,7 +128,7 @@ export function attachedItemsText(part: {
   type: string;
   data?: unknown;
 }): { type: "text"; text: string } | undefined {
-  if (part.type !== `data-${ATTACHED_ITEMS}`) return undefined;
+  if (part.type !== ATTACHED_ITEMS_PART) return undefined;
   const parsed = attachedItemsDataSchema.safeParse(part.data);
   if (!parsed.success) return undefined;
   const lines = parsed.data.connections.flatMap(({ connectionId, label, items }) => {
