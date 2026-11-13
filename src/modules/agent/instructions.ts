@@ -1,7 +1,9 @@
 import "server-only";
+import type { AllowedConnection } from "@/modules/records/server";
 import type { Skill } from "@/modules/skills";
 import { recordCountLabel, type SourceRecord } from "@/modules/sources";
 import type { AgentContext, AttachedRecords } from "./context";
+import attachedItems from "./instructions/attached-items.md";
 import formatting from "./instructions/formatting.md";
 import workspace from "./instructions/workspace.md";
 
@@ -44,17 +46,48 @@ function skillList(skills: readonly Skill[]) {
   ].join("\n\n");
 }
 
-/** Base instructions, then the selected skill, the skills to load, then the attached records. */
+/** One allowed connection's line. Every value is the server's, never the browser's. */
+function connectionLine({ connectionId, providerName, provider, account, reach }: AllowedConnection) {
+  const line = `- connectionId ${connectionId}: ${providerName} (${provider}), account ${JSON.stringify(account)}`;
+  return reach ? `${line}, reaching ${reach}` : line;
+}
+
+/**
+ * What the agent knows of attached items: the fixed paragraph, the connections it may use and
+ * each of their providers' guides, once per provider. Only server-written text.
+ */
+function connectionsContext(connections: readonly AllowedConnection[]) {
+  const guides = new Map<string, string>();
+  for (const connection of connections)
+    if (connection.guide && !guides.has(connection.providerName))
+      guides.set(connection.providerName, connection.guide);
+  return [
+    "# Attached items and connections",
+    attachedItems.trim(),
+    "## Connections you may use",
+    connections.length > 0
+      ? connections.map(connectionLine).join("\n")
+      : "None. The connections this thread attached were removed or need reconnecting in Settings.",
+    ...[...guides].map(([name, guide]) => `## ${name}\n\n${guide}`),
+  ].join("\n\n");
+}
+
+/**
+ * Base instructions, then the selected skill, the skills to load, the attached records, then the
+ * connections the thread attached.
+ */
 export function instructionsFor({
   skill,
   offeredSkills,
   attached,
+  connections,
 }: AgentContext) {
   return [
     baseInstructions,
     skill && `# Skill: ${skill.name}\n\n${skill.instructions}`,
     offeredSkills.length > 0 && skillList(offeredSkills),
     attached && sourceContext(attached),
+    connections && connectionsContext(connections),
   ]
     .filter(Boolean)
     .join("\n\n");

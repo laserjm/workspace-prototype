@@ -33,6 +33,19 @@ export function itemCount(attached: readonly AttachedConnection[]): number {
   return attached.reduce((sum, connection) => sum + connection.items.length, 0);
 }
 
+/**
+ * How the composer's suggestion names a draft's attachments: "these 3 items", "this item", or the
+ * whole connections by name ("@acme and @beta"). Nothing when nothing is attached.
+ */
+export function attachedPhrase(attached: readonly AttachedConnection[]): string | undefined {
+  const count = itemCount(attached);
+  if (count === 1) return "this item";
+  if (count > 1) return `these ${count} items`;
+  const labels = attached.map((connection) => connection.label);
+  if (labels.length <= 1) return labels[0];
+  return `${labels.slice(0, -1).join(", ")} and ${labels.at(-1)}`;
+}
+
 export function isPicked(
   attached: readonly AttachedConnection[],
   { connectionId, type, key }: Pick<RecordSummary, "connectionId" | "type" | "key">,

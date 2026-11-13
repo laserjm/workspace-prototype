@@ -2,7 +2,7 @@
 name: Summary
 description: Turn selected records into a concise, source-linked overview.
 output: Overview, status breakdown, and citations
-prompt: Create a summary of these
+prompt: Create a summary of
 enabledByDefault: true
 order: 1
 ---

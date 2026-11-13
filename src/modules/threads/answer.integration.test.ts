@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { beforeEach, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   assertIsolation,
   describeIntegration,
@@ -52,7 +52,9 @@ const ask = (id: string, text = "And now?") => ({
 });
 
 /** The POST body the chat sends: the latest message and the options. */
-const aChatTurn = (message = ask("u3")) => ({ modelId: "opus", message });
+const aChatTurn = (
+  message: { id: string; role: "user"; parts: unknown[] } = ask("u3"),
+) => ({ modelId: "opus", message });
 
 /** A thread of `user`'s, stored with `messages` and put where `placement` says. */
 async function aThreadOf(
@@ -190,6 +192,62 @@ describeIntegration(
       const response = await answerThread(ana, thread.id, { modelId: "opus" });
       expect(response.status).toBe(400);
       expect(requests).toEqual([]);
+    });
+
+    describe("a question's attached connections", () => {
+      // Not one of Ana's connections: another user's, or one that was removed.
+      const foreign = {
+        connectionId: randomUUID(),
+        provider: "github",
+        label: "@someone",
+      };
+      const attaching = (message: ReturnType<typeof ask>) => ({
+        ...message,
+        parts: [
+          ...message.parts,
+          {
+            type: "data-attached-items" as const,
+            data: {
+              connections: [
+                {
+                  ...foreign,
+                  items: [
+                    {
+                      type: "issue",
+                      key: "someone/private#1",
+                      snapshot: { label: "private#1", title: "Secret", state: "open" },
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        ],
+      });
+
+      it("refuse a new question that attaches a connection that is not the user's", async () => {
+        const thread = await aThreadOf(ana);
+        const response = await answerThread(ana, thread.id, aChatTurn(attaching(ask("u3"))));
+        expect(response.status).toBe(400);
+        expect(requests).toEqual([]);
+        expect(await listThreadMessages(ana, thread.id)).toEqual(aConversation);
+      });
+
+      it("answer a stored question sent again, as Try again does, and keep its data part", async () => {
+        const question = attaching(ask("u2", "Which ones?"));
+        const stored = [...aConversation.slice(0, 2), question, aConversation[3]!];
+        const thread = await aThreadOf(ana, { messages: stored });
+        const response = await answerThread(ana, thread.id, aChatTurn(question));
+        expect(response.status).toBe(200);
+        expect(requests[0]?.messages).toEqual(stored.slice(0, 3));
+
+        const reply = { ...aConversation[3]!, id: "a2b" };
+        await requests[0]!.onEnd([...stored.slice(0, 3), reply]);
+        expect(await listThreadMessages(ana, thread.id)).toEqual([
+          ...stored.slice(0, 3),
+          reply,
+        ]);
+      });
     });
 
     // Ben cannot read Ana's conversation, and a chat turn on her thread is a 404 that asks the

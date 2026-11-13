@@ -1,6 +1,7 @@
 import type { User } from "@/lib/auth/user";
 import { notFound, type NotFound } from "@/lib/errors";
 import { err, ok, type Result } from "@/lib/result";
+import type { AllowedConnection } from "@/modules/records/server";
 import type { Skill } from "@/modules/skills";
 import type { Source, SourceRecord } from "@/modules/sources";
 import type { ChatOptions } from "./contracts";
@@ -24,6 +25,11 @@ export type AgentContext = {
   /** The other skills switched on in this browser: the agent may load one (`load_skill`). */
   offeredSkills: Skill[];
   attached?: AttachedRecords;
+  /**
+   * The connections the answer may use, decided by the server from what the thread's questions
+   * attached. Left out when the thread attached nothing; empty when none of it is usable.
+   */
+  connections?: AllowedConnection[];
 };
 
 export type Catalogs = {

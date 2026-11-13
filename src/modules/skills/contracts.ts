@@ -7,7 +7,7 @@ export type Skill = {
   description: string;
   output: string;
   instructions: string;
-  /** Opening of the example prompt, completed with the scope: "… these 5 tickets." */
+  /** Opening of the example prompt, completed with what is attached: "… these 3 items." */
   prompt: string;
   enabledByDefault: boolean;
 };

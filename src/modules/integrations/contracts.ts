@@ -185,6 +185,12 @@ export type Provider = {
   };
   /** The records a user can find and attach to a question (ADR 0003 §3). */
   records?: ProviderRecords;
+  /**
+   * What the agent should know to use one of its connections: what its records and states mean
+   * and how its search reads. Markdown imported as text (`guide.md`), in the system prompt while
+   * one of its connections is allowed. Server-only: never on `ProviderChoice`.
+   */
+  guide?: string;
 };
 
 // --- Records (ADR 0003): what a provider holds that a question can be about. ---

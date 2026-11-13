@@ -6,11 +6,24 @@ export type {
   ItemSnapshot,
 } from "./contracts";
 export {
+  attachedPhrase,
   itemCount,
   MAX_ATTACHED_CONNECTIONS,
   MAX_ATTACHED_ITEMS,
   removeConnection,
   removeItem,
 } from "./contracts";
+export {
+  ATTACHED_ITEMS,
+  attachedConnectionsOf,
+  attachedItemsDataSchema,
+  attachedItemsText,
+  recordsDataSchemas,
+  threadAttachedItems,
+  type AttachedItemsData,
+  type MessageWithParts,
+  type RecordsDataTypes,
+  type ThreadAttachedItem,
+} from "./attached-items";
 export { AttachDialog } from "./components/attach-dialog";
 export { AttachedItemChip } from "./components/attached-item-chip";

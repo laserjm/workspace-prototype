@@ -10,6 +10,7 @@ export {
   type ModelChoice,
   type ModelProvider,
   type WorkspaceMessageMetadata,
+  type WorkspaceUIDataTypes,
   type WorkspaceUIMessage,
   type WorkspaceUITools,
 } from "./contracts";

@@ -8,11 +8,18 @@ import type {
   ModelChoice,
   WorkspaceUIMessage,
 } from "@/modules/agent";
+import { ATTACHED_ITEMS, type AttachedConnection } from "@/modules/records";
 import type { Thread } from "../contracts";
 import { lastRequest } from "./last-request";
 
 /** A question as the composer sends it. */
-export type Question = { text: string; attachments: string[] };
+export type Question = {
+  text: string;
+  /** Names of attached files. */
+  attachments: string[];
+  /** The records and connections the question is about; none for a plain question. */
+  attached: readonly AttachedConnection[];
+};
 
 /** The first question of a thread this page started, which its chat sends when it opens. */
 export type FirstQuestion = { question: Question; options: ChatOptions };
@@ -93,9 +100,16 @@ export function useThreadChat({
   const busy = status === "submitted" || status === "streaming";
 
   function send(question: Question, options: ChatOptions) {
+    // Parts, not the `{ text }` shorthand, which cannot carry a data part.
+    const parts: WorkspaceUIMessage["parts"] = [{ type: "text", text: question.text }];
+    if (question.attached.length > 0)
+      parts.push({
+        type: `data-${ATTACHED_ITEMS}`,
+        data: { connections: [...question.attached] },
+      });
     void sendMessage(
       {
-        text: question.text,
+        parts,
         metadata: {
           createdAt: new Date().toISOString(),
           attachments: question.attachments,

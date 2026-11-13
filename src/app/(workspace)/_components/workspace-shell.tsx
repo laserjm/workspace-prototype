@@ -38,6 +38,7 @@ import {
   useThreads,
   type ConversationControls,
   type FirstQuestion,
+  type Question,
   type ForkTarget,
   type SnoozeTimeInPast,
   type Thread,
@@ -307,8 +308,7 @@ export function WorkspaceShell({
   /** Asks the open thread's chat; false keeps the draft in the composer. */
   async function askThread(
     controls: ConversationControls,
-    prompt: string,
-    attachments: string[],
+    question: Question,
     modelId: string,
     skillId?: string,
   ): Promise<boolean> {
@@ -324,18 +324,14 @@ export function WorkspaceShell({
     if (!continued.ok) return false;
     if (threadNotice?.undo?.threadId === activeThread.id)
       setThreadNotice(undefined);
-    controls.send(
-      { text: prompt, attachments },
-      chatOptions(modelId, skillId, activeThread.scope),
-    );
-    countTurn(activeThread.id, attachments.length);
+    controls.send(question, chatOptions(modelId, skillId, activeThread.scope));
+    countTurn(activeThread.id, question.attachments.length);
     return true;
   }
 
   /** Stores a new thread, then opens it; its chat sends the first question. */
   async function startNewThread(
-    prompt: string,
-    attachments: string[],
+    question: Question,
     modelId: string,
     skillId?: string,
   ): Promise<boolean> {
@@ -344,7 +340,7 @@ export function WorkspaceShell({
     const thread = await startThread({
       id: crypto.randomUUID(),
       projectId,
-      prompt,
+      prompt: question.text,
       provider: model.provider,
       scope: draftScope,
     });
@@ -356,10 +352,10 @@ export function WorkspaceShell({
     }
     setStarted({
       threadId: thread.id,
-      question: { text: prompt, attachments },
+      question,
       options: chatOptions(modelId, skillId, thread.scope),
     });
-    countTurn(thread.id, attachments.length);
+    countTurn(thread.id, question.attachments.length);
     navigate(thread.id);
     return true;
   }
@@ -562,14 +558,8 @@ export function WorkspaceShell({
                       busy={controls.busy}
                       onStop={controls.stop}
                       models={models}
-                      onSend={(prompt, attachments, modelId, skillId) =>
-                        askThread(
-                          controls,
-                          prompt,
-                          attachments,
-                          modelId,
-                          skillId,
-                        )
+                      onSend={(question, modelId, skillId) =>
+                        askThread(controls, question, modelId, skillId)
                       }
                       onSources={() => setDialog("sources")}
                       scope={activeThread.scope}

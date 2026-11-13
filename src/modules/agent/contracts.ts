@@ -1,4 +1,4 @@
-import type { UIDataTypes, UIMessage } from "ai";
+import type { UIMessage } from "ai";
 import { z } from "zod";
 import {
   HTML_RENDER_MAX_HEIGHT,
@@ -6,6 +6,7 @@ import {
   HTML_RENDER_MAX_TITLE_LENGTH,
   HTML_RENDER_MIN_HEIGHT,
 } from "@/lib/html-render/html-render";
+import type { RecordsDataTypes } from "@/modules/records";
 import type { LoadSkillInput, LoadSkillOutput } from "@/modules/skills";
 import type { SearchRecordsInput, SearchRecordsOutput } from "@/modules/sources";
 
@@ -89,8 +90,14 @@ export type WorkspaceUITools = {
   load_skill: { input: LoadSkillInput; output: LoadSkillOutput };
 };
 
+/**
+ * The data parts a message may carry, by name: a question's attached items
+ * (`data-attached-items`). Stored conversations hold these names, so one is never renamed.
+ */
+export type WorkspaceUIDataTypes = RecordsDataTypes;
+
 export type WorkspaceUIMessage = UIMessage<
   WorkspaceMessageMetadata,
-  UIDataTypes,
+  WorkspaceUIDataTypes,
   WorkspaceUITools
 >;

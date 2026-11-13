@@ -11,7 +11,8 @@ const chipClassName =
 
 /**
  * An attached item, drawn from its snapshot (kind mark, `web#482`, title), or with no item a
- * whole connection, dashed. It never fetches.
+ * whole connection, dashed. It never fetches. Once its connection is removed, it is muted and
+ * says so.
  */
 export function AttachedItemChip({
   connection,
@@ -22,15 +23,22 @@ export function AttachedItemChip({
   item?: AttachedItem;
   onRemove?: () => void;
 }) {
-  const { providers } = useIntegrations();
+  const { providers, connections } = useIntegrations();
+  const removed = !connections.some((candidate) => candidate.id === connection.connectionId);
   const providerName =
     providers.find((provider) => provider.id === connection.provider)?.name ??
     connection.provider;
   const name = item ? item.snapshot.label : `${providerName} · ${connection.label}`;
   return (
     <span
-      className={cn(chipClassName, !item && "border-dashed")}
-      title={item ? item.snapshot.title : `${name}: the agent may search it`}
+      className={cn(chipClassName, !item && "border-dashed", removed && "opacity-60")}
+      title={
+        removed
+          ? `${name}: connection removed`
+          : item
+            ? item.snapshot.title
+            : `${name}: the agent may search it`
+      }
     >
       {item ? (
         <RecordKindMark
@@ -43,6 +51,9 @@ export function AttachedItemChip({
       )}
       <span className="shrink-0 font-medium text-secondary-foreground">{name}</span>
       <span className="truncate">{item ? item.snapshot.title : "· whole connection"}</span>
+      {removed && (
+        <span className="shrink-0 text-3xs text-secondary-label">Connection removed</span>
+      )}
       {onRemove && (
         <button
           type="button"

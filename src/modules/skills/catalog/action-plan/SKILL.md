@@ -2,7 +2,7 @@
 name: Action plan
 description: Bring the next steps from your source records into one place.
 output: Next steps grouped by source record
-prompt: Create an action plan for these
+prompt: Create an action plan for
 enabledByDefault: false
 order: 3
 ---
