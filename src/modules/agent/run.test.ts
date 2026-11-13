@@ -684,6 +684,25 @@ describe("runAgent", () => {
     );
   });
 
+  it("shows invisible and bidirectional characters in a diff as their code points, so none hides a change", async () => {
+    const [recorded] = fixture("pull-request-files.json");
+    useRecordedGithub({
+      ...mergedPullRequestDiff,
+      [`${REPO}/pulls/8/files?per_page=100`]: {
+        status: 200,
+        body: [{ ...recorded, filename: "src/a​.ts", patch: "+if (admin‮) {}\u{E0041}" }],
+      },
+    });
+    model.current = calling("github_pull_request_diff", [diffOf(8)]);
+    const conversation = await run({ modelId: "mock" }, [attaching([{ ...laserjm, items: [] }])]);
+
+    const [output] = diffOutputs(conversation);
+    expect(output && "files" in output && output.files[0]).toMatchObject({
+      path: "src/a.ts",
+      patch: "+if (admin<U+202E>) {}<U+E0041>",
+    });
+  });
+
   it("narrows the diff to one file by its path, and says when no changed file is there", async () => {
     useRecordedGithub(mergedPullRequestDiff);
     model.current = calling("github_pull_request_diff", [

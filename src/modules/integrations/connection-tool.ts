@@ -9,8 +9,9 @@ import type { ConnectionAccess, RecordReadRefusal } from "./contracts";
 import { listConnections, markNeedsReconnect } from "./queries";
 
 /**
- * What a provider tool may see: the user and the connections of its provider the server allowed
- * for this answer (`integrationToolsFor`). Never from the model.
+ * What a tool that reads connections may see: the user and the connections the server allowed for
+ * this answer (for a provider tool, only its provider's: `integrationToolsFor`). Never from the
+ * model. The record tools share it.
  */
 export const connectionToolContextSchema = z.object({
   user: z.custom<User>().optional(),

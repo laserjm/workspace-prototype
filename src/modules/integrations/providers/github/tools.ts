@@ -3,14 +3,12 @@ import "server-only";
 // answers (`records/tools.ts`). Each runs through `readWithConnection`, so it only gets an access.
 import { tool } from "ai";
 import { connectionToolContextSchema, readWithConnection } from "../../connection-tool";
+import { github } from ".";
 import {
   githubPullRequestDiffInputSchema,
   githubPullRequestDiffOutputSchema,
   readGithubPullRequestDiff,
 } from "./diff";
-
-/** The provider id the tools' connections must have. */
-const GITHUB = "github";
 
 /** Keys are the names the model sees and stored conversations hold, so a tool is never renamed. */
 export const githubTools = {
@@ -21,7 +19,7 @@ export const githubTools = {
     outputSchema: githubPullRequestDiffOutputSchema,
     contextSchema: connectionToolContextSchema,
     execute: ({ connectionId, key, path }, { context }) =>
-      readWithConnection(context, connectionId, GITHUB, (access) =>
+      readWithConnection(context, connectionId, github.id, (access) =>
         readGithubPullRequestDiff(access, key, path),
       ),
   }),

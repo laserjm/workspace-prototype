@@ -3,13 +3,17 @@ import "server-only";
 // of them one answer may call.
 import type { User } from "@/lib/auth/user";
 import type { ConnectionToolContext } from "./connection-tool";
+import { github } from "./providers/github";
 import { githubTools } from "./providers/github/tools";
 
 /** Each provider's tools, by provider id: a tool reads only connections of its provider. */
-const toolsByProvider = { github: githubTools };
+const toolsByProvider = { [github.id]: githubTools };
 
-/** Every provider tool. Keys are the names the model sees and stored conversations hold. */
-export const integrationTools = { ...toolsByProvider.github };
+/**
+ * Every provider tool, each provider's spread by name so the registry keeps their types. Keys are
+ * the names the model sees and stored conversations hold.
+ */
+export const integrationTools = { ...githubTools };
 
 export type IntegrationToolName = keyof typeof integrationTools;
 

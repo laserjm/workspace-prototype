@@ -9,9 +9,9 @@ import type { GithubPullRequestDiffInput, GithubPullRequestDiffOutput } from "..
 import { counted } from "./parts";
 
 /**
- * One `github_pull_request_diff` call in a reply, as one quiet line: "Read the diff of web#482
- * (12 files)", the pull request drawn by `recordChip` (the records module's chip, which opens its
- * view), or why it could not be read.
+ * One `github_pull_request_diff` call in a reply, as one quiet line: "Read the diff of web#42
+ * (12 files)", or of one file "in web#42", the pull request drawn by `recordChip` (the records
+ * module's chip, which opens its view); or why it could not be read.
  */
 export function GithubPullRequestDiffCall({
   state,
@@ -59,12 +59,17 @@ export function GithubPullRequestDiffCall({
       </p>
     );
   const connected = connections.some((candidate) => candidate.id === output.summary.connectionId);
+  const path = input?.path;
+  const line =
+    path !== undefined && output.files.length === 0
+      ? `Found no changed file at ${path} in`
+      : `Read ${what}`;
   return (
     <p className="mt-1 mb-3 flex flex-wrap items-center gap-1.5 text-xs text-secondary-label [&+&]:-mt-2">
       <FileDiff aria-hidden className="size-3 shrink-0" />
-      <span>Read {what}</span>
+      <span>{line}</span>
       {connected ? recordChip(output.summary) : <span>{output.summary.label}</span>}
-      <span>({counted(output.fileCount, "file")})</span>
+      {path === undefined && <span>({counted(output.fileCount, "file")})</span>}
     </p>
   );
 }

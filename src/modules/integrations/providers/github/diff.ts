@@ -12,14 +12,23 @@ import {
   type RecordReadRefusal,
   type RecordSummary,
 } from "../../contracts";
-import { getJson, githubRecordUrl, parseKey, pullSchema, pullSummary, visibleText } from "./records";
+import {
+  codePointsShown,
+  getJson,
+  githubRecordUrl,
+  parseKey,
+  pullSchema,
+  pullSummary,
+  visibleText,
+} from "./records";
 
 /** How many changed files are read: GitHub's largest page. */
 const FILES_READ = 100;
 
 /** Where what a cut left out is: the model is told, and can tell the user. */
-const REST = "the rest is on GitHub";
-const TOTAL = MODEL_LIMITS.diffCharacters.toLocaleString("en-US");
+const REST_ON_GITHUB = "the rest is on GitHub";
+/** "40,000": the answer's limit, as its notes name it. */
+const TOTAL_LABEL = MODEL_LIMITS.diffCharacters.toLocaleString("en-US");
 
 /** What the model may ask `github_pull_request_diff` for. */
 export const githubPullRequestDiffInputSchema = z.object({
@@ -84,9 +93,12 @@ const patchedFilesSchema = z.array(
 );
 
 /** `1 file`, `3 files`. */
-const files = (count: number) => `${count} ${count === 1 ? "file" : "files"}`;
+const countedFiles = (count: number) => `${count} ${count === 1 ? "file" : "files"}`;
 
-/** A changed file as read, its text without invisible characters, and its whole patch. */
+/**
+ * A changed file as read, and its whole patch. Invisible characters are dropped from its paths and
+ * shown as code points in its patch, where they may be the change.
+ */
 const fileOf = (file: z.infer<typeof patchedFilesSchema>[number]) => ({
   listed: {
     path: visibleText(file.filename),
@@ -95,13 +107,14 @@ const fileOf = (file: z.infer<typeof patchedFilesSchema>[number]) => ({
     additions: file.additions,
     deletions: file.deletions,
   },
-  patch: file.patch ? visibleText(file.patch) : undefined,
+  patch: file.patch ? codePointsShown(file.patch) : undefined,
 });
 
 /**
  * The changed files as the model reads them, only the one at `path` when asked: each patch cut to
- * its first characters, and once the patches kept reach the answer's limit, the file that would
- * pass it and every later one listed without theirs. The note says what was left out.
+ * its first characters, and once the patches kept reach the answer's limit (counted in the diffs'
+ * characters, the cut notes aside), the file that would pass it and every later one listed without
+ * theirs. The note says what was left out.
  */
 function cutDiffs(
   read: z.infer<typeof patchedFilesSchema>,
@@ -116,10 +129,10 @@ function cutDiffs(
     const kept = Math.min(patch.length, MODEL_LIMITS.diffFileCharacters);
     if (leftOut > 0 || kept > budget) {
       leftOut += 1;
-      return { ...listed, note: `Diff left out: past the ${TOTAL} characters of this answer.` };
+      return { ...listed, note: `Diff left out: past the ${TOTAL_LABEL} characters of this answer.` };
     }
     budget -= kept;
-    return { ...listed, patch: cutText(patch, MODEL_LIMITS.diffFileCharacters, REST) };
+    return { ...listed, patch: cutText(patch, MODEL_LIMITS.diffFileCharacters, REST_ON_GITHUB) };
   });
   // A file asked for by its path and found needs nothing more.
   const unread = path !== undefined && shown.length > 0 ? 0 : fileCount - read.length;
@@ -129,11 +142,11 @@ function cutDiffs(
       : []),
     ...(leftOut > 0
       ? [
-          `${files(leftOut)} ${leftOut === 1 ? "is" : "are"} listed without their diff, past the ${TOTAL} characters of this answer: ask for one by its path.`,
+          `${countedFiles(leftOut)} ${leftOut === 1 ? "is" : "are"} listed without their diff, past the ${TOTAL_LABEL} characters of this answer: ask for one by its path.`,
         ]
       : []),
     ...(unread > 0
-      ? [`${unread} more changed ${unread === 1 ? "file was" : "files were"} not read: ${REST}.`]
+      ? [`${unread} more changed ${unread === 1 ? "file was" : "files were"} not read: ${REST_ON_GITHUB}.`]
       : []),
   ];
   return notes.length ? { files: shown, note: notes.join(" ") } : { files: shown };

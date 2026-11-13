@@ -525,6 +525,17 @@ const INVISIBLE = /[\u00AD\u034F\u061C\u115F\u1160\u180E\u200B\u200C\u200E\u200F
 /** `text` without invisible and bidirectional characters. */
 export const visibleText = (text: string) => text.replace(INVISIBLE, "");
 
+/**
+ * `text` with each invisible or bidirectional character written as its code point (`<U+202E>`):
+ * for code, where such a character may be the change itself (a Trojan Source edit), so it is shown
+ * rather than dropped.
+ */
+export const codePointsShown = (text: string) =>
+  text.replace(
+    INVISIBLE,
+    (character) => `<U+${character.codePointAt(0)!.toString(16).toUpperCase().padStart(4, "0")}>`,
+  );
+
 /** An issue's or pull request's text and comments, as its view shows them. Markdown bodies. */
 export const githubIssueDetailSchema = z.object({
   number: z.number(),
@@ -691,7 +702,7 @@ type GithubConversation = z.infer<z.ZodObject<typeof conversationFields>> & { nu
 /** The parts of `GET /repos/{o}/{r}/issues/{n}` a view shows. */
 const issueSchema = itemSchema.extend(conversationFields);
 
-/** The parts of `GET /repos/{o}/{r}/pulls/{n}` a view shows. */
+/** The parts of `GET /repos/{o}/{r}/pulls/{n}` a view and the diff tool read. */
 export const pullSchema = itemSchema.omit({ repository_url: true, pull_request: true }).extend({
   ...conversationFields,
   merged_at: z.string().nullable(),

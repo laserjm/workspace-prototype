@@ -416,15 +416,18 @@ lives in that provider's folder instead (see **Provider tools**).
 - **`github_pull_request_diff`.** `{ connectionId, key, path? }` answers `{ summary: RecordSummary
   & { url }, fileCount, files: [{ path, previousPath?, status, additions, deletions, patch?, note?
   }], note? }` or `{ error: RecordError & { url? } }`, as data. It reads `/pulls/{n}` and the first
-  100 changed files with their patches (`/pulls/{n}/files`) in parallel, invisible and
-  bidirectional characters stripped as the readers do. `path` keeps only the file at that path. The
+  100 changed files with their patches (`/pulls/{n}/files`) in parallel. Invisible and
+  bidirectional characters are stripped from paths as the readers do, but shown in a patch as their
+  code points (`<U+202E>`, `codePointsShown`), since in code such a character may be the change
+  itself (a Trojan Source edit). `path` keeps only the file at that path. The
   limits are `MODEL_LIMITS`' `diffFileCharacters` (4,000 per file, `cutText`: `[… 1,000 more
-  characters, the rest is on GitHub]`) and `diffCharacters` (40,000 in all): the file whose diff
-  would pass the total, and every later one, is listed without its diff and says so. The answer's
+  characters, the rest is on GitHub]`) and `diffCharacters` (40,000 diff characters in all, the cut notes aside): the file whose diff would
+  pass the total, and every later one, is listed without its diff and says so. The answer's
   `note` says how many were listed so ("ask for one by its path"), how many changed files were not
   read, or that no changed file is at `path`; a file GitHub shows no diff for (binary, too large)
   says that. Its card is one quiet line, "Read the diff of" the pull request as a chip "(12
-  files)", or the error in words.
+  files)" (with `path`, "Read the diff of src/a.ts in" it, or "Found no changed file at src/a.ts
+  in" it), or the error in words.
 - **Registration.** `agent/tools.ts` spreads the module's tools (and `integrationTools`) into
   `tools`, adds the tool's context to `toolsFor` (`integrationToolsFor`'s for provider tools), and
   `WorkspaceUITools` in `agent/contracts.ts` gets its types.
@@ -445,8 +448,8 @@ read directly when a qualifier passes through, a foreign `connectionId` answerin
 request read with long bodies and comment and review lists cut with their notes, two records read
 in one step with nothing cut, a foreign `connectionId` answering `no_access`, a 404 answering
 `not_found` with the record's page; `github_pull_request_diff` offered with a GitHub connection and
-not without one, the recorded merged pull request's files and patches, each file cut at 4,000
-characters and the answer at 40,000 with their notes, `path` narrowing to one file or saying none
+not without one, the recorded merged pull request's files and patches, invisible characters shown as code points
+in a patch, each file cut at 4,000 characters and the answer at 40,000 with their notes, `path` narrowing to one file or saying none
 is there, a foreign `connectionId` answering `no_access`); `integrations/providers.test.ts` (every
 declared type has a `trim`); `tsc`
 (`WorkspaceUITools`, `toolsContext`).
@@ -466,9 +469,9 @@ mark and each type's record view and kind mark; ADR 0003 §3), an optional `guid
 its connections (what its records and states mean, how its search reads), imported as text,
 declared as the manifest's `guide`, kept server-side (never on `ProviderChoice`) and in the system
 prompt while one of its connections is allowed (`providerForPrompt`, `integrations/server.ts`;
-`providers.test.ts` caps its length), and an optional `tools.ts` for agent tools of its own
-(GitHub's `github_pull_request_diff`; see "Agent tools live in their module"; the record tools are
-`records`'). A provider's code is handed a `ProviderAccess` (the
+`providers.test.ts` caps its length), and an optional `tools.ts` for agent tools of its own, with
+their readers and schemas beside it (GitHub's `github_pull_request_diff` and `diff.ts`; see "Agent
+tools live in their module"; the record tools are `records`'). A provider's code is handed a `ProviderAccess` (the
 API address and the `Authorization` header value) and never reads a secret, an env var or the
 database. `auth` lists how a user connects: `token` (sent as `Bearer`) or `basic` (username and
 password, or an email and API token, sent as HTTP Basic); `verify` checks a credential and names
