@@ -361,7 +361,8 @@ way to connect, a base URL and `verify` when it takes a credential, sources in a
 product, records read back by id in order, nothing for an unknown key);
 `integrations/actions.integration.test.ts` (connect, reconnect, refusals, test, disconnect, a
 visitor, `assertIsolation()`); `providers/github/api.test.ts`; `sources/queries.test.ts`; `tsc`.
-**Recorded in.** This entry; `docs/adr/0002-integrations.md`.
+**Recorded in.** This entry; `docs/adr/0002-integrations.md`;
+`docs/adr/0003-attached-items-and-record-views.md`.
 
 ### Connection credentials live in the vault
 
