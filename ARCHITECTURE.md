@@ -356,7 +356,16 @@ into `Source`s, the scope's records and the records route. The sample records ar
 provider's `data.ts`; the stored threads' sample ids moved to `sample:<product>` in
 `drizzle/0006_rename-sample-source-ids.sql`. Unit tests that read sources swap the connection
 query for `tests/support/connections.ts` (the sample connection alone), so they need no Postgres.
-**Enforced by.** `integrations/providers.test.ts` (every provider in the registry: unique ids, a
+
+The GitHub provider's tests will replay recorded answers (ADR 0003 §5): `providers/github/fixtures/`
+holds plain GitHub JSON, one response body per file, captured from the public sandbox
+`laserjm/workspace-fixtures`. The sandbox's records are made by its `seed/seed.sh` and labelled
+`case/<name>`, so they can be rebuilt; the folder's README holds one `gh api` line per file. Only
+public data is saved: `/user` without its account-only fields, and `/user/repos` cut to the
+sandbox.
+**Enforced by.** `providers/github/fixtures.test.ts` (README lines and files one to one, each
+seeded case found by its label, CI on the merged pull request's head, no token or `Authorization`);
+`integrations/providers.test.ts` (every provider in the registry: unique ids, a
 way to connect, a base URL and `verify` when it takes a credential, sources in a declared
 product, records read back by id in order, nothing for an unknown key);
 `integrations/actions.integration.test.ts` (connect, reconnect, refusals, test, disconnect, a
