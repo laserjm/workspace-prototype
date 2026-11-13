@@ -1,0 +1,50 @@
+[
+    {
+        "sha": "2abee80d301b1a028973067feca18d31f05a772e",
+        "filename": "README.md",
+        "status": "modified",
+        "additions": 2,
+        "deletions": 0,
+        "changes": 2,
+        "blob_url": "https://github.com/laserjm/workspace-fixtures/blob/7b55399cea249bb3579d78746cbb25ca5567ec80/README.md",
+        "raw_url": "https://github.com/laserjm/workspace-fixtures/raw/7b55399cea249bb3579d78746cbb25ca5567ec80/README.md",
+        "contents_url": "https://api.github.com/repos/laserjm/workspace-fixtures/contents/README.md?ref=7b55399cea249bb3579d78746cbb25ca5567ec80",
+        "patch": "@@ -16,3 +16,5 @@ CI response read by the provider.\n The downloaded API answers live beside the GitHub provider in\n `workspace-prototype/src/modules/integrations/providers/github/fixtures/`.\n Its README records the commands needed to capture fresh answers.\n+\n+The `status/` folder holds a synthetic status page (seed/seed.sh)."
+    },
+    {
+        "sha": "1a2f9db0d80ef317a847e0c5531a5681b43627a8",
+        "filename": "status/README.md",
+        "status": "added",
+        "additions": 4,
+        "deletions": 0,
+        "changes": 4,
+        "blob_url": "https://github.com/laserjm/workspace-fixtures/blob/7b55399cea249bb3579d78746cbb25ca5567ec80/status%2FREADME.md",
+        "raw_url": "https://github.com/laserjm/workspace-fixtures/raw/7b55399cea249bb3579d78746cbb25ca5567ec80/status%2FREADME.md",
+        "contents_url": "https://api.github.com/repos/laserjm/workspace-fixtures/contents/status%2FREADME.md?ref=7b55399cea249bb3579d78746cbb25ca5567ec80",
+        "patch": "@@ -0,0 +1,4 @@\n+# Status\n+\n+`components.json` lists each part of the prototype and its status;\n+`incidents.md` lists what happened recently. Both are synthetic."
+    },
+    {
+        "sha": "5a5b496d20ca517e725b12ae507feeefac7847e2",
+        "filename": "status/components.json",
+        "status": "added",
+        "additions": 7,
+        "deletions": 0,
+        "changes": 7,
+        "blob_url": "https://github.com/laserjm/workspace-fixtures/blob/7b55399cea249bb3579d78746cbb25ca5567ec80/status%2Fcomponents.json",
+        "raw_url": "https://github.com/laserjm/workspace-fixtures/raw/7b55399cea249bb3579d78746cbb25ca5567ec80/status%2Fcomponents.json",
+        "contents_url": "https://api.github.com/repos/laserjm/workspace-fixtures/contents/status%2Fcomponents.json?ref=7b55399cea249bb3579d78746cbb25ca5567ec80",
+        "patch": "@@ -0,0 +1,7 @@\n+{\n+  \"components\": [\n+    { \"id\": \"app\", \"name\": \"App\", \"status\": \"operational\" },\n+    { \"id\": \"sign-in\", \"name\": \"Sign-in\", \"status\": \"degraded\" },\n+    { \"id\": \"database\", \"name\": \"Database\", \"status\": \"operational\" }\n+  ]\n+}"
+    },
+    {
+        "sha": "3d9ca7437cae54e4231055dd698641cca2f10f75",
+        "filename": "status/incidents.md",
+        "status": "added",
+        "additions": 4,
+        "deletions": 0,
+        "changes": 4,
+        "blob_url": "https://github.com/laserjm/workspace-fixtures/blob/7b55399cea249bb3579d78746cbb25ca5567ec80/status%2Fincidents.md",
+        "raw_url": "https://github.com/laserjm/workspace-fixtures/raw/7b55399cea249bb3579d78746cbb25ca5567ec80/status%2Fincidents.md",
+        "contents_url": "https://api.github.com/repos/laserjm/workspace-fixtures/contents/status%2Fincidents.md?ref=7b55399cea249bb3579d78746cbb25ca5567ec80",
+        "patch": "@@ -0,0 +1,4 @@\n+# Recent incidents\n+\n+- **2026-11-01, sign-in:** Keycloak restarted during a deploy; sign-in failed for six minutes.\n+- **2026-10-20, database:** a long migration held a lock; writes waited for two minutes."
+    }
+]
