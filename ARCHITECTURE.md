@@ -628,21 +628,30 @@ it, and Unicode stripped from reviews, file paths and CI);
 ### The record panel
 
 **Decision.** An open thread's right-hand panel shows its attached items as record views (ADR 0003
-§2, #40, #51). `records` owns it; the shell puts `RecordPanelProvider` (keyed by nothing, told the
+§2, #40, #51, #66). `records` owns it; the shell puts `RecordPanelProvider` (keyed by nothing, told the
 open thread) around the header and the conversation, `RecordPanelToggle` in the header of an open
 thread (no panel and no button on the new-thread page), and `ThreadConversation` draws its `panel`
 render prop, `RecordPanel`, beside the conversation once that is here.
 - **State.** `records/record-panel.ts` is pure: per thread, the open views (in the order they
-  opened, each with the snapshot it was opened from, so a tab draws without fetching), the active
-  one (none shows the fixed **Attached** tab), whether the panel is shown and whether the user
-  rearranged it (opened, focused, closed or hid) since their last question. A view's id is `<viewKind>:<connectionId>:<key>`.
+  opened, each with the snapshot it was opened from, so a tab draws without fetching), the pinned
+  one (none when nothing is pinned), the active one below the tabs (none shows the fixed
+  **Attached** tab; never the pinned one), whether the panel is shown and whether the user
+  rearranged it (opened, focused, closed, pinned, unpinned or hid) since their last question. A view's id is `<viewKind>:<connectionId>:<key>`.
   `openView` (a chip or an Attached row) opens or focuses and shows the panel; `openSent` opens a
   question's items and focuses the first, showing a hidden panel on a wide screen, unless the user
   rearranged the panel since their last question, when they open without taking focus; closing a
-  view focuses its neighbour, the last one Attached. Nothing opens twice. The provider keeps each
+  view focuses its neighbour among the tabs, the last one Attached. Nothing opens twice.
+- **Pinning.** Any view can be pinned from its frame (`pinView`): it takes the top half of the
+  panel and stays put, and keeps its place among the open views but loses its tab; the tabs and
+  the active view take the bottom half. One pin at a time: pinning another returns the old one to
+  the tabs, shown in the new one's place when that was the active view, or else its neighbour.
+  Unpinning (`unpinView`) returns it to the tabs, focused; closing a pinned view unpins it. The
+  pinned view is never focused below: `focusView` ignores it, and a chip's `openView` or a
+  question's first item that is pinned leaves the active view as it is. The provider keeps each
   thread's state in `localStorage` (`workspace:record-panel:<threadId>`, versioned, read by
-  `restorePanel`: another version or an unreadable value starts afresh, a view that does not read
-  is dropped). A thread with nothing stored starts open on a wide screen when it has attached
+  `restorePanel`: version 2 holds the pin, version 1 is migrated with nothing pinned, another
+  version or an unreadable value starts afresh, a view that does not read is dropped, a pin on a
+  view that is gone is dropped and a focus on the pinned view shows Attached). A thread with nothing stored starts open on a wide screen when it has attached
   items, hidden otherwise; below 1200px the panel is a sheet over the conversation and always
   starts hidden.
 - **Sending.** `RecordPanel` calls `openSent` for each user message that appears in the
@@ -651,9 +660,11 @@ render prop, `RecordPanel`, beside the conversation once that is here.
 - **The panel.** The Attached tab lists `attachedByQuestion(conversation)` (built on
   `threadAttachedItems`), grouped by the question that attached them, each marked when its view is
   open; empty, it offers "Choose a data source", whose picks land in the composer's draft (the
-  shell holds the open thread's draft for both). A tab per view: the kind mark in its live state's
-  tone, the short label, close on hover or middle-click. Only the active view renders and reads.
-  Its frame (kind mark, where, live state badge, title, refresh, "Open on <provider>", close) is
+  shell holds the open thread's draft for both). A tab per view but the pinned one: the kind mark in its live state's
+  tone, the short label, close on hover or middle-click. Only the active and the pinned view render
+  and read.
+  Its frame (kind mark, where, live state badge, title, refresh, "Open on <provider>", pin or
+  unpin, close) is
   `records`'; the body is the provider's `RecordViewBody`. Errors: not found or no access offer
   Retry and the record's page; needs reconnecting offers Reconnect (Settings → Data sources) and
   Retry; a removed connection says so, with no link, and reads nothing. On a wide screen the panel
@@ -664,7 +675,8 @@ render prop, `RecordPanel`, beside the conversation once that is here.
   it has meanwhile. Nothing is cached on the server.
 **Enforced by.** `records/record-panel.test.ts` (open and focus, nothing twice, `openSent` with
 and without "rearranged", the neighbour on close and Attached after the last, starting open or
-hidden, a stored state of an older version or a corrupt one);
+hidden; pin, re-pin replacing the pin, unpin, closing a pinned view, the focus rules with a pin;
+the pin stored, version 1 migrated, a stored state of another version or a corrupt one);
 `records/components/record-view-store.test.ts` (one read per view, refresh, a refusal kept until a
 retry); `records/attached-items.test.ts` (the grouping by question).
 **Recorded in.** This entry; `docs/adr/0003-attached-items-and-record-views.md`.

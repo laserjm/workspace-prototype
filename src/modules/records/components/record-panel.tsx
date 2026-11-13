@@ -17,6 +17,8 @@ import {
   PanelRight,
   PanelRightClose,
   Paperclip,
+  Pin,
+  PinOff,
   Plus,
   RefreshCw,
   TriangleAlert,
@@ -79,8 +81,9 @@ function useOpenSentQuestions(messages: readonly PanelMessage[]) {
 /**
  * The right-hand panel of an open thread (ADR 0003 §2): a fixed Attached tab listing what the
  * thread's questions attached, and a tab per open record view, of which only the shown one renders
- * and reads its record. Beside the conversation on a wide screen, resizable; below desktop width
- * a sheet over it. Renders nothing while hidden, but sets the thread's panel up and opens what
+ * and reads its record. A pinned view (#66) takes the top half and renders and reads like the
+ * shown one; the tabs and the shown view take the bottom half. Beside the conversation on a wide
+ * screen, resizable; below desktop width a sheet over it. Renders nothing while hidden, but sets the thread's panel up and opens what
  * each new question attached.
  */
 export function RecordPanel({
@@ -108,53 +111,65 @@ export function RecordPanel({
   const [attaching, setAttaching] = useState(false);
 
   if (!state?.shown) return null;
-  const active = state.views.find((view) => view.id === state.activeId);
+  const pinned = state.views.find((view) => view.id === state.pinnedId);
+  const tabs = state.views.filter((view) => view !== pinned);
+  const active = tabs.find((view) => view.id === state.activeId);
   const content = (
     <div id="record-panel" className="flex h-full min-h-0 flex-col bg-background">
-      <div className="flex h-10 shrink-0 items-stretch border-b border-border">
-        <div
-          role="tablist"
-          aria-label="Record views"
-          className="flex min-w-0 flex-1 items-stretch overflow-x-auto [scrollbar-width:none]"
+      {pinned && (
+        <section
+          aria-label={`Pinned: ${pinned.snapshot.label}`}
+          className="flex min-h-0 flex-1 basis-0 flex-col border-b border-border"
         >
-          <button
-            type="button"
-            role="tab"
-            aria-selected={!active}
-            onClick={() => panel.focus(null)}
-            className={cn(
-              "flex shrink-0 items-center gap-1.5 border-r border-border px-3 text-2xs text-muted-foreground",
-              !active && "bg-accent text-accent-foreground",
-            )}
+          <RecordViewFrame key={pinned.id} view={pinned} pinned onConnect={onConnect} />
+        </section>
+      )}
+      <div className="flex min-h-0 flex-1 basis-0 flex-col">
+        <div className="flex h-10 shrink-0 items-stretch border-b border-border">
+          <div
+            role="tablist"
+            aria-label="Record views"
+            className="flex min-w-0 flex-1 items-stretch overflow-x-auto [scrollbar-width:none]"
           >
-            <Paperclip className="size-3.5" /> Attached
-          </button>
-          {state.views.map((view) => (
-            <ViewTab key={view.id} view={view} active={view.id === active?.id} />
-          ))}
-        </div>
-        <div className="flex shrink-0 items-center px-1.5">
-          <IconButton label="Hide record panel" onClick={() => panel.setShown(false)}>
-            <PanelRightClose />
-          </IconButton>
-        </div>
-      </div>
-      {active ? (
-        <RecordViewFrame key={active.id} view={active} onConnect={onConnect} />
-      ) : (
-        <AttachedList groups={groups} openIds={state.views.map((view) => view.id)}>
-          <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center text-2xs text-muted-foreground">
-            <p>Nothing attached yet. Attach issues and pull requests to read them here.</p>
             <button
               type="button"
-              className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-secondary-foreground hover:bg-accent"
-              onClick={() => setAttaching(true)}
+              role="tab"
+              aria-selected={!active}
+              onClick={() => panel.focus(null)}
+              className={cn(
+                "flex shrink-0 items-center gap-1.5 border-r border-border px-3 text-2xs text-muted-foreground",
+                !active && "bg-accent text-accent-foreground",
+              )}
             >
-              <Plus className="size-3.5" /> Choose a data source
+              <Paperclip className="size-3.5" /> Attached
             </button>
+            {tabs.map((view) => (
+              <ViewTab key={view.id} view={view} active={view.id === active?.id} />
+            ))}
           </div>
-        </AttachedList>
-      )}
+          <div className="flex shrink-0 items-center px-1.5">
+            <IconButton label="Hide record panel" onClick={() => panel.setShown(false)}>
+              <PanelRightClose />
+            </IconButton>
+          </div>
+        </div>
+        {active ? (
+          <RecordViewFrame key={active.id} view={active} onConnect={onConnect} />
+        ) : (
+          <AttachedList groups={groups} openIds={state.views.map((view) => view.id)}>
+            <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center text-2xs text-muted-foreground">
+              <p>Nothing attached yet. Attach issues and pull requests to read them here.</p>
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-secondary-foreground hover:bg-accent"
+                onClick={() => setAttaching(true)}
+              >
+                <Plus className="size-3.5" /> Choose a data source
+              </button>
+            </div>
+          </AttachedList>
+        )}
+      </div>
       {attaching && (
         <AttachDialog
           attached={draft}
@@ -298,10 +313,19 @@ function AttachedList({
 
 /**
  * The frame every record view shares (kind mark, where, live state, title, refresh, open on the
- * provider's site, close) around its provider's body. It reads the record the first time it is
- * shown, and again only on refresh.
+ * provider's site, pin or unpin, close) around its provider's body. It reads the record the first
+ * time it is shown, and again only on refresh.
  */
-function RecordViewFrame({ view, onConnect }: { view: OpenView; onConnect: () => void }) {
+function RecordViewFrame({
+  view,
+  pinned = false,
+  onConnect,
+}: {
+  view: OpenView;
+  /** Drawn in the top half: it offers Unpin instead of Pin. */
+  pinned?: boolean;
+  onConnect: () => void;
+}) {
   const panel = useRecordPanel();
   const { providers, connections } = useIntegrations();
   const providerName = providers.find((provider) => provider.id === view.provider)?.name ?? view.provider;
@@ -341,6 +365,15 @@ function RecordViewFrame({ view, onConnect }: { view: OpenView; onConnect: () =>
               onClick={() => window.open(url, "_blank", "noopener,noreferrer")}
             >
               <ExternalLink />
+            </IconButton>
+          )}
+          {pinned ? (
+            <IconButton label="Unpin" onClick={panel.unpin}>
+              <PinOff />
+            </IconButton>
+          ) : (
+            <IconButton label="Pin to the top" onClick={() => panel.pin(view.id)}>
+              <Pin />
             </IconButton>
           )}
           <IconButton label="Close view" onClick={() => panel.close(view.id)}>
