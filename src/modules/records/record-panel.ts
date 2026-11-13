@@ -115,6 +115,28 @@ export function openSent(
   };
 }
 
+/** A message of the thread as the panel follows it: a question carries the items it attached. */
+export type FollowedMessage = { id: string; role: string; targets: readonly ViewTarget[] };
+
+/**
+ * The panel once the conversation reads `messages`, of which it had seen those in `seen` (#51):
+ * each question it had not seen opens its items, in order (`openSent`). Replies open nothing, and
+ * so does Try again, which asks a question the panel has seen again: the panel stays exactly as it
+ * is, the same state, and the user's "since" goes on.
+ */
+export function followConversation(
+  state: PanelState,
+  {
+    seen,
+    messages,
+    wide,
+  }: { seen: ReadonlySet<string>; messages: readonly FollowedMessage[]; wide: boolean },
+): PanelState {
+  return messages
+    .filter((message) => message.role === "user" && !seen.has(message.id))
+    .reduce((current, question) => openSent(current, question.targets, { wide }), state);
+}
+
 /**
  * Shows one view below the tabs, or with none the Attached tab. Not the pinned view: it has no
  * tab.

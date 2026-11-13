@@ -36,7 +36,6 @@ import {
 } from "@/modules/integrations";
 import {
   attachedByQuestion,
-  attachedConnectionsOf,
   type MessageWithParts,
 } from "../attached-items";
 import type { AttachedConnection } from "../contracts";
@@ -60,22 +59,16 @@ function useViewLoad(view: OpenView): ViewLoad {
 
 /**
  * Opens the items of each question the thread sends from now on: a question already in the
- * conversation when the panel mounts, or one asked again by Try again, opens nothing.
+ * conversation when the panel mounts (a fork's copied ones too), or one asked again by Try again,
+ * opens nothing.
  */
 function useOpenSentQuestions(messages: readonly PanelMessage[]) {
-  const { openSent } = useRecordPanel();
-  const seen = useRef<Set<string>>(null);
+  const { follow } = useRecordPanel();
+  const seen = useRef<ReadonlySet<string>>(null);
   useEffect(() => {
-    if (!seen.current) {
-      seen.current = new Set(messages.map((message) => message.id));
-      return;
-    }
-    for (const message of messages) {
-      if (seen.current.has(message.id)) continue;
-      seen.current.add(message.id);
-      if (message.role === "user") openSent(attachedConnectionsOf(message));
-    }
-  }, [messages, openSent]);
+    if (seen.current) follow(seen.current, messages);
+    seen.current = new Set([...(seen.current ?? []), ...messages.map((message) => message.id)]);
+  }, [messages, follow]);
 }
 
 /**

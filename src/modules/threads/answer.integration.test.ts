@@ -1,11 +1,12 @@
 import { randomUUID } from "node:crypto";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   assertIsolation,
   describeIntegration,
 } from "@/tests/support/integration";
 import { db } from "@/lib/db/client";
+import { connectionsTable } from "@/lib/db/schema";
 import { err, ok } from "@/lib/result";
 import type { WorkspaceUIMessage } from "@/modules/agent";
 import {
@@ -201,7 +202,10 @@ describeIntegration(
         provider: "github",
         label: "@someone",
       };
-      const attaching = (message: ReturnType<typeof ask>) => ({
+      const attaching = (
+        message: ReturnType<typeof ask>,
+        connection: { connectionId: string; provider: string; label: string } = foreign,
+      ) => ({
         ...message,
         parts: [
           ...message.parts,
@@ -210,7 +214,7 @@ describeIntegration(
             data: {
               connections: [
                 {
-                  ...foreign,
+                  ...connection,
                   items: [
                     {
                       type: "issue",
@@ -247,6 +251,39 @@ describeIntegration(
           ...stored.slice(0, 3),
           reply,
         ]);
+      });
+
+      it("answer Try again on a question whose connection was removed since, and still refuse it on a new one", async () => {
+        // One of Ana's connections, stored and later removed as `integrations` does. Its actions
+        // are not part of its public API, so the test writes the row the way they would.
+        const [own] = await db()
+          .insert(connectionsTable)
+          .values({
+            userId: ana.id,
+            providerId: "github",
+            baseUrl: "https://api.github.com",
+            accountRef: "1001",
+            accountLabel: "@ana",
+            authKind: "token",
+            lastVerifiedAt: new Date(),
+          })
+          .returning({ id: connectionsTable.id });
+        const connection = { connectionId: own!.id, provider: "github", label: "@ana" };
+        const thread = await aThreadOf(ana, { messages: aConversation.slice(0, 2) });
+        const question = attaching(ask("u2", "Which ones?"), connection);
+        expect((await answerThread(ana, thread.id, aChatTurn(question))).status).toBe(200);
+        // The answer failed: the thread holds the question and no reply.
+        await requests[0]!.onEnd([...aConversation.slice(0, 2), question]);
+
+        // Removed, as Settings → Data sources does.
+        await db().delete(connectionsTable).where(eq(connectionsTable.id, own!.id));
+        const retried = await answerThread(ana, thread.id, aChatTurn(question));
+        expect(retried.status).toBe(200);
+        expect(requests[1]?.messages).toEqual([...aConversation.slice(0, 2), question]);
+
+        const asked = await answerThread(ana, thread.id, aChatTurn(attaching(ask("u3"), connection)));
+        expect(asked.status).toBe(400);
+        expect(requests).toHaveLength(2);
       });
     });
 

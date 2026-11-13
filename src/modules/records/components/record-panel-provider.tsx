@@ -12,12 +12,13 @@ import {
 } from "react";
 import { bug } from "@/lib/errors";
 import { viewKindOf } from "@/modules/integrations";
+import { attachedConnectionsOf, type MessageWithParts } from "../attached-items";
 import type { AttachedConnection, AttachedItem, ConnectionRef } from "../contracts";
 import {
   closeView,
   focusView,
+  followConversation,
   initialPanelState,
-  openSent,
   openView,
   pinView,
   setShown,
@@ -91,8 +92,14 @@ export type RecordPanelControls = {
   ensure: (hasAttached: boolean) => void;
   /** Opens a record's view, or focuses it: a chip's click. */
   open: (record: Openable) => void;
-  /** Opens the items a question just sent (`openSent` in record-panel.ts). */
-  openSent: (attached: readonly AttachedConnection[]) => void;
+  /**
+   * Opens the items of each question in `messages` not in `seen`: what the thread sent since
+   * (`followConversation` in record-panel.ts). Try again opens nothing.
+   */
+  follow: (
+    seen: ReadonlySet<string>,
+    messages: readonly (MessageWithParts & { id: string })[],
+  ) => void;
   /** Shows a view, or with none the Attached tab. */
   focus: (id: string | null) => void;
   close: (id: string) => void;
@@ -133,7 +140,9 @@ export function RecordPanelProvider({
         const current =
           previous[threadId] ??
           initialPanelState({ stored: readStored(threadId), wide, hasAttached });
-        return { ...previous, [threadId]: change(current) };
+        const next = change(current);
+        // An unchanged panel is not set again, so nothing renders or is stored for it.
+        return next === previous[threadId] ? previous : { ...previous, [threadId]: next };
       });
     },
     [threadId, wide],
@@ -146,8 +155,18 @@ export function RecordPanelProvider({
       store,
       ensure: (hasAttached) => update((current) => current, hasAttached),
       open: (record) => update((current) => openView(current, targetOf(record))),
-      openSent: (attached) =>
-        update((current) => openSent(current, targetsOf(attached), { wide })),
+      follow: (seen, messages) =>
+        update((current) =>
+          followConversation(current, {
+            seen,
+            messages: messages.map((message) => ({
+              id: message.id,
+              role: message.role,
+              targets: targetsOf(attachedConnectionsOf(message)),
+            })),
+            wide,
+          }),
+        ),
       focus: (id) => update((current) => focusView(current, id)),
       close: (id) => update((current) => closeView(current, id)),
       pin: (id) => update((current) => pinView(current, id)),
