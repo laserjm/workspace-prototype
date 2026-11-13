@@ -52,10 +52,13 @@ unchanged).
 ### Data ownership
 
 **Decision.** Each signed-in user owns their threads, projects and skill
-preferences; there are no shared workspaces. A user's sources come from their connections
-(see "Integrations are provider folders"); the provider and skill catalogues are shared data. Shared workspaces, such as a team seeing each other's
-threads or source connections configured once per organisation, would add an
-organisation to every owned row, recorded here when it comes.
+preferences; there are no shared workspaces. A user reads only what their own connections reach
+(see "Integrations are provider folders"): every connection is a stored row, and nothing is
+connected for them. The provider and skill catalogues are shared data, declared in code: a
+provider is a folder (its manifest, `api.ts`, `records.ts`, `views/`, an optional `guide.md` and
+`tools.ts`), not a row. Shared workspaces, such as a team seeing each other's threads or
+connections configured once per organisation, would add an organisation to every owned row,
+recorded here when it comes.
 The owner is the signed-in Keycloak user, so the code says user: `User.id` (a `UserId`) is their
 `sub`, which is also `users.id` (see the sign-in). The four sign-in tables are Better Auth's,
 not owned data the app reads. The owned tables are `projects`, `threads`, `thread_messages`, `connections` and
@@ -70,26 +73,29 @@ the user first and names their id in its query.
 
 ### Modules
 
-**Decision.** Seven modules. `agent` (the runtime AI: the model allowlist, instructions, tools
+**Decision.** Six modules. `agent` (the runtime AI: the model allowlist, instructions, tools
 and the agent loop; see "Answers come from the Vercel AI Gateway"), `threads` (rich:
 conversations, settle, snooze, wake, fork, the live chat), `integrations` (the providers the
 workspace connects to, the user's connections and what they read; a leaf that imports no other
 module), `records` (attaching records to a question and reading them, provider-neutral: the
 attachment rules, the attach dialog and its chips, the record panel and the frame its views share,
-and the record tools every provider answers; ADR 0003 §2), `sources` (the sample's sources and
-records; a read-only domain, which ADR 0003 retires and #63 removes),
+and the record tools every provider answers; ADR 0003 §2),
 `skills` (the skill catalogue and its activation in this browser) and `projects` (the project
 list, the add-project rule and the sidebar filter). `app/(workspace)/` composes them; its
 `_components/` hold the shell, sidebar, settings and new-thread heading, which only that route
 uses. Another module is reached only through its `index.ts`, which is safe to import in the
 browser, or its `server.ts`, which is `server-only`; inside a module, files import each other
 relatively.
-`records` builds on `integrations` alone: it imports only `@/modules/integrations` and
+`integrations` is a strict leaf: nothing under it imports any `@/modules/*`, its own entry points
+included, and the record vocabulary every provider answers in is its own. `records` builds on
+`integrations` alone: it imports only `@/modules/integrations` and
 `@/modules/integrations/server`. Its `queries.ts` holds what the server decides about attached
 items from the user's connections: the allowed connections and the refusal of a foreign one.
 **Enforced by.** ESLint `no-restricted-imports` (`eslint.config.mjs`: `@/modules/<x>/` followed
-by anything but `index` or `server` is an error; a block for `src/modules/records/**` refuses
-any `@/modules/*` but those two); the `server-only` import in every `server.ts`.
+by anything but `index` or `server` is an error; a block for `src/modules/integrations/**`, the
+vault files included, refuses any `@/modules/*`; a block for `src/modules/records/**` refuses any
+`@/modules/*` but `@/modules/integrations` and `@/modules/integrations/server`); the
+`server-only` import in every `server.ts`.
 **Recorded in.** This entry; `docs/adr/0003-attached-items-and-record-views.md`.
 
 ### Cross-module references are ids
@@ -105,8 +111,6 @@ resolve the ids through the other module's public API (`useIntegrations().connec
 `useSkills().skillById`). Provider-specific presentation (the provider mark, a type's kind mark,
 a state's label and tone) is data the provider declares, not a branch on its id. The record
 vocabulary (`RecordSummary`, `RecordError`, the tones) is `integrations`'; `records` builds on it.
-The sample's older vocabulary (`SourceRecord`, `RecordQuery`, `RecordPage`) is still `sources`',
-which `integrations` imports as types only, until #63 removes both.
 **Enforced by.** Review.
 **Recorded in.** This entry.
 
@@ -214,10 +218,8 @@ through `queries.ts` and `server.ts`, and reach the browser through `Integration
 `GET /api/connections/[connectionId]/records/[type]/[key]` the first time it is shown, into the
 browser's `RecordViewStore` (see "The record panel"). Skill activation, the record panel's width
 and each thread's record panel persist in `localStorage`; the stored skill ids are parsed with
-`storedSkillIdsSchema`, a stored panel with `restorePanel`. (`GET /api/sources/[sourceId]/records`
-is still served, though nothing reads it since the scope went; #63 removes it with `sources`.)
-There are no cache tags: every read is per request, and an action returns what it
-stored, which the browser adds to its state.
+`storedSkillIdsSchema`, a stored panel with `restorePanel`. There are no cache tags: every read is
+per request, and an action returns what it stored, which the browser adds to its state.
 **Enforced by.** The `server-only` import in every `queries.ts`, `server.ts` and
 `threads/answer.ts` (a client component that imports one fails the build); the
 `thread_messages_thread_id_user_id_fkey` and `threads_one_placement` constraints; the
@@ -400,28 +402,30 @@ read directly when a qualifier passes through, a foreign `connectionId` answerin
 ### Integrations are provider folders
 
 **Decision.** `docs/adr/0002` chose one leaf module, `integrations`, with one folder per
-provider: a system the workspace connects to (`providers/sample/` and `providers/github/` today;
-Atlassian, codebeamer, PostHog, Stripe and Supabase are planned). A provider is
-`defineProvider({ id, name, description, auth, baseUrl?, verify?, records?, guide? })` (`contracts.ts`),
-registered by one line in `providers.ts`, and written in its folder: `index.ts` (the
-manifest), `api.ts` (its HTTP calls, every response parsed with zod), `records.ts` (its record
+provider: a system the workspace connects to (`providers/github/` today; Atlassian, codebeamer,
+PostHog, Stripe and Supabase are planned). There is no sample provider: the workspace shows only
+what the user connects (ADR 0003 §5). A provider is
+`defineProvider({ id, name, description, auth, baseUrl, verify, records?, guide? })`
+(`contracts.ts`), registered by one line in `providers.ts`, and written in its folder: `index.ts`
+(the manifest), `api.ts` (its HTTP calls, every response parsed with zod), `records.ts` (its record
 types, states, search and one reader per type, only with records), `views/` (in the browser: its
-mark and each type's record view and kind mark; ADR 0003 §3) and an optional `guide.md`: what the agent should know to use
+mark and each type's record view and kind mark; ADR 0003 §3), an optional `guide.md`: what the agent should know to use
 its connections (what its records and states mean, how its search reads), imported as text,
 declared as the manifest's `guide`, kept server-side (never on `ProviderChoice`) and in the system
 prompt while one of its connections is allowed (`providerForPrompt`, `integrations/server.ts`;
-`providers.test.ts` caps its length). A provider's code is handed a `ProviderAccess` (the API
-address and the `Authorization` header value) and never reads a secret, an env var or the
-database. `auth` lists how a user connects: `none` (the sample), `token` (sent as `Bearer`) or
-`basic` (username and password, or an email and API token, sent as HTTP Basic); `verify` checks a
-credential and names the account.
+`providers.test.ts` caps its length), and an optional `tools.ts` for agent tools of its own (none
+has any yet; the record tools are `records`'). A provider's code is handed a `ProviderAccess` (the
+API address and the `Authorization` header value) and never reads a secret, an env var or the
+database. `auth` lists how a user connects: `token` (sent as `Bearer`) or `basic` (username and
+password, or an email and API token, sent as HTTP Basic); `verify` checks a credential and names
+the account.
 
 A connection is one user's link to one account of a provider at one address (`connections`,
 unique per user, provider, `base_url` and `account_ref`). `listConnections(user)` answers with
-the built-in sample connection, which every user has and nothing stores, then the stored ones.
-`connectAction` verifies the credential with the provider before anything is stored, then
-writes the connection and its credential in one transaction; connecting the same account again
-updates both. `testConnectionAction` asks the provider again (a refused credential is
+the stored ones, in the order they were made; a new user has none. `connectAction` verifies the
+credential with the provider before anything is stored, then writes the connection and its
+credential in one transaction; connecting the same account again updates both.
+`testConnectionAction` asks the provider again (a refused credential is
 `needs_reconnect`; an unreachable provider changes nothing), and `disconnectAction` deletes the
 connection and, by cascade, its credential. The base URL must be HTTPS, and `connectAction`
 (so connecting and reconnecting) refuses one that points the server at itself or at an internal
@@ -429,15 +433,15 @@ network (`integrations/address.ts`): a host that is `localhost`, or a loopback, 
 unique local) or link-local address, given literally or among what its name resolves to, and a
 name that does not resolve. The form shows the refusal as the URL field's error, and nothing is stored. The check runs when a
 connection is saved only: no DNS pinning and no re-check per request (decided in #44), so every
-provider request is sent with `redirect: "error"` and cannot be led elsewhere. Settings → Sources
-(`SourcesSettingsPanel`, the connect form built from the provider's `auth` and `baseUrl`) lists
-every provider and the user's connections; `IntegrationsProvider` holds them, and an action's
-answer goes into its state. `integrations/records.ts` runs the sample's reader for `sources`
-(`listConnectedSources`, `searchConnectionRecords`); `sources` turns that into `Source`s and their
-records route, which nothing reads since the scope went (#63 removes them). The sample records are the
-provider's `data.ts`; the stored threads' sample ids moved to `sample:<product>` in
-`drizzle/0006_rename-sample-source-ids.sql`. Unit tests that read sources swap the connection
-query for `tests/support/connections.ts` (the sample connection alone), so they need no Postgres.
+provider request is sent with `redirect: "error"` and cannot be led elsewhere. Settings → Data
+sources (code name `sources`: `SourcesSettingsPanel`, the connect form built from the provider's
+`auth` and `baseUrl`) lists every provider and the user's connections; the sidebar's "Data
+sources" button opens it. `IntegrationsProvider` holds them, and an action's answer goes into its
+state. With no connection, the new-thread page offers the first provider with records in one
+quiet line ("Connect GitHub to ask about your issues and pull requests", from its name and
+`pluralLabels`; `invitedProvider`), and the attach dialog says "No data sources connected yet" with
+"Connect GitHub"; both open Settings → Data sources, and the composer keeps its draft. With a
+connection, the new-thread page shows no line.
 
 A provider with records (ADR 0003 §3) declares them in its manifest's `records`: its types, each
 with a singular and a plural label and its states, each state with a label and a tone from
@@ -452,7 +456,7 @@ which the dialog shows) or a `RecordError` and never throws. Each declared type 
 (`GithubIssueDetail` or `GithubPullRequestDetail`, zod schemas beside the readers; there is no
 generic detail type), and the
 manifest's `url(baseUrl, type, key)` builds the record's page from the connection's base URL and
-the key, without asking the provider. The sample's older reader is its manifest's `sources`. The
+the key, without asking the provider. The
 declarations, without code (`listProviderChoices` drops the readers), reach the browser on
 `ProviderChoice.records`. The browser's registry is `record-views.ts`, one line per provider: its
 `views/` maps each declared type to `{ view, icon }`, a `React.lazy` body-only view
@@ -538,11 +542,10 @@ fails the test and names it), and swaps the connection query and the vault for
 **Enforced by.** `providers/github/fixtures.test.ts` (README lines and files one to one, each
 seeded case found by its label, CI on the heads of the merged and the draft pull request, no token
 or `Authorization`);
-`integrations/providers.test.ts` (every provider in the registry: unique ids, a
-way to connect, a base URL and `verify` when it takes a credential, declared record types whose
-states' tones are in the set, every declared type with a reader, a view and an icon and every
-view of a declared type, a provider mark, sources in a declared product, records read back by id
-in order, nothing for an unknown key);
+`integrations/providers.test.ts` (the declarations of every provider in the registry: unique ids,
+an auth method, a base URL and `verify`, declared record types whose states' tones are in the
+set, every declared type with a reader, a view and an icon and every view of a declared type, a
+provider mark, a guide under its size cap);
 `integrations/actions.integration.test.ts` (connect, reconnect, refusals including each internal
 address kind with name resolution stubbed, test, disconnect, a search marking only its user's
 connection `needs_reconnect`, a visitor, `assertIsolation()`); `providers/github/api.test.ts`;
@@ -557,8 +560,7 @@ connection, 403, 429 with `retryAt`, 502 and a 409 marking the connection; the r
 draft pull requests' reviews and their inline comments, changed files, merge state and CI, the
 100-file cap with `fileCount`, a 403 on Actions leaving the view loaded, a CI rate limit failing
 it, and Unicode stripped from reviews, file paths and CI);
-`records/contracts.test.ts` (the dialog's default connection);
-`sources/queries.test.ts`; `tsc`.
+`records/contracts.test.ts` (the dialog's default connection); `tsc`.
 **Recorded in.** This entry; `docs/adr/0002-integrations.md`;
 `docs/adr/0003-attached-items-and-record-views.md`.
 
@@ -592,9 +594,9 @@ render prop, `RecordPanel`, beside the conversation once that is here.
   tone, the short label, close on hover or middle-click. Only the active view renders and reads.
   Its frame (kind mark, where, live state badge, title, refresh, "Open on <provider>", close) is
   `records`'; the body is the provider's `RecordViewBody`. Errors: not found or no access offer
-  Retry and the record's page; needs reconnecting offers Reconnect (Settings → Sources) and Retry;
-  a removed connection says so, with no link, and reads nothing. On a wide screen the panel is
-  resizable (`ResizablePanel`, its width in `localStorage`).
+  Retry and the record's page; needs reconnecting offers Reconnect (Settings → Data sources) and
+  Retry; a removed connection says so, with no link, and reads nothing. On a wide screen the panel
+  is resizable (`ResizablePanel`, its width in `localStorage`).
 - **View data.** `RecordViewStore` (`records/components/record-view-store.ts`) holds each view's
   record by view id for the page's lifetime: read the first time the view is shown, shared while
   in flight, kept when the view is shown again; refresh (and Retry) reads again, showing the record
@@ -660,7 +662,7 @@ below `text-xs` (`text-2xs` 11px down to `text-5xs` 7px, registered with `cn` in
 `@theme inline` mappings that make them utilities (`bg-sidebar-row-hover`,
 `text-secondary-label`, `shadow-popover`). Components style themselves with Tailwind classes
 on those tokens and nothing else: no hex colours, no font sizes off the type scale, no CSS
-files beside `globals.css`. Colours that only identify something (project letters, source
+files beside `globals.css`. Colours that only identify something (project letters, provider
 marks, record status, priority, issue type) use Tailwind's palette with a `dark:` variant; a
 colour with meaning (errors, warnings, success) uses its token. Layout state that descendants
 react to is a data attribute on a named group: `data-sidebar` and `data-mobile-sidebar` on

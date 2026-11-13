@@ -20,11 +20,7 @@ import {
 } from "./contracts";
 import { baseUrlRefusal } from "./address";
 import { findProvider } from "./providers";
-import {
-  connectionColumns,
-  findStoredConnection,
-  toConnection,
-} from "./queries";
+import { connectionColumns, findStoredConnection } from "./queries";
 import { readCredential, writeSecret } from "./vault";
 
 /** The connect form shows `message` as its URL field's error. */
@@ -54,10 +50,10 @@ export const connectAction = action(
     >
   > => {
     const provider = findProvider(providerId);
-    if (!provider?.verify) return err(notFound("Provider", providerId));
+    if (!provider) return err(notFound("Provider", providerId));
     if (!provider.auth.some((method) => method.kind === credential.kind))
       return err(notFound("Sign-in method", credential.kind));
-    const baseUrl = (givenUrl ?? provider.baseUrl?.default)?.replace(/\/+$/, "");
+    const baseUrl = (givenUrl ?? provider.baseUrl.default)?.replace(/\/+$/, "");
     if (!baseUrl) return err(badBaseUrl(`Enter the ${provider.name} URL.`));
     const refused = await baseUrlRefusal(baseUrl);
     if (refused) return err(badBaseUrl(refused));
@@ -95,7 +91,7 @@ export const connectAction = action(
       await writeSecret(tx, user.id, row!.id, credential);
       return row!;
     });
-    return ok(toConnection(stored));
+    return ok(stored);
   },
 );
 
@@ -113,8 +109,8 @@ export const testConnectionAction = action(
     const connection = await findStoredConnection(user, connectionId);
     const provider = connection && findProvider(connection.providerId);
     const credential =
-      provider?.verify && (await readCredential(user.id, connectionId));
-    if (!connection || !provider?.verify || !credential)
+      provider && (await readCredential(user.id, connectionId));
+    if (!connection || !provider || !credential)
       return err(notFound("Connection", connectionId));
 
     const verified = await provider.verify({
@@ -145,7 +141,7 @@ export const testConnectionAction = action(
         ),
       )
       .returning(connectionColumns);
-    return row ? ok(toConnection(row)) : err(notFound("Connection", connectionId));
+    return row ? ok(row) : err(notFound("Connection", connectionId));
   },
 );
 

@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { authorizationOf, credentialSchema, expiryLabel } from "./contracts";
+import {
+  authorizationOf,
+  credentialSchema,
+  expiryLabel,
+  invitedProvider,
+  type ProviderChoice,
+} from "./contracts";
 
 describe("authorizationOf", () => {
   it("sends a token as Bearer", () => {
@@ -35,5 +41,29 @@ describe("expiryLabel", () => {
     { expiresAt: "2026-11-06T11:00:00Z", label: "Expired" },
   ])("says $label", ({ expiresAt, label }) => {
     expect(expiryLabel(new Date(expiresAt), now)).toBe(label);
+  });
+});
+
+describe("invitedProvider", () => {
+  const choice = (id: string, withRecords: boolean): ProviderChoice => ({
+    id,
+    name: id,
+    description: "",
+    auth: [{ kind: "token", label: "Token", help: "" }],
+    baseUrl: { label: "API URL" },
+    ...(withRecords
+      ? { records: { types: {}, filters: [], hint: { idle: "", typing: "" } } }
+      : {}),
+  });
+
+  it("invites the first provider that holds records", () => {
+    expect(
+      invitedProvider([choice("stripe", false), choice("github", true), choice("jira", true)])
+        ?.id,
+    ).toBe("github");
+  });
+
+  it("invites none when no provider holds records", () => {
+    expect(invitedProvider([choice("stripe", false)])).toBeUndefined();
   });
 });
