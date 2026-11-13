@@ -21,9 +21,13 @@ words, so ask one search per alternative.
 
 `read_record` answers an issue's or pull request's description, labels, assignees and newest
 comments. A pull request adds its newest reviews with their inline comments, its merge state,
-its changed files (paths and line counts, no diffs) and the CI of its head commit: the GitHub
+its changed files (paths and line counts; `github_pull_request_diff` reads their diffs) and the CI of its head commit: the GitHub
 Actions runs and the combined commit status (`readable: false` when the token may not read it).
 `merge.mergeableState` is GitHub's `mergeable_state`: `clean` can merge, `unstable` can merge
 with a failing check, `has_hooks` can merge with hooks, `behind` needs the base branch merged
 in, `blocked` lacks a required review or check, `dirty` has a merge conflict, `draft` is not
 ready for review, `unknown` is not worked out yet (and after a merge). A review is `APPROVED`, `CHANGES_REQUESTED`, `COMMENTED`, `DISMISSED` or `PENDING`.
+
+`github_pull_request_diff` answers a pull request's changed files with their unified diffs: each
+cut at 4,000 characters, 40,000 in all, the files past that listed without theirs. Ask for one
+file with `path`. A binary or very large file has no diff.

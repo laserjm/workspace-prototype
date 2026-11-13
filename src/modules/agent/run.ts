@@ -17,6 +17,7 @@ import {
   attachedItemsText,
   recordsDataSchemas,
 } from "@/modules/records/server";
+import { integrationToolsFor } from "@/modules/integrations/server";
 import { listSkills } from "@/modules/skills/server";
 import { resolveContext, type AgentContext } from "./context";
 import type {
@@ -61,6 +62,7 @@ const workspaceAgent = new ToolLoopAgent({
   toolsContext: {
     search_records: { connectionIds: [] },
     read_record: { connectionIds: [] },
+    ...integrationToolsFor(undefined, []).toolsContext,
     load_skill: { skillIds: [] },
   },
   // Lets the model call a tool or two and then write its reply.

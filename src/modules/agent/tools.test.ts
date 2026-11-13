@@ -25,11 +25,19 @@ describe("tools", () => {
   // tool adds a name here; renaming or removing one would break the threads that called it.
   it("keeps every tool name a stored conversation may hold", () => {
     expect(Object.keys(tools).sort()).toEqual([
+      "github_pull_request_diff",
       "html_render",
       "load_skill",
       "read_record",
       "search_records",
     ]);
+  });
+
+  it("reads a pull request's diff by its connection and key, one file by its path", async () => {
+    const pullRequest = { connectionId: "c1", key: "acme/web#42" };
+    expect(await accepts("github_pull_request_diff", pullRequest)).toBe(true);
+    expect(await accepts("github_pull_request_diff", { ...pullRequest, path: "src/a.ts" })).toBe(true);
+    expect(await accepts("github_pull_request_diff", { key: "acme/web#42" })).toBe(false);
   });
 
   it("reads one record by its connection, type and key", async () => {
@@ -53,6 +61,7 @@ describe("toolsFor", () => {
       toolsContext: {
         search_records: { user, connectionIds: [] },
         read_record: { user, connectionIds: [] },
+        github_pull_request_diff: { user, connectionIds: [] },
         load_skill: { skillIds: [] },
       },
     });
@@ -66,10 +75,10 @@ describe("toolsFor", () => {
     });
   });
 
-  it("offers search_records and read_record over the connections the server allowed", () => {
-    const connection = (connectionId: string) => ({
+  it("offers search_records and read_record over the connections the server allowed, and GitHub's tools over its", () => {
+    const connection = (connectionId: string, provider = "github") => ({
       connectionId,
-      provider: "github",
+      provider,
       providerName: "GitHub",
       account: "@acme",
     });
@@ -78,13 +87,14 @@ describe("toolsFor", () => {
         user,
         model: opus,
         offeredSkills: [],
-        connections: [connection("c1"), connection("c2")],
+        connections: [connection("c1"), connection("c2"), connection("c3", "jira")],
       }),
     ).toMatchObject({
-      activeTools: ["html_render", "search_records", "read_record"],
+      activeTools: ["html_render", "search_records", "read_record", "github_pull_request_diff"],
       toolsContext: {
-        search_records: { user, connectionIds: ["c1", "c2"] },
-        read_record: { user, connectionIds: ["c1", "c2"] },
+        search_records: { user, connectionIds: ["c1", "c2", "c3"] },
+        read_record: { user, connectionIds: ["c1", "c2", "c3"] },
+        github_pull_request_diff: { user, connectionIds: ["c1", "c2"] },
       },
     });
   });

@@ -1,10 +1,9 @@
 "use client";
 
 import { BookOpen } from "lucide-react";
-import { useIntegrations } from "@/modules/integrations";
+import { recordErrorWords, useIntegrations } from "@/modules/integrations";
 import { connectionRefOf, type ReadRecordInput, type ReadRecordOutput } from "../contracts";
 import { AttachedItemChip } from "./attached-item-chip";
-import { recordErrorWords } from "./record-error-words";
 import { useRecordPanel } from "./record-panel-provider";
 
 /**

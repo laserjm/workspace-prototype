@@ -1,10 +1,9 @@
 "use client";
 
 import { Search } from "lucide-react";
-import { useIntegrations } from "@/modules/integrations";
+import { recordErrorWords, useIntegrations } from "@/modules/integrations";
 import { connectionRefOf, type SearchRecordsInput, type SearchRecordsOutput } from "../contracts";
 import { AttachedItemChip } from "./attached-item-chip";
-import { recordErrorWords } from "./record-error-words";
 import { useRecordPanel } from "./record-panel-provider";
 
 /** How many results show as chips; the rest are counted. */

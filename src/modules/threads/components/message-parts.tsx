@@ -3,7 +3,8 @@
 import { HtmlRenderFrame } from "@/components/ui/html-render-frame";
 import { Markdown } from "@/components/ui/markdown";
 import type { WorkspaceUIMessage } from "@/modules/agent";
-import { RecordReadCall, RecordSearchCall } from "@/modules/records";
+import { GithubPullRequestDiffCall } from "@/modules/integrations";
+import { RecordChip, RecordReadCall, RecordSearchCall } from "@/modules/records";
 import { SkillLoadCall } from "@/modules/skills";
 import { preparingDotClassName } from "./response-turn";
 
@@ -11,6 +12,7 @@ type MessagePart = WorkspaceUIMessage["parts"][number];
 type HtmlRenderPart = Extract<MessagePart, { type: "tool-html_render" }>;
 type SearchRecordsPart = Extract<MessagePart, { type: "tool-search_records" }>;
 type ReadRecordPart = Extract<MessagePart, { type: "tool-read_record" }>;
+type PullRequestDiffPart = Extract<MessagePart, { type: "tool-github_pull_request_diff" }>;
 type LoadSkillPart = Extract<MessagePart, { type: "tool-load_skill" }>;
 
 /** Whether a message has anything `MessageParts` would show yet. */
@@ -21,6 +23,7 @@ export function hasVisibleParts(message: WorkspaceUIMessage | undefined) {
       part.type === "tool-html_render" ||
       part.type === "tool-search_records" ||
       part.type === "tool-read_record" ||
+      part.type === "tool-github_pull_request_diff" ||
       part.type === "tool-load_skill",
   );
 }
@@ -60,6 +63,8 @@ export function MessageParts({
         return <SearchRecordsToolPart key={part.toolCallId} part={part} />;
       case "tool-read_record":
         return <ReadRecordToolPart key={part.toolCallId} part={part} />;
+      case "tool-github_pull_request_diff":
+        return <PullRequestDiffToolPart key={part.toolCallId} part={part} />;
       case "tool-load_skill":
         return <LoadSkillToolPart key={part.toolCallId} part={part} />;
       default:
@@ -134,6 +139,39 @@ function ReadRecordToolPart({ part }: { part: ReadRecordPart }) {
       return <RecordReadCall state="done" input={part.input} output={part.output} />;
     case "output-error":
       return <RecordReadCall state="failed" input={part.input} errorText={part.errorText} />;
+    default:
+      return null;
+  }
+}
+
+/** The pull request is drawn as the records module's chip, which opens its view. */
+const recordChip = (summary: Parameters<typeof RecordChip>[0]["summary"]) => (
+  <RecordChip summary={summary} />
+);
+
+function PullRequestDiffToolPart({ part }: { part: PullRequestDiffPart }) {
+  switch (part.state) {
+    case "input-streaming":
+    case "input-available":
+      return <GithubPullRequestDiffCall state="reading" input={part.input} recordChip={recordChip} />;
+    case "output-available":
+      return (
+        <GithubPullRequestDiffCall
+          state="done"
+          input={part.input}
+          output={part.output}
+          recordChip={recordChip}
+        />
+      );
+    case "output-error":
+      return (
+        <GithubPullRequestDiffCall
+          state="failed"
+          input={part.input}
+          errorText={part.errorText}
+          recordChip={recordChip}
+        />
+      );
     default:
       return null;
   }
