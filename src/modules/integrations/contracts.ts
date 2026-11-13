@@ -191,7 +191,79 @@ export type RecordRead = { summary: RecordSummary & { url: string }; detail: unk
 export type RecordType = RecordTypeDeclaration & {
   /** Reads one record by its key, which only this provider parses; never throws. */
   read: (access: ConnectionAccess, key: string) => Promise<Result<RecordDetail, RecordError>>;
+  /**
+   * The detail `read` answered, trimmed for the model (`read_record`) within `MODEL_LIMITS`, every
+   * cut saying what it cut. Only ever handed what this type's `read` answered.
+   */
+  trim: (detail: unknown) => unknown;
 };
+
+/**
+ * How much of a record the model reads (`read_record`): each provider trims its own detail with
+ * these, next to its readers. The view shows everything it read.
+ */
+export const MODEL_LIMITS = {
+  /** A record's body (an issue's description): its first characters. */
+  bodyCharacters: 8_000,
+  /** A list of comments (or reviews): its newest entries. */
+  comments: 30,
+  /** Each kept comment: its first characters. */
+  commentCharacters: 2_000,
+} as const;
+
+/**
+ * `text` cut to its first `max` characters, ending with what was cut:
+ * `[… 32,000 more characters, open the view]`. A character is never split in two.
+ */
+export function cutText(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const lead = text.charCodeAt(max - 1);
+  const end = lead >= 0xd800 && lead <= 0xdbff ? max - 1 : max;
+  const more = (text.length - end).toLocaleString("en-US");
+  return `${text.slice(0, end)}\n\n[… ${more} more characters, open the view]`;
+}
+
+/**
+ * What a trimmed list left out: `+ 12 older comments`, and `+ 50 later comments not read, open
+ * the view` when the reader read fewer than there are. Nothing when nothing was left out.
+ */
+export function cutNote(noun: string, older: number, unread: number): string | undefined {
+  const notes = [
+    ...(older > 0 ? [`+ ${older} older ${noun}`] : []),
+    ...(unread > 0 ? [`+ ${unread} later ${noun} not read, open the view`] : []),
+  ];
+  return notes.length ? notes.join(", ") : undefined;
+}
+
+/**
+ * The newest `MODEL_LIMITS.comments` entries of a list as read (oldest first), of `total` there
+ * are, and the `cutNote` of what was left out.
+ */
+export function newestEntries<T>(
+  read: readonly T[],
+  total: number,
+  noun: string,
+): { kept: T[]; note?: string } {
+  const kept = read.slice(-MODEL_LIMITS.comments);
+  const note = cutNote(noun, read.length - kept.length, total - read.length);
+  return note ? { kept, note } : { kept };
+}
+
+/**
+ * A record type from its declaration, its reader and the trim of what that reader answers, so the
+ * trim is typed against the reader's own detail.
+ */
+export function recordType<D>(
+  declaration: RecordTypeDeclaration,
+  read: (
+    access: ConnectionAccess,
+    key: string,
+  ) => Promise<Result<{ summary: RecordSummary; detail: D }, RecordError>>,
+  trim: (detail: D) => unknown,
+): RecordType {
+  // `trim` only ever gets what `read` answered, which is a `D`.
+  return { ...declaration, read, trim: trim as (detail: unknown) => unknown };
+}
 
 /** The generic filters the attach dialog offers; a provider says which its search supports. */
 export type RecordFilter = "type" | "includeClosed";

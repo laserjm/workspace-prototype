@@ -18,3 +18,12 @@ A search only ever covers the repositories the connection's token can read. A re
 name (`web` or `acme/web`), `repo:acme/web`, `user:acme` or `org:acme` narrows it to those of
 them; one the token cannot read is ignored. `AND`, `OR`, `NOT` and parentheses are searched as
 words, so ask one search per alternative.
+
+`read_record` answers an issue's or pull request's description, labels, assignees and newest
+comments. A pull request adds its newest reviews with their inline comments, its merge state,
+its changed files (paths and line counts, no diffs) and the CI of its head commit: the GitHub
+Actions runs and the combined commit status (`readable: false` when the token may not read it).
+`merge.mergeableState` is GitHub's `mergeable_state`: `clean` can merge, `unstable` can merge
+with a failing check, `has_hooks` can merge with hooks, `behind` needs the base branch merged
+in, `blocked` lacks a required review or check, `dirty` has a merge conflict, `draft` is not
+ready for review, `unknown` is not worked out yet (and after a merge). A review is `APPROVED`, `CHANGES_REQUESTED`, `COMMENTED`, `DISMISSED` or `PENDING`.

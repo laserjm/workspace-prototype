@@ -358,18 +358,19 @@ connection is a 400 on a new message only, and a stored message keeps its data p
 the module it acts on and is a thin wrapper over that module's queries (or, for a write, its
 actions). `records/tools.ts` is the pattern: `search_records` searches one of the connections the
 thread attached, through the provider's own search, the same code the attach dialog runs (ADR 0003
-§4); `skills/tools.ts` (`load_skill`, see "Skills are SKILL.md files") follows it.
+§4), and `read_record` reads one record through the same reader its view uses; `skills/tools.ts`
+(`load_skill`, see "Skills are SKILL.md files") follows it.
 - **Files.** The tool's input and output schemas are in the module's `contracts.ts`, so the
   browser can type the tool's parts; field meanings are in their `.describe()`, and the tool's
   description says that its results are third-party data. The tool is in `<module>/tools.ts`
   (`server-only`), exported as `<module>Tools` from `server.ts`. Its chat card is in
-  `<module>/components/` (`RecordSearchCall`), exported from `index.ts`; the chat's
+  `<module>/components/` (`RecordSearchCall`, `RecordReadCall`), exported from `index.ts`; the chat's
   `message-parts.tsx` maps the part's state onto it.
 - **Context, not trust.** What a tool may see comes from the server, never from the model: the
   tool declares it with `contextSchema`, and `toolsFor` in `agent/tools.ts` fills it from the
-  resolved `AgentContext`. `search_records` (context `{ user?, connectionIds }`) answers
+  resolved `AgentContext`. `search_records` and `read_record` (context `{ user?, connectionIds }`) answer
   `no_access` for a `connectionId` outside the **allowed connections** (`allowedConnections`, see
-  "Answers come from the Vercel AI Gateway"), whatever the model asks, and is offered
+  "Answers come from the Vercel AI Gateway"), whatever the model asks, and are offered
   (`activeTools`) only while one connection is allowed, even one attached with no items. A tool
   whose context the thread lacks is not offered, and its `execute` refuses anyway.
 - **`search_records`.** `{ connectionId, query, type?, includeClosed? }` answers `{ results:
@@ -381,6 +382,22 @@ thread attached, through the provider's own search, the same code the attach dia
   folders"). Its card is one quiet line ("Searched @acme for “login timeout”: 6 results", or the
   error in words) with the first three results as `AttachedItemChip`s and "+N"; a chip opens the
   record's view as a tab, never under Attached.
+- **`read_record`.** `{ connectionId, type, key }` answers `{ summary: RecordSummary & { url },
+  detail }` or `{ error: RecordError & { url? } }` (`not_found`, `no_access`, `needs_reconnect`,
+  `rate_limited`, `unreachable`), as data. It calls `readRecordForModel(user, connectionId, type,
+  key)` (`integrations/server.ts`): `readRecord`, the record views' read, then the declared type's
+  own `trim` of the detail, which the provider writes next to its readers. The limits are
+  `MODEL_LIMITS` in `integrations/contracts.ts`: a body's first 8,000 characters; the newest 30
+  comments (and, for a pull request, reviews and inline review comments), 2,000 characters each.
+  Every cut says what it cut (`cutText`: `[… 32,000 more characters, open the view]`;
+  `newestEntries` and `cutNote`: `+ 12 older comments`, and the comments a reader did not reach
+  as `+ 50 later comments not read, open the view`: GitHub's readers read the first 100, so
+  past that the model gets the newest of those). The trimmed copy is the tool's output and so what the
+  conversation stores. Field meanings are in the provider's detail schema's `.describe()` and,
+  since the model never sees an output schema, its guide (GitHub's `mergeableState`). The
+  description asks for one call per record in the same step. Its card is one quiet line ("Read"
+  and the record as an `AttachedItemChip`, or "Could not read acme/web#482: …"); the chip opens
+  the record's view as a tab, never under Attached.
 - **Registration.** `agent/tools.ts` spreads the module's tools into `tools`, adds the tool's
   context to `toolsFor`, and `WorkspaceUITools` in `agent/contracts.ts` gets its types.
 - **Behaviour.** The tools only read. Record bodies never reach the prompt: the model reads
@@ -389,13 +406,17 @@ thread attached, through the provider's own search, the same code the attach dia
   name. One exception was made: the thread scope's `search_records` (#62) kept no stub, and its
   name was reused with the new schema, because the database is reset with that change
   (`pnpm stack:reset`), so no stored conversation holds the old parts.
-**Enforced by.** `agent/tools.test.ts` (the tool names, the new `search_records` schema, what
-`toolsFor` offers); `agent/run.test.ts` (on a mock model over recorded GitHub answers:
+**Enforced by.** `agent/tools.test.ts` (the tool names, the new `search_records` schema, the
+`read_record` schema, what `toolsFor` offers); `agent/run.test.ts` (on a mock model over recorded GitHub answers:
 `search_records` offered for a connection attached whole and not without one or for one needing
 reconnecting, the call reaching GitHub with the token's scope and an outside `repo:` or `user:`
 dropped, results kept to the token's repositories when the scope names their owners, no number
 read directly when a qualifier passes through, a foreign `connectionId` answering `no_access`, a
-422 answering `invalid_query`); `tsc`
+422 answering `invalid_query`; `read_record` offered beside it, the recorded issue and pull
+request read with long bodies and comment and review lists cut with their notes, two records read
+in one step with nothing cut, a foreign `connectionId` answering `no_access`, a 404 answering
+`not_found` with the record's page); `integrations/providers.test.ts` (every declared type has a
+`trim`); `tsc`
 (`WorkspaceUITools`, `toolsContext`).
 **Recorded in.** This entry; `docs/adr/0003-attached-items-and-record-views.md`.
 
@@ -452,7 +473,9 @@ typing; a provider's own terms, such as GitHub's numbers and repository names, s
 declaration); and its search, which answers a `RecordSearchPage` (`RecordSummary`s, an opaque
 `next` cursor, `total`, the connection's `reach`, and `narrowedTo` when the text narrowed it,
 which the dialog shows) or a `RecordError` and never throws. Each declared type also has a
-`read(access, key)`, which answers the record's live `RecordSummary` and the provider's own detail
+`read(access, key)`, which answers the record's live `RecordSummary` and the provider's own detail,
+and a `trim(detail)` for the model (`recordType(declaration, read, trim)` types the trim against
+the reader's detail; see "Agent tools live in their module"). The detail is the provider's own
 (`GithubIssueDetail` or `GithubPullRequestDetail`, zod schemas beside the readers; there is no
 generic detail type), and the
 manifest's `url(baseUrl, type, key)` builds the record's page from the connection's base URL and
@@ -544,7 +567,7 @@ seeded case found by its label, CI on the heads of the merged and the draft pull
 or `Authorization`);
 `integrations/providers.test.ts` (the declarations of every provider in the registry: unique ids,
 an auth method, a base URL and `verify`, declared record types whose states' tones are in the
-set, every declared type with a reader, a view and an icon and every view of a declared type, a
+set, every declared type with a reader, a trim, a view and an icon and every view of a declared type, a
 provider mark, a guide under its size cap);
 `integrations/actions.integration.test.ts` (connect, reconnect, refusals including each internal
 address kind with name resolution stubbed, test, disconnect, a search marking only its user's

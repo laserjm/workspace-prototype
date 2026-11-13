@@ -7,6 +7,8 @@ import {
   HTML_RENDER_MIN_HEIGHT,
 } from "@/lib/html-render/html-render";
 import type {
+  ReadRecordInput,
+  ReadRecordOutput,
   RecordsDataTypes,
   SearchRecordsInput,
   SearchRecordsOutput,
@@ -84,6 +86,7 @@ export type WorkspaceMessageMetadata = {
 export type WorkspaceUITools = {
   html_render: { input: HtmlRenderInput; output: HtmlRenderOutput };
   search_records: { input: SearchRecordsInput; output: SearchRecordsOutput };
+  read_record: { input: ReadRecordInput; output: ReadRecordOutput };
   load_skill: { input: LoadSkillInput; output: LoadSkillOutput };
 };
 

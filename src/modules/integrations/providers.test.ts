@@ -41,7 +41,7 @@ describe("providers", () => {
     }
   });
 
-  it("read, show and mark each declared record type, and show no type they do not declare", () => {
+  it("read, trim, show and mark each declared record type, and show no type they do not declare", () => {
     for (const provider of providers) {
       const declared = Object.keys(provider.records?.types ?? {}).toSorted();
       const views = providerViews[provider.id];
@@ -53,6 +53,7 @@ describe("providers", () => {
       expect(Object.keys(views?.types ?? {}).toSorted(), provider.id).toEqual(declared);
       for (const type of declared) {
         expect(provider.records.types[type]?.read, `${provider.id} ${type}`).toBeTypeOf("function");
+        expect(provider.records.types[type]?.trim, `${provider.id} ${type}`).toBeTypeOf("function");
         expect(views?.types[type]?.view, `${provider.id} ${type}`).toBeDefined();
         expect(views?.types[type]?.icon, `${provider.id} ${type}`).toBeDefined();
       }
