@@ -1,0 +1,50 @@
+[
+  {
+    "sha": "2d5381a1a0a9e8717f01e25a0fcafea56147c5af",
+    "filename": ".github/workflows/fixture-checks.yml",
+    "status": "added",
+    "additions": 14,
+    "deletions": 0,
+    "changes": 14,
+    "blob_url": "https://github.com/laserjm/workspace-fixtures/blob/dba3c57ddfe47bde1c174183a4105817ed7ad658/.github%2Fworkflows%2Ffixture-checks.yml",
+    "raw_url": "https://github.com/laserjm/workspace-fixtures/raw/dba3c57ddfe47bde1c174183a4105817ed7ad658/.github%2Fworkflows%2Ffixture-checks.yml",
+    "contents_url": "https://api.github.com/repos/laserjm/workspace-fixtures/contents/.github%2Fworkflows%2Ffixture-checks.yml?ref=dba3c57ddfe47bde1c174183a4105817ed7ad658",
+    "patch": "@@ -0,0 +1,14 @@\n+name: Fixture checks\n+\n+on: [push, pull_request]\n+\n+permissions:\n+  contents: read\n+\n+jobs:\n+  validate:\n+    runs-on: ubuntu-latest\n+    steps:\n+      - uses: actions/checkout@v4\n+      - name: Validate sample JSON\n+        run: python3 -m json.tool samples/launch.json > /dev/null"
+  },
+  {
+    "sha": "b91cf76ded14f25f106d33a8f69e353174c04e33",
+    "filename": "README.md",
+    "status": "modified",
+    "additions": 18,
+    "deletions": 1,
+    "changes": 19,
+    "blob_url": "https://github.com/laserjm/workspace-fixtures/blob/dba3c57ddfe47bde1c174183a4105817ed7ad658/README.md",
+    "raw_url": "https://github.com/laserjm/workspace-fixtures/raw/dba3c57ddfe47bde1c174183a4105817ed7ad658/README.md",
+    "contents_url": "https://api.github.com/repos/laserjm/workspace-fixtures/contents/README.md?ref=dba3c57ddfe47bde1c174183a4105817ed7ad658",
+    "patch": "@@ -1 +1,18 @@\n-# workspace-fixtures\n+# Workspace fixtures\n+\n+Public, synthetic GitHub data for the recorded provider tests in\n+[workspace-prototype](https://github.com/laserjm/workspace-prototype), seeded for\n+[issue 55](https://github.com/laserjm/workspace-prototype/issues/55).\n+\n+The issues and pull requests here are deliberate test cases, not a project backlog.\n+Keep the open issue and draft pull request in their seeded states. Do not put\n+credentials or private work in this repository.\n+\n+`samples/launch.json` and `docs/launch-checklist.md` give the merged pull request\n+several readable changed files. The **Fixture checks** workflow validates the JSON\n+on pushes and pull requests. A separate seeded commit status exercises the other\n+CI response read by the provider.\n+\n+The downloaded API answers live beside the GitHub provider in\n+`workspace-prototype/src/modules/integrations/providers/github/fixtures/`.\n+Its README records the commands needed to capture fresh answers."
+  },
+  {
+    "sha": "97f7bd98dae94b49bae24bcf4dee7acf91600a98",
+    "filename": "docs/launch-checklist.md",
+    "status": "added",
+    "additions": 11,
+    "deletions": 0,
+    "changes": 11,
+    "blob_url": "https://github.com/laserjm/workspace-fixtures/blob/dba3c57ddfe47bde1c174183a4105817ed7ad658/docs%2Flaunch-checklist.md",
+    "raw_url": "https://github.com/laserjm/workspace-fixtures/raw/dba3c57ddfe47bde1c174183a4105817ed7ad658/docs%2Flaunch-checklist.md",
+    "contents_url": "https://api.github.com/repos/laserjm/workspace-fixtures/contents/docs%2Flaunch-checklist.md?ref=dba3c57ddfe47bde1c174183a4105817ed7ad658",
+    "patch": "@@ -0,0 +1,11 @@\n+# Launch checklist\n+\n+This checklist is synthetic sample content for GitHub provider tests.\n+\n+- [x] Write documentation\n+- [ ] Confirm release owner\n+- [ ] Publish announcement\n+\n+## Rollback\n+\n+Keep the previous release available until the launch has been checked."
+  },
+  {
+    "sha": "1dabdba3b8c26e19fbdbc64114281f12409876ae",
+    "filename": "samples/launch.json",
+    "status": "added",
+    "additions": 9,
+    "deletions": 0,
+    "changes": 9,
+    "blob_url": "https://github.com/laserjm/workspace-fixtures/blob/dba3c57ddfe47bde1c174183a4105817ed7ad658/samples%2Flaunch.json",
+    "raw_url": "https://github.com/laserjm/workspace-fixtures/raw/dba3c57ddfe47bde1c174183a4105817ed7ad658/samples%2Flaunch.json",
+    "contents_url": "https://api.github.com/repos/laserjm/workspace-fixtures/contents/samples%2Flaunch.json?ref=dba3c57ddfe47bde1c174183a4105817ed7ad658",
+    "patch": "@@ -0,0 +1,9 @@\n+{\n+  \"name\": \"Workspace sandbox launch\",\n+  \"format\": \"markdown\",\n+  \"tasks\": [\n+    { \"title\": \"Write documentation\", \"done\": true },\n+    { \"title\": \"Confirm release owner\", \"done\": false },\n+    { \"title\": \"Publish announcement\", \"done\": false }\n+  ]\n+}"
+  }
+]

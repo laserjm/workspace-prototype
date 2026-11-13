@@ -356,6 +356,14 @@ into `Source`s, the scope's records and the records route. The sample records ar
 provider's `data.ts`; the stored threads' sample ids moved to `sample:<product>` in
 `drizzle/0006_rename-sample-source-ids.sql`. Unit tests that read sources swap the connection
 query for `tests/support/connections.ts` (the sample connection alone), so they need no Postgres.
+
+The GitHub provider's `fixtures/` holds plain JSON answers captured from the public
+`laserjm/workspace-fixtures` sandbox, with refresh commands and the seeded cases in its README.
+They cover the user, repositories, searches, issues and pull requests (including review comments,
+changed files, commit statuses and Actions runs). Only public repository data is captured;
+account-only profile fields and credentials are excluded. These are test data for ADR 0003's
+recorded-answer approach, not a registered provider or an app connection. Replay support and
+the sample provider's removal belong to the later ADR 0003 implementation.
 **Enforced by.** `integrations/providers.test.ts` (every provider in the registry: unique ids, a
 way to connect, a base URL and `verify` when it takes a credential, sources in a declared
 product, records read back by id in order, nothing for an unknown key);

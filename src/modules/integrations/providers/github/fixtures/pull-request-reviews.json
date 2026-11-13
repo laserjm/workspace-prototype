@@ -1,0 +1,44 @@
+[
+  {
+    "id": 5889602645,
+    "node_id": "PRR_kwDOVs_Kes8AAAABXww0VQ",
+    "user": {
+      "login": "laserjm",
+      "id": 58994012,
+      "node_id": "MDQ6VXNlcjU4OTk0MDEy",
+      "avatar_url": "https://avatars.githubusercontent.com/u/58994012?u=c39ae64fad41cbe436fbc1e59f26492d4708b986&v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/laserjm",
+      "html_url": "https://github.com/laserjm",
+      "followers_url": "https://api.github.com/users/laserjm/followers",
+      "following_url": "https://api.github.com/users/laserjm/following{/other_user}",
+      "gists_url": "https://api.github.com/users/laserjm/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/laserjm/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/laserjm/subscriptions",
+      "organizations_url": "https://api.github.com/users/laserjm/orgs",
+      "repos_url": "https://api.github.com/users/laserjm/repos",
+      "events_url": "https://api.github.com/users/laserjm/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/laserjm/received_events",
+      "type": "User",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "body": "Synthetic fixture review: the sample includes documentation, task data, and a CI workflow. This is a comment review by the author, not an independent approval.",
+    "state": "COMMENTED",
+    "html_url": "https://github.com/laserjm/workspace-fixtures/pull/3#pullrequestreview-5889602645",
+    "pull_request_url": "https://api.github.com/repos/laserjm/workspace-fixtures/pulls/3",
+    "author_association": "OWNER",
+    "is_copilot_code_review": false,
+    "copilot_code_review_effort": null,
+    "_links": {
+      "html": {
+        "href": "https://github.com/laserjm/workspace-fixtures/pull/3#pullrequestreview-5889602645"
+      },
+      "pull_request": {
+        "href": "https://api.github.com/repos/laserjm/workspace-fixtures/pulls/3"
+      }
+    },
+    "submitted_at": "2026-11-13T10:42:49Z",
+    "commit_id": "dba3c57ddfe47bde1c174183a4105817ed7ad658"
+  }
+]
