@@ -3,17 +3,18 @@
 Plain GitHub REST answers for the GitHub provider's tests (ADR 0003 §5): one response body per
 file, no headers, no token. They come from the public sandbox
 [laserjm/workspace-fixtures](https://github.com/laserjm/workspace-fixtures), whose records are
-made by its [`seed/seed.sh`](https://github.com/laserjm/workspace-fixtures/blob/main/seed/README.md)
-and labelled `fixture`:
+made by its `seed/seed.sh` ([laserjm/workspace-fixtures#10](https://github.com/laserjm/workspace-fixtures/pull/10))
+and labelled `fixture` plus one `case/<name>`:
 
-| Record | Case | Files |
-| --- | --- | --- |
-| [#6](https://github.com/laserjm/workspace-fixtures/issues/6) | open issue, 3 comments | `issue.json`, `issue-comments.json` |
-| [#7](https://github.com/laserjm/workspace-fixtures/issues/7) | closed as not planned | `issue-not-planned.json` |
-| [#8](https://github.com/laserjm/workspace-fixtures/pull/8) | merged; a review, an inline comment, 4 files; on its head two Actions runs and two commit statuses (one failing) | `pull-request*.json` |
-| [#9](https://github.com/laserjm/workspace-fixtures/pull/9) | open draft | `pull-request-draft.json` |
+| Record | Label | Case | Files |
+| --- | --- | --- | --- |
+| [#6](https://github.com/laserjm/workspace-fixtures/issues/6) | `case/open-issue` | open issue, 3 comments | `issue.json`, `issue-comments.json` |
+| [#7](https://github.com/laserjm/workspace-fixtures/issues/7) | `case/not-planned` | closed as not planned | `issue-not-planned.json` |
+| [#8](https://github.com/laserjm/workspace-fixtures/pull/8) | `case/merged-pr` | merged; a review, an inline comment, 4 files; on its head two Actions runs and two commit statuses (one failing) | `pull-request*.json` |
+| [#9](https://github.com/laserjm/workspace-fixtures/pull/9) | `case/draft-pr` | open draft | `pull-request-draft.json` |
 
-`fixtures.test.ts` beside this folder checks the files against this table and the lines below.
+`fixtures.test.ts` beside this folder checks that each file has its line below, finds each case by
+its label (not its number) and checks its state.
 
 ## Capture again
 
@@ -22,10 +23,11 @@ fails when a line and a file don't match.
 
 ```bash
 get() { gh api -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28' "$@"; }
+head=$(get repos/laserjm/workspace-fixtures/pulls/8 --jq .head.sha)
 get user --jq 'del(.email, .notification_email, .private_gists, .total_private_repos, .owned_private_repos, .disk_usage, .collaborators, .two_factor_authentication, .plan)' > user.json
 get 'user/repos?visibility=public&affiliation=owner&per_page=100' --jq '[.[] | select(.full_name == "laserjm/workspace-fixtures")]' > repositories.json
 get -X GET search/issues -f q='repo:laserjm/workspace-fixtures' -f sort=updated -f order=desc -F per_page=20 > search.json
-get -X GET search/issues -f q='repo:laserjm/workspace-fixtures is:open involves:@me' -f sort=updated -f order=desc -F per_page=20 > search-involves-me.json
+get -X GET search/issues -f q='repo:laserjm/workspace-fixtures involves:@me' -f sort=updated -f order=desc -F per_page=20 > search-involves-me.json
 get -X GET search/issues -f q='repo:laserjm/workspace-fixtures is:issue is:open status in:title,body' -f sort=updated -f order=desc -F per_page=20 > search-narrowed.json
 get repos/laserjm/workspace-fixtures/issues/6 > issue.json
 get 'repos/laserjm/workspace-fixtures/issues/6/comments?per_page=100' > issue-comments.json
@@ -35,10 +37,15 @@ get 'repos/laserjm/workspace-fixtures/issues/8/comments?per_page=100' > pull-req
 get 'repos/laserjm/workspace-fixtures/pulls/8/reviews?per_page=100' > pull-request-reviews.json
 get 'repos/laserjm/workspace-fixtures/pulls/8/comments?per_page=100' > pull-request-review-comments.json
 get 'repos/laserjm/workspace-fixtures/pulls/8/files?per_page=100' > pull-request-files.json
-get repos/laserjm/workspace-fixtures/commits/7b55399cea249bb3579d78746cbb25ca5567ec80/status > pull-request-status.json
-get 'repos/laserjm/workspace-fixtures/actions/runs?head_sha=7b55399cea249bb3579d78746cbb25ca5567ec80' > pull-request-workflow-runs.json
+get repos/laserjm/workspace-fixtures/commits/$head/status > pull-request-status.json
+get "repos/laserjm/workspace-fixtures/actions/runs?head_sha=$head" > pull-request-workflow-runs.json
 get repos/laserjm/workspace-fixtures/pulls/9 > pull-request-draft.json
 ```
+
+The three searches are the ones #43 describes, with "Include closed" on: the two that run
+before typing (`involves:@me`, then the same scope without it) and one narrowed by a repository
+word (`workspace-fixtures status` becomes `repo:… status in:title,body`) with the issue toggle and
+"Include closed" off. The JSON is formatted with `python3 -m json.tool --no-ensure-ascii`.
 
 Two answers are cut down before they are saved, so that nothing private reaches this public
 repository:

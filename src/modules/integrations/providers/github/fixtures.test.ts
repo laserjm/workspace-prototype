@@ -14,9 +14,11 @@ const captureLines = [...readme.matchAll(/^get (.+) > ([\w-]+\.json)$/gm)].map(
 );
 const jsonFiles = readdirSync(folder).filter((file) => file.endsWith(".json"));
 
-/** One saved answer, typed only as far as these checks read it. */
-function answer<T>(file: string): T {
-  return JSON.parse(readFileSync(path.join(folder, file), "utf8")) as T;
+const textOf = (file: string) => readFileSync(path.join(folder, file), "utf8");
+
+/** One recorded answer, typed only as far as these checks read it. */
+function recorded<T>(file: string): T {
+  return JSON.parse(textOf(file)) as T;
 }
 
 type Labelled = { labels: { name: string }[] };
@@ -41,46 +43,44 @@ describe("the recorded GitHub answers", () => {
 
   it("save no token and no Authorization header", () => {
     const secret = /authorization|bearer |gh[opsur]_[A-Za-z0-9]{20}|github_pat_/i;
-    const leaking = jsonFiles.filter((file) =>
-      secret.test(readFileSync(path.join(folder, file), "utf8")),
-    );
+    const leaking = jsonFiles.filter((file) => secret.test(textOf(file)));
     expect(leaking).toEqual([]);
   });
 
   it("hold the open issue with its three comments", () => {
-    const issue = answer<Issue>("issue.json");
+    const issue = recorded<Issue>("issue.json");
     expect(isCase("open-issue")(issue)).toBe(true);
     expect(issue).toMatchObject({
       title: "Sample: publish a status page for the prototype",
       state: "open",
     });
-    expect(answer<unknown[]>("issue-comments.json")).toHaveLength(3);
+    expect(recorded<unknown[]>("issue-comments.json")).toHaveLength(3);
   });
 
   it("hold the issue closed as not planned", () => {
-    const issue = answer<Issue>("issue-not-planned.json");
+    const issue = recorded<Issue>("issue-not-planned.json");
     expect(isCase("not-planned")(issue)).toBe(true);
     expect(issue).toMatchObject({ state: "closed", state_reason: "not_planned" });
   });
 
   it("hold the draft pull request", () => {
-    const pull = answer<PullRequest>("pull-request-draft.json");
+    const pull = recorded<PullRequest>("pull-request-draft.json");
     expect(isCase("draft-pr")(pull)).toBe(true);
     expect(pull).toMatchObject({ state: "open", draft: true });
   });
 
   it("hold the merged pull request with its review, comments and changed files", () => {
-    const pull = answer<PullRequest>("pull-request.json");
+    const pull = recorded<PullRequest>("pull-request.json");
     expect(isCase("merged-pr")(pull)).toBe(true);
     expect(pull).toMatchObject({ state: "closed", merged: true });
-    expect(answer<{ state: string }[]>("pull-request-reviews.json")).toEqual([
+    expect(recorded<{ state: string }[]>("pull-request-reviews.json")).toEqual([
       expect.objectContaining({ state: "COMMENTED" }),
     ]);
-    expect(answer<{ path: string }[]>("pull-request-review-comments.json")).toEqual([
+    expect(recorded<{ path: string }[]>("pull-request-review-comments.json")).toEqual([
       expect.objectContaining({ path: "status/components.json" }),
     ]);
-    expect(answer<unknown[]>("pull-request-comments.json")).toHaveLength(1);
-    const files = answer<{ filename: string; status: string }[]>("pull-request-files.json");
+    expect(recorded<unknown[]>("pull-request-comments.json")).toHaveLength(1);
+    const files = recorded<{ filename: string; status: string }[]>("pull-request-files.json");
     expect(files.map(({ filename, status }) => `${status} ${filename}`).toSorted()).toEqual([
       "added status/README.md",
       "added status/components.json",
@@ -90,8 +90,8 @@ describe("the recorded GitHub answers", () => {
   });
 
   it("hold Actions runs and commit statuses for the merged pull request's head", () => {
-    const { sha } = answer<PullRequest>("pull-request.json").head;
-    const status = answer<{ sha: string; state: string; statuses: { context: string; state: string }[] }>(
+    const { sha } = recorded<PullRequest>("pull-request.json").head;
+    const status = recorded<{ sha: string; state: string; statuses: { context: string; state: string }[] }>(
       "pull-request-status.json",
     );
     expect(status).toMatchObject({ sha, state: "failure" });
@@ -99,7 +99,7 @@ describe("the recorded GitHub answers", () => {
       "fixtures/links failure",
       "fixtures/schema success",
     ]);
-    const { workflow_runs: runs } = answer<{ workflow_runs: { head_sha: string }[] }>(
+    const { workflow_runs: runs } = recorded<{ workflow_runs: { head_sha: string }[] }>(
       "pull-request-workflow-runs.json",
     );
     expect(runs.length).toBeGreaterThan(0);
@@ -107,7 +107,7 @@ describe("the recorded GitHub answers", () => {
   });
 
   it("hold a search page with every seeded state", () => {
-    const { items } = answer<Search>("search.json");
+    const { items } = recorded<Search>("search.json");
     const stateOf = (name: string) => {
       const item = items.find(isCase(name));
       if (!item) return undefined;
@@ -120,22 +120,21 @@ describe("the recorded GitHub answers", () => {
     ).toEqual(["open", "not_planned", "draft", "merged"]);
   });
 
-  it("hold the involves:@me search, open records only, and a search narrowed to the open issue", () => {
-    const involved = answer<Search>("search-involves-me.json").items;
-    expect(involved.every((item) => item.state === "open")).toBe(true);
+  it("hold the involves:@me search and a search narrowed to the open issue", () => {
+    const involved = recorded<Search>("search-involves-me.json").items;
     expect(involved.some(isCase("open-issue"))).toBe(true);
     expect(involved.some(isCase("draft-pr"))).toBe(true);
-    const narrowed = answer<Search>("search-narrowed.json").items;
+    const narrowed = recorded<Search>("search-narrowed.json").items;
     expect(narrowed).toHaveLength(1);
     expect(isCase("open-issue")(narrowed[0]!)).toBe(true);
   });
 
   it("hold the user and the sandbox repository, without account-only fields", () => {
-    const user = answer<Record<string, unknown>>("user.json");
+    const user = recorded<Record<string, unknown>>("user.json");
     expect(user).toHaveProperty("login", "laserjm");
     expect(user).not.toHaveProperty("email");
     expect(user).not.toHaveProperty("total_private_repos");
-    expect(answer<{ full_name: string; private: boolean }[]>("repositories.json")).toEqual([
+    expect(recorded<{ full_name: string; private: boolean }[]>("repositories.json")).toEqual([
       expect.objectContaining({ full_name: "laserjm/workspace-fixtures", private: false }),
     ]);
   });
