@@ -9,10 +9,11 @@ import {
   restorePanel,
   setShown,
   storedPanel,
+  tabsOf,
+  unpinView,
   viewIdOf,
   type PanelState,
   type ViewTarget,
-  unpinView,
 } from "./record-panel";
 
 const ACME = "8f0e1c5a-4b9d-4e2f-9a37-2c6d1e0b7f41";
@@ -174,8 +175,7 @@ describe("a thread's panel when it opens", () => {
 
 describe("pinning a view", () => {
   const three = openSent(EMPTY, [issue(1), issue(2), issue(3)], { wide: true });
-  /** The views shown as tabs: every open view but the pinned one. */
-  const tabIds = (state: PanelState) => openIds(state).filter((id) => id !== state.pinnedId);
+  const tabIds = (state: PanelState) => tabsOf(state).map((view) => view.id);
 
   it("pins it above the tabs, which no longer list it, and keeps it open", () => {
     const state = pinView(three, idOf(issue(3)));
@@ -258,11 +258,29 @@ describe("the stored panel", () => {
   });
 
   it("migrates what the version before stored, with nothing pinned", () => {
-    const opened = openSent(EMPTY, [issue(1), issue(2)], { wide: true });
-    // What version 1 wrote: the same panel, without a pin.
-    const { views, activeId, shown, rearranged } = opened;
-    const before = { version: 1, views, activeId, shown, rearranged };
-    expect(restorePanel(JSON.parse(JSON.stringify(before)))).toEqual(opened);
+    const view = (number: number) => ({
+      id: `github.issue-view:${ACME}:acme/web#${number}`,
+      connectionId: ACME,
+      provider: "github",
+      type: "issue",
+      key: `acme/web#${number}`,
+      snapshot: { label: `web#${number}`, title: `Issue ${number}`, state: "open" },
+    });
+    // As version 1 wrote it, before there was a pin.
+    const before = {
+      version: 1,
+      views: [view(1), view(2)],
+      activeId: view(2).id,
+      shown: true,
+      rearranged: false,
+    };
+    expect(restorePanel(before)).toEqual({
+      views: [view(1), view(2)],
+      activeId: view(2).id,
+      pinnedId: null,
+      shown: true,
+      rearranged: false,
+    });
   });
 
   it("drops a pin on a view it does not hold, and a focus on the pinned view", () => {

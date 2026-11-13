@@ -1,6 +1,7 @@
 // The record panel's state for one thread (ADR 0003 §2, #40, #51, #66): which record views are
 // open, which one is pinned above the tabs, which one is shown below them, whether the panel is,
-// and whether the user rearranged it since their last question. Browser-safe and pure; `RecordPanelProvider` keeps it per thread in `localStorage`.
+// and whether the user rearranged it since their last question. Browser-safe and pure;
+// `RecordPanelProvider` keeps it per thread in `localStorage`.
 // Like the other pure rules here it imports `integrations` as types only: the view kind comes in
 // as data, derived by the components with `viewKindOf`.
 import { z } from "zod";
@@ -32,12 +33,19 @@ export type PanelState = {
   /** The view pinned to the top half of the panel, one at a time; none when nothing is pinned. */
   pinnedId: string | null;
   shown: boolean;
-  /** The user opened, focused or closed something, or hid the panel, since their last question. */
+  /**
+   * The user opened, focused, closed, pinned or unpinned something, or hid the panel, since their
+   * last question.
+   */
   rearranged: boolean;
 };
 
 export const viewIdOf = (kind: string, connectionId: string, key: string) =>
   `${kind}:${connectionId}:${key}`;
+
+/** The views that have a tab: every open view but the pinned one, in their order. */
+export const tabsOf = (state: Pick<PanelState, "views" | "pinnedId">) =>
+  state.views.filter((view) => view.id !== state.pinnedId);
 
 function viewOf({ kind, connection, item }: ViewTarget): OpenView {
   return {
@@ -97,17 +105,20 @@ export function openSent(
   { wide }: { wide: boolean },
 ): PanelState {
   const takeFocus = !state.rearranged && targets.length > 0;
-  const first = targets[0] && viewOf(targets[0]).id;
+  const firstId = targets[0] ? viewOf(targets[0]).id : null;
   return {
     ...state,
     views: withViews(state.views, targets),
-    activeId: takeFocus && first !== state.pinnedId ? first! : state.activeId,
+    activeId: takeFocus && firstId !== state.pinnedId ? firstId : state.activeId,
     shown: state.shown || (takeFocus && wide),
     rearranged: false,
   };
 }
 
-/** Shows one view below the tabs, or with none the Attached tab. Not the pinned view: it has no tab. */
+/**
+ * Shows one view below the tabs, or with none the Attached tab. Not the pinned view: it has no
+ * tab.
+ */
 export function focusView(state: PanelState, id: string | null): PanelState {
   const known = id === null || state.views.some((view) => view.id === id);
   return known && id !== state.pinnedId ? { ...state, activeId: id, rearranged: true } : state;
