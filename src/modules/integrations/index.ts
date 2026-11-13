@@ -11,11 +11,27 @@ export type {
   ProviderUnreachable,
   ProductPresentation,
   Provider,
+  RateLimited,
+  RecordDeclarations,
+  RecordError,
+  RecordFilter,
   RecordReader,
+  RecordSearchPage,
+  RecordSearchQuery,
+  RecordSummary,
+  RecordTone,
+  RecordTypeDeclaration,
   SourceRef,
   SourceSummary,
 } from "./contracts";
-export { defineProvider, expiryLabel } from "./contracts";
+export {
+  defineProvider,
+  expiryLabel,
+  pluralLabels,
+  RECORD_TONES,
+  toneOf,
+} from "./contracts";
 export { IntegrationsProvider } from "./components/integrations-provider";
+export { ProviderMark, RecordKindMark } from "./components/record-marks";
 export { SourcesSettingsPanel } from "./components/sources-settings-panel";
 export { useIntegrations } from "./components/use-integrations";

@@ -160,7 +160,9 @@ function ConnectionRow({
       </div>
       {error && error._tag !== "NotFound" && (
         <p className="text-2xs text-destructive-foreground" role="alert">
-          {error._tag === "ProviderUnreachable" ? error.message : errorMessage(error)}
+          {error._tag === "ProviderUnreachable" || error._tag === "RateLimited"
+            ? error.message
+            : errorMessage(error)}
         </p>
       )}
     </li>

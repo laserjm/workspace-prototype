@@ -147,6 +147,19 @@ export const providerUnreachable = (message: string): ProviderUnreachable => ({
   message,
 });
 
+/** The provider's rate limit is reached; the credential was not judged. `message` is for the user. */
+export type RateLimited = {
+  readonly _tag: "RateLimited";
+  readonly message: string;
+  /** ISO 8601. */
+  readonly retryAt: string;
+};
+export const rateLimited = (message: string, retryAt: string): RateLimited => ({
+  _tag: "RateLimited",
+  message,
+  retryAt,
+});
+
 /**
  * A system the workspace can connect to. Code, not rows: one folder in ./providers/ and one line
  * in ../providers.ts. Capabilities are optional, so a provider has records, tools or both.
@@ -161,25 +174,125 @@ export type Provider = {
   /** Checks a credential and says whose it is. Required for a provider one connects to. */
   verify?: (
     access: ProviderAccess,
-  ) => Promise<Result<VerifiedAccount, CredentialRejected | ProviderUnreachable>>;
-  /** Sources and records a thread can browse and attach. */
-  records?: {
+  ) => Promise<
+    Result<VerifiedAccount, CredentialRejected | ProviderUnreachable | RateLimited>
+  >;
+  /** Sources a thread can browse and fix as its scope (ADR 0002; ADR 0003 retires them). */
+  sources?: {
     /** Each product's presentation, by the `product` its sources name. */
     products: Readonly<Record<string, ProductPresentation>>;
     reader: RecordReader;
   };
+  /** The records a user can find and attach to a question (ADR 0003 §3). */
+  records?: ProviderRecords;
 };
+
+// --- Records (ADR 0003): what a provider holds that a question can be about. ---
+
+/** How a record's state is drawn. An unknown state draws `neutral`, so an old snapshot never breaks. */
+export const RECORD_TONES = ["open", "draft", "done", "closed", "neutral"] as const;
+export type RecordTone = (typeof RECORD_TONES)[number];
+
+/** One record as a search lists it; an attached item's snapshot is `{ label, title, state }` of it. */
+export type RecordSummary = {
+  connectionId: string;
+  /** One of the provider's declared record types, e.g. "pull-request". */
+  type: string;
+  /** The provider's own reference, parsed only by the provider, e.g. "acme/web#482". */
+  key: string;
+  /** Short, e.g. "web#482". */
+  label: string;
+  title: string;
+  /** One of the type's declared states, e.g. "merged". */
+  state: string;
+  /** ISO 8601. */
+  updatedAt: string;
+  /** Where it lives, e.g. "acme/web #482". */
+  where: string;
+};
+
+/** Why a provider could not answer about records. Providers return it, never throw it. */
+export type RecordError =
+  | { kind: "not_found" }
+  | { kind: "no_access" }
+  | { kind: "needs_reconnect" }
+  /** `retryAt` is ISO 8601. */
+  | { kind: "rate_limited"; retryAt: string }
+  | { kind: "unreachable" }
+  | { kind: "invalid_query"; message: string };
+
+export type RecordStateDeclaration = { label: string; tone: RecordTone };
+
+/** One kind of record a provider holds, e.g. GitHub's pull requests. */
+export type RecordTypeDeclaration = {
+  /** "pull request", "pull requests": the dialog's title and type toggle are built from them. */
+  singular: string;
+  plural: string;
+  states: Readonly<Record<string, RecordStateDeclaration>>;
+};
+
+/** The generic filters the attach dialog offers; a provider says which its search supports. */
+export type RecordFilter = "type" | "includeClosed";
+
+/** What the attach dialog asks a provider's search for. */
+export type RecordSearchQuery = {
+  /** The words typed; none before typing. */
+  text?: string;
+  /** One declared type; all of them when left out. */
+  type?: string;
+  includeClosed?: boolean;
+  /** The `next` of the page before, opaque to everyone but the provider. */
+  cursor?: string;
+};
+
+export type RecordSearchPage = {
+  results: RecordSummary[];
+  /** The cursor of the next page, when there is one. */
+  next?: string;
+  total?: number;
+  /** What the connection reaches, e.g. "Organisation acme, 4 repositories". */
+  reach?: string;
+};
+
+/** The records part of a provider's manifest. */
+export type ProviderRecords = {
+  types: Readonly<Record<string, RecordTypeDeclaration>>;
+  filters: readonly RecordFilter[];
+  search: (
+    access: ConnectionAccess,
+    query: RecordSearchQuery,
+  ) => Promise<Result<RecordSearchPage, RecordError>>;
+};
+
+/** The records declaration as the browser gets it: no code. */
+export type RecordDeclarations = Pick<ProviderRecords, "types" | "filters">;
+
+/** The tone a record in `state` is drawn in; `neutral` for anything undeclared. */
+export function toneOf(
+  declarations: RecordDeclarations | undefined,
+  type: string,
+  state: string,
+): RecordTone {
+  return declarations?.types[type]?.states[state]?.tone ?? "neutral";
+}
+
+/** "issues and pull requests": the declared types' plural labels, for a title. */
+export function pluralLabels(declarations: RecordDeclarations): string {
+  const plurals = Object.values(declarations.types).map((type) => type.plural);
+  if (plurals.length <= 1) return plurals.join("");
+  return `${plurals.slice(0, -1).join(", ")} and ${plurals.at(-1)}`;
+}
 
 /** Declares a provider; only checks it against the contract. */
 export function defineProvider<const P extends Provider>(provider: P): P {
   return provider;
 }
 
-/** What a provider offers the connect form: the provider without its code. */
+/** What a provider offers the browser: the provider without its code. */
 export type ProviderChoice = Pick<
   Provider,
   "id" | "name" | "description" | "auth" | "baseUrl"
->;
+> & { records?: RecordDeclarations };
 
 export type ConnectionStatus = "active" | "needs_reconnect";
 

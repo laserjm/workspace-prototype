@@ -9,6 +9,13 @@ const moduleEntryPoints = {
     "Import another module through its index.ts or server.ts (ARCHITECTURE.md, \"Modules\").",
 };
 
+// `records` builds on `integrations` and on no other module (ARCHITECTURE.md, "Modules").
+const recordsDependencies = {
+  regex: "^@/modules/(?!integrations(/server)?$).+",
+  message:
+    "The records module imports only @/modules/integrations and @/modules/integrations/server (ARCHITECTURE.md, \"Modules\").",
+};
+
 // The auth library stays behind lib/auth/ (ARCHITECTURE.md, "Sign-in").
 const authLibrary = {
   group: ["better-auth", "better-auth/*"],
@@ -56,6 +63,18 @@ export default defineConfig([
       "no-restricted-imports": [
         "error",
         { patterns: [moduleEntryPoints, authLibrary] },
+      ],
+    },
+  },
+  {
+    files: ["src/modules/records/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [moduleEntryPoints, authLibrary, recordsDependencies],
+          paths: [secretsTable],
+        },
       ],
     },
   },

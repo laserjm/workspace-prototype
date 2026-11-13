@@ -1,9 +1,10 @@
 import { defineProvider } from "../../contracts";
 import { verifyGithubToken } from "./api";
+import { githubRecordTypes, searchGithubRecords } from "./records";
 
 /**
  * GitHub: connected with a fine-grained personal access token for now (ADR 0002, phase 2).
- * Repositories, issues and pull requests come with its record reader (phase 3).
+ * Its records are the issues and pull requests of every repository the token reads (ADR 0003).
  */
 export const github = defineProvider({
   id: "github",
@@ -23,4 +24,9 @@ export const github = defineProvider({
     placeholder: "https://github.example.com/api/v3",
   },
   verify: verifyGithubToken,
+  records: {
+    types: githubRecordTypes,
+    filters: ["type", "includeClosed"],
+    search: searchGithubRecords,
+  },
 });

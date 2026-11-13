@@ -3,9 +3,17 @@ import { bug } from "@/lib/errors";
 import type { User } from "@/lib/auth/user";
 import { accessFor } from "./access";
 import type { RecordPage, RecordQuery, SourceRecord } from "@/modules/sources";
-import type { ProductPresentation, SourceRef, SourceSummary } from "./contracts";
+import type {
+  ProductPresentation,
+  RecordError,
+  RecordSearchPage,
+  RecordSearchQuery,
+  SourceRef,
+  SourceSummary,
+} from "./contracts";
+import { err, type Result } from "@/lib/result";
 import { findProvider } from "./providers";
-import { listConnections } from "./queries";
+import { listConnections, markNeedsReconnect } from "./queries";
 
 /** A source of one of the user's connections, with its product's presentation. */
 export type ConnectedSource = {
@@ -19,7 +27,7 @@ async function recordsOf(user: User, connectionId: string) {
   const connection = (await listConnections(user)).find(
     (item) => item.id === connectionId,
   );
-  const records = connection && findProvider(connection.providerId)?.records;
+  const records = connection && findProvider(connection.providerId)?.sources;
   const access = records && (await accessFor(user, connection));
   return access && { access, ...records };
 }
@@ -30,7 +38,7 @@ export async function listConnectedSources(
 ): Promise<ConnectedSource[]> {
   const perConnection = await Promise.all(
     (await listConnections(user)).map(async (connection) => {
-      const records = findProvider(connection.providerId)?.records;
+      const records = findProvider(connection.providerId)?.sources;
       const access = records && (await accessFor(user, connection));
       if (!records || !access) return [];
       const summaries = await records.reader.listSources(access);
@@ -64,4 +72,26 @@ export async function getConnectionRecords(
 ): Promise<SourceRecord[]> {
   const records = await recordsOf(user, connectionId);
   return records ? records.reader.getRecords(records.access, sourceKey, ids) : [];
+}
+
+/**
+ * Searches the records of one of the user's connections (ADR 0003 §3). Another user's connection,
+ * or one whose provider holds no records, is `not_found`. A credential the provider refuses marks
+ * the connection `needs_reconnect`.
+ */
+export async function searchRecords(
+  user: User,
+  connectionId: string,
+  query: RecordSearchQuery,
+): Promise<Result<RecordSearchPage, RecordError>> {
+  const connection = (await listConnections(user)).find(
+    (item) => item.id === connectionId,
+  );
+  const records = connection && findProvider(connection.providerId)?.records;
+  const access = records && (await accessFor(user, connection));
+  if (!records || !access) return err({ kind: "not_found" });
+  const page = await records.search(access, query);
+  if (!page.ok && page.error.kind === "needs_reconnect")
+    await markNeedsReconnect(user, connectionId);
+  return page;
 }

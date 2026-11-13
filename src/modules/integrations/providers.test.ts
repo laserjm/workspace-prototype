@@ -1,6 +1,7 @@
 // The provider contract, checked for every provider in the registry: what a new provider folder
 // must satisfy before it ships (docs/adr/0002, "The pattern a provider author follows").
 import { describe, expect, it } from "vitest";
+import { RECORD_TONES } from "./contracts";
 import { providers } from "./providers";
 
 const access = { connectionId: "test", baseUrl: "" };
@@ -25,11 +26,26 @@ describe("providers", () => {
         expect(provider.baseUrl.default, provider.id).toMatch(/^https:\/\/[^/]+.*[^/]$/);
     }
   });
+
+  it("declare record types with labels and states, each state in a tone from the set", () => {
+    for (const provider of providers) {
+      if (!provider.records) continue;
+      const types = Object.entries(provider.records.types);
+      expect(types.length, provider.id).toBeGreaterThan(0);
+      for (const [type, declared] of types) {
+        expect(declared.singular, `${provider.id} ${type}`).not.toBe("");
+        expect(declared.plural, `${provider.id} ${type}`).not.toBe("");
+        expect(Object.keys(declared.states).length, `${provider.id} ${type}`).toBeGreaterThan(0);
+        for (const [state, { tone }] of Object.entries(declared.states))
+          expect(RECORD_TONES, `${provider.id} ${type} ${state}`).toContain(tone);
+      }
+    }
+  });
 });
 
 describe.each(
   providers.flatMap((provider) =>
-    provider.records ? [{ id: provider.id, records: provider.records }] : [],
+    provider.sources ? [{ id: provider.id, records: provider.sources }] : [],
   ),
 )("the $id record reader", ({ records }) => {
   it("lists sources with unique keys, each in a declared product", async () => {
