@@ -220,3 +220,46 @@ export const searchRecordsOutputSchema = z.union([
   z.object({ error: recordErrorSchema }),
 ]);
 export type SearchRecordsOutput = z.infer<typeof searchRecordsOutputSchema>;
+
+/** What the model may ask `read_record` for: one record, by reference (ADR 0003 §1). */
+export const readRecordInputSchema = z.object({
+  connectionId: z
+    .string()
+    .min(1)
+    .max(100)
+    .describe("The record's connection: a connectionId from the connections you may use."),
+  type: z
+    .string()
+    .min(1)
+    .max(50)
+    .describe("The provider's record type, e.g. issue or pull-request."),
+  key: z
+    .string()
+    .min(1)
+    .max(200)
+    .describe("The record's key, as an attached item or a search result names it, e.g. acme/web#42."),
+});
+export type ReadRecordInput = z.infer<typeof readRecordInputSchema>;
+
+/**
+ * The record as it is now: its summary with its page, and the provider's own detail trimmed for
+ * the model; or why it cannot be read.
+ */
+export const readRecordOutputSchema = z.union([
+  z.object({
+    summary: recordSummarySchema.extend({
+      url: z.string().describe("The record's page on the provider's site."),
+    }),
+    detail: z
+      .unknown()
+      .describe(
+        "The provider's own detail of the record (see its guide), trimmed: a long text ends with what was cut, and a long list keeps its newest entries and says how many older ones were left out.",
+      ),
+  }),
+  z.object({
+    error: recordErrorSchema.and(
+      z.object({ url: z.string().optional().describe("The record's page, to point the user to.") }),
+    ),
+  }),
+]);
+export type ReadRecordOutput = z.infer<typeof readRecordOutputSchema>;

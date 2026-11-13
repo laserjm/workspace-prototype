@@ -1,31 +1,14 @@
 "use client";
 
 import { Search } from "lucide-react";
-import { useIntegrations, waitLabel, type RecordError } from "@/modules/integrations";
+import { useIntegrations } from "@/modules/integrations";
 import { connectionRefOf, type SearchRecordsInput, type SearchRecordsOutput } from "../contracts";
 import { AttachedItemChip } from "./attached-item-chip";
+import { recordErrorWords } from "./record-error-words";
 import { useRecordPanel } from "./record-panel-provider";
 
 /** How many results show as chips; the rest are counted. */
 const CHIPS_SHOWN = 3;
-
-/** Why a search found nothing, in words. */
-function errorWords(error: RecordError, providerName: string): string {
-  switch (error.kind) {
-    case "not_found":
-      return "the connection was not found";
-    case "no_access":
-      return "this thread has no access to that connection";
-    case "needs_reconnect":
-      return `${providerName} refused the connection’s token; connect it again in Settings`;
-    case "rate_limited":
-      return `${providerName}’s rate limit is reached, try again in ${waitLabel(error.retryAt)}`;
-    case "unreachable":
-      return `${providerName} could not be reached`;
-    case "invalid_query":
-      return `${providerName} could not run the search: ${error.message}`;
-  }
-}
 
 const resultCount = (count: number) => `${count} ${count === 1 ? "result" : "results"}`;
 
@@ -67,7 +50,7 @@ export function RecordSearchCall({
     state === "searching" || !output
       ? `Searching ${what}…`
       : "error" in output
-        ? `Could not search ${what}: ${errorWords(output.error, providerName)}`
+        ? `Could not search ${what}: ${recordErrorWords(output.error, providerName, "the connection was not found")}`
         : `Searched ${what}: ${resultCount(count)}`;
   const ref = connection && connectionRefOf(connection);
   const more = count - CHIPS_SHOWN;

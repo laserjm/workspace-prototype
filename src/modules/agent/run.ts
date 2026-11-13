@@ -58,7 +58,11 @@ const workspaceAgent = new ToolLoopAgent({
   instructions: baseInstructions,
   tools,
   // Replaced on every call by toolsFor; no thread, no allowed connections.
-  toolsContext: { search_records: { connectionIds: [] }, load_skill: { skillIds: [] } },
+  toolsContext: {
+    search_records: { connectionIds: [] },
+    read_record: { connectionIds: [] },
+    load_skill: { skillIds: [] },
+  },
   // Lets the model call a tool or two and then write its reply.
   stopWhen: stepCountIs(5),
   // Built on the server by resolveContext, never from the request, so it is not parsed again.

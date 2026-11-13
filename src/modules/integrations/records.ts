@@ -6,6 +6,7 @@ import type {
   RecordRead,
   RecordSearchPage,
   RecordSearchQuery,
+  RecordType,
 } from "./contracts";
 import { err, ok, type Result } from "@/lib/result";
 import { findProvider } from "./providers";
@@ -37,6 +38,29 @@ export async function readRecord(
   type: string,
   key: string,
 ): Promise<Result<RecordRead, RecordReadRefusal>> {
+  return readWith(user, connectionId, type, key, (detail) => detail);
+}
+
+/**
+ * Reads one record as `readRecord` does, with the detail trimmed for the model by its type's own
+ * `trim` (`read_record`): the trimmed copy is what the agent sees and the conversation stores.
+ */
+export async function readRecordForModel(
+  user: User,
+  connectionId: string,
+  type: string,
+  key: string,
+): Promise<Result<RecordRead, RecordReadRefusal>> {
+  return readWith(user, connectionId, type, key, (detail, declared) => declared.trim(detail));
+}
+
+async function readWith(
+  user: User,
+  connectionId: string,
+  type: string,
+  key: string,
+  shown: (detail: unknown, declared: RecordType) => unknown,
+): Promise<Result<RecordRead, RecordReadRefusal>> {
   const found = await recordsConnection(user, connectionId);
   const declared = found && Object.hasOwn(found.records.types, type) ? found.records.types[type] : undefined;
   if (!found || !declared) return err({ kind: "not_found" });
@@ -49,7 +73,7 @@ export async function readRecord(
     return err({ ...read.error, url });
   }
   const { summary, detail } = read.value;
-  return ok({ summary: { ...summary, url }, detail });
+  return ok({ summary: { ...summary, url }, detail: shown(detail, declared) });
 }
 
 /**

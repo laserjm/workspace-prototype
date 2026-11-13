@@ -27,8 +27,16 @@ describe("tools", () => {
     expect(Object.keys(tools).sort()).toEqual([
       "html_render",
       "load_skill",
+      "read_record",
       "search_records",
     ]);
+  });
+
+  it("reads one record by its connection, type and key", async () => {
+    expect(
+      await accepts("read_record", { connectionId: "c1", type: "issue", key: "acme/web#42" }),
+    ).toBe(true);
+    expect(await accepts("read_record", { connectionId: "c1", key: "acme/web#42" })).toBe(false);
   });
 
   // The name was reused with a new schema (#62): the scope's filters are gone.
@@ -44,6 +52,7 @@ describe("toolsFor", () => {
       activeTools: ["html_render"],
       toolsContext: {
         search_records: { user, connectionIds: [] },
+        read_record: { user, connectionIds: [] },
         load_skill: { skillIds: [] },
       },
     });
@@ -57,7 +66,7 @@ describe("toolsFor", () => {
     });
   });
 
-  it("offers search_records over the connections the server allowed", () => {
+  it("offers search_records and read_record over the connections the server allowed", () => {
     const connection = (connectionId: string) => ({
       connectionId,
       provider: "github",
@@ -72,8 +81,11 @@ describe("toolsFor", () => {
         connections: [connection("c1"), connection("c2")],
       }),
     ).toMatchObject({
-      activeTools: ["html_render", "search_records"],
-      toolsContext: { search_records: { user, connectionIds: ["c1", "c2"] } },
+      activeTools: ["html_render", "search_records", "read_record"],
+      toolsContext: {
+        search_records: { user, connectionIds: ["c1", "c2"] },
+        read_record: { user, connectionIds: ["c1", "c2"] },
+      },
     });
   });
 

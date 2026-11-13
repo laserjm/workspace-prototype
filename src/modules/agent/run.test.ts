@@ -1,5 +1,7 @@
 // runAgent end to end on a mock model: the wiring from the context to the tools the model is
 // offered and to what a tool's execute sees. No gateway, no network.
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { MockLanguageModelV4 } from "ai/test";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
@@ -37,6 +39,14 @@ const reply = () =>
     { type: "text-end", id: "t1" },
     finish("stop"),
   ]);
+
+const fixture = (file: string) =>
+  JSON.parse(
+    readFileSync(
+      path.join(import.meta.dirname, "../integrations/providers/github/fixtures", file),
+      "utf8",
+    ),
+  );
 
 // The test support's connections, without the compose Postgres, and a fake token for GitHub.
 vi.mock("@/modules/integrations/queries", () =>
@@ -255,11 +265,11 @@ describe("runAgent", () => {
     expect(system).not.toContain("## GitHub");
   });
 
-  it("offers search_records for a connection attached whole, and not for one needing reconnecting", async () => {
+  it("offers search_records and read_record for a connection attached whole, and not for one needing reconnecting", async () => {
     const whole = new MockLanguageModelV4({ doStream: [reply()] });
     model.current = whole;
     await run({ modelId: "mock" }, [attaching([{ ...laserjm, items: [] }])]);
-    expect(toolNames(whole, 0).sort()).toEqual(["html_render", "search_records"]);
+    expect(toolNames(whole, 0).sort()).toEqual(["html_render", "read_record", "search_records"]);
 
     await markNeedsReconnect(connectedUser, githubConnection.id);
     const broken = new MockLanguageModelV4({ doStream: [reply()] });
@@ -268,23 +278,25 @@ describe("runAgent", () => {
     expect(toolNames(broken, 0)).toEqual(["html_render"]);
   });
 
-  /** A model that calls search_records with `input`, then replies. */
-  const searching = (input: Record<string, unknown>) =>
+  /** A model that calls `toolName` once for each input, all in one step, then replies. */
+  const calling = (toolName: string, inputs: Record<string, unknown>[]) =>
     new MockLanguageModelV4({
       doStream: [
         step([
           { type: "stream-start", warnings: [] },
-          {
+          ...inputs.map((input, index) => ({
             type: "tool-call",
-            toolCallId: "call-1",
-            toolName: "search_records",
+            toolCallId: `call-${index + 1}`,
+            toolName,
             input: JSON.stringify(input),
-          },
+          })),
           finish("tool-calls"),
         ]),
         reply(),
       ],
     });
+  /** A model that calls search_records with `input`, then replies. */
+  const searching = (input: Record<string, unknown>) => calling("search_records", [input]);
   /** The output of the reply's search_records call. */
   const searchOutput = (conversation: WorkspaceUIMessage[]) =>
     conversation.at(-1)?.parts.find((part) => part.type === "tool-search_records");
@@ -395,6 +407,176 @@ describe("runAgent", () => {
         error: { kind: "invalid_query", message: "Validation Failed: The date is not valid." },
       },
     });
+  });
+
+  /** The outputs of the reply's read_record calls, in order. */
+  const readOutputs = (conversation: WorkspaceUIMessage[]) =>
+    conversation
+      .at(-1)
+      ?.parts.flatMap((part) =>
+        part.type === "tool-read_record" && part.state === "output-available" ? [part.output] : [],
+      );
+  const REPO = "GET /repos/laserjm/workspace-fixtures";
+  const reading = (type: string, number: number, connectionId = githubConnection.id) => ({
+    connectionId,
+    type,
+    key: `laserjm/workspace-fixtures#${number}`,
+  });
+  /** `count` comments like the recorded first, a minute apart, the last one `last` long. */
+  const comments = (count: number, last = 10) => {
+    const [first] = fixture("issue-comments.json");
+    return Array.from({ length: count }, (_, index) => ({
+      ...first,
+      id: 1000 + index,
+      created_at: new Date(Date.UTC(2026, 10, 1, 10, index)).toISOString(),
+      body: index === count - 1 ? "c".repeat(last) : `Comment ${index + 1}`,
+    }));
+  };
+
+  it("reads an attached issue, trimmed: the first 8,000 characters and the newest 30 comments", async () => {
+    useRecordedGithub({
+      [`${REPO}/issues/6`]: {
+        status: 200,
+        body: { ...fixture("issue.json"), body: "b".repeat(40_000), comments: 42 },
+      },
+      [`${REPO}/issues/6/comments?per_page=100`]: { status: 200, body: comments(42, 5_000) },
+    });
+    model.current = calling("read_record", [reading("issue", 6)]);
+    const conversation = await run({ modelId: "mock" }, [attaching([{ ...laserjm, items: [] }])]);
+
+    const [output] = readOutputs(conversation) ?? [];
+    expect(output).toMatchObject({
+      summary: {
+        key: "laserjm/workspace-fixtures#6",
+        state: "open",
+        url: "https://github.com/laserjm/workspace-fixtures/issues/6",
+      },
+      detail: {
+        author: "laserjm",
+        labels: ["fixture", "case/open-issue"],
+        commentCount: 42,
+        olderComments: "+ 12 older comments",
+      },
+    });
+    const detail = output && "detail" in output ? (output.detail as Record<string, never>) : {};
+    expect(detail.body).toBe(`${"b".repeat(8_000)}\n\n[… 32,000 more characters, open the view]`);
+    const kept = detail.comments as { body: string }[];
+    expect(kept).toHaveLength(30);
+    expect(kept[0]).toEqual({ author: "laserjm", createdAt: "2026-11-01T10:12:00.000Z", body: "Comment 13" });
+    expect(kept[29]?.body).toBe(`${"c".repeat(2_000)}\n\n[… 3,000 more characters, open the view]`);
+  });
+
+  const HEAD = "7b55399cea249bb3579d78746cbb25ca5567ec80";
+  /** The recorded merged pull request #8: a review with an inline comment, 4 files, its CI. */
+  const mergedPullRequest = {
+    [`${REPO}/pulls/8`]: "pull-request.json",
+    [`${REPO}/issues/8/comments?per_page=100`]: "pull-request-comments.json",
+    [`${REPO}/pulls/8/reviews?per_page=100`]: "pull-request-reviews.json",
+    [`${REPO}/pulls/8/comments?per_page=100`]: "pull-request-review-comments.json",
+    [`${REPO}/pulls/8/files?per_page=100`]: "pull-request-files.json",
+    [`${REPO}/commits/${HEAD}/status`]: "pull-request-status.json",
+    [`${REPO}/actions/runs?head_sha=${HEAD}`]: "pull-request-workflow-runs.json",
+  };
+
+  it("reads an attached pull request for review, trimmed like an issue, its reviews like comments", async () => {
+    const [review] = fixture("pull-request-reviews.json");
+    // 31 older reviews before the recorded one, which keeps its inline comment.
+    const reviews = [
+      ...Array.from({ length: 31 }, (_, index) => ({
+        ...review,
+        id: 100 + index,
+        body: `Review ${index + 1}`,
+        submitted_at: new Date(Date.UTC(2026, 10, 1, 9, index)).toISOString(),
+      })),
+      { ...review, body: "r".repeat(2_500) },
+    ];
+    useRecordedGithub({
+      ...mergedPullRequest,
+      [`${REPO}/pulls/8`]: {
+        status: 200,
+        body: { ...fixture("pull-request.json"), body: "b".repeat(9_000), comments: 35 },
+      },
+      [`${REPO}/issues/8/comments?per_page=100`]: { status: 200, body: comments(35) },
+      [`${REPO}/pulls/8/reviews?per_page=100`]: { status: 200, body: reviews },
+    });
+    model.current = calling("read_record", [reading("pull-request", 8)]);
+    const conversation = await run({ modelId: "mock" }, [attaching([{ ...laserjm, items: [] }])]);
+
+    const [output] = readOutputs(conversation) ?? [];
+    expect(output).toMatchObject({
+      summary: { type: "pull-request", state: "merged" },
+      detail: {
+        number: 8,
+        body: `${"b".repeat(8_000)}\n\n[… 1,000 more characters, open the view]`,
+        commentCount: 35,
+        olderComments: "+ 5 older comments",
+        olderReviews: "+ 2 older reviews",
+        merge: { mergeableState: "unknown", merged: true, base: "main", head: "fixtures/status-page" },
+        reviewCommentCount: 1,
+        fileCount: 4,
+        ci: { headSha: HEAD, actions: { readable: true, total: 2 } },
+      },
+    });
+    const detail = output && "detail" in output ? (output.detail as Record<string, never>) : {};
+    expect(detail.comments).toHaveLength(30);
+    const kept = detail.reviews as { body: string; comments: unknown[] }[];
+    expect(kept).toHaveLength(30);
+    expect(kept[0]?.body).toBe("Review 3");
+    expect(kept[29]).toMatchObject({
+      state: "COMMENTED",
+      body: `${"r".repeat(2_000)}\n\n[… 500 more characters, open the view]`,
+      comments: [
+        { path: "status/components.json", body: "Should a degraded component link to its incident?" },
+      ],
+    });
+    expect(detail.files).toHaveLength(4);
+  });
+
+  it("reads two attached items in one step", async () => {
+    useRecordedGithub({
+      ...mergedPullRequest,
+      [`${REPO}/issues/6`]: "issue.json",
+      [`${REPO}/issues/6/comments?per_page=100`]: "issue-comments.json",
+    });
+    model.current = calling("read_record", [reading("issue", 6), reading("pull-request", 8)]);
+    const conversation = await run({ modelId: "mock" }, [
+      attaching([{ ...laserjm, items: [issue(6), issue(8)] }]),
+    ]);
+    const outputs = readOutputs(conversation) ?? [];
+    expect(outputs.map((output) => "summary" in output && output.summary.label)).toEqual([
+      "workspace-fixtures#6",
+      "workspace-fixtures#8",
+    ]);
+    // Short enough: nothing is cut.
+    expect(JSON.stringify(outputs)).not.toMatch(/more characters, open the view|"older/);
+  });
+
+  it("answers no_access for a record of a connection the thread did not attach, without asking GitHub", async () => {
+    const { requests } = useRecordedGithub({});
+    model.current = calling("read_record", [
+      reading("issue", 6, "00000000-0000-4000-8000-000000000009"),
+    ]);
+    const conversation = await run({ modelId: "mock" }, [attaching([{ ...laserjm, items: [] }])]);
+    expect(requests).toEqual([]);
+    expect(readOutputs(conversation)).toEqual([{ error: { kind: "no_access" } }]);
+  });
+
+  it("answers not_found, as data, for a record GitHub does not have, and the reply goes on", async () => {
+    useRecordedGithub({
+      [`${REPO}/issues/404`]: { status: 404, body: { message: "Not Found" } },
+      [`${REPO}/issues/404/comments?per_page=100`]: { status: 404, body: { message: "Not Found" } },
+    });
+    model.current = calling("read_record", [reading("issue", 404)]);
+    const conversation = await run({ modelId: "mock" }, [attaching([{ ...laserjm, items: [] }])]);
+    expect(readOutputs(conversation)).toEqual([
+      {
+        error: {
+          kind: "not_found",
+          url: "https://github.com/laserjm/workspace-fixtures/issues/404",
+        },
+      },
+    ]);
+    expect(conversation.at(-1)?.parts.at(-1)).toMatchObject({ type: "text", text: "Two are in review." });
   });
 
   it("says nothing of connections when the thread attached none", async () => {

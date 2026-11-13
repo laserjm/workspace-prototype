@@ -3,13 +3,14 @@
 import { HtmlRenderFrame } from "@/components/ui/html-render-frame";
 import { Markdown } from "@/components/ui/markdown";
 import type { WorkspaceUIMessage } from "@/modules/agent";
-import { RecordSearchCall } from "@/modules/records";
+import { RecordReadCall, RecordSearchCall } from "@/modules/records";
 import { SkillLoadCall } from "@/modules/skills";
 import { preparingDotClassName } from "./response-turn";
 
 type MessagePart = WorkspaceUIMessage["parts"][number];
 type HtmlRenderPart = Extract<MessagePart, { type: "tool-html_render" }>;
 type SearchRecordsPart = Extract<MessagePart, { type: "tool-search_records" }>;
+type ReadRecordPart = Extract<MessagePart, { type: "tool-read_record" }>;
 type LoadSkillPart = Extract<MessagePart, { type: "tool-load_skill" }>;
 
 /** Whether a message has anything `MessageParts` would show yet. */
@@ -19,6 +20,7 @@ export function hasVisibleParts(message: WorkspaceUIMessage | undefined) {
       (part.type === "text" && part.text.trim().length > 0) ||
       part.type === "tool-html_render" ||
       part.type === "tool-search_records" ||
+      part.type === "tool-read_record" ||
       part.type === "tool-load_skill",
   );
 }
@@ -56,6 +58,8 @@ export function MessageParts({
         return <HtmlRenderToolPart key={part.toolCallId} part={part} />;
       case "tool-search_records":
         return <SearchRecordsToolPart key={part.toolCallId} part={part} />;
+      case "tool-read_record":
+        return <ReadRecordToolPart key={part.toolCallId} part={part} />;
       case "tool-load_skill":
         return <LoadSkillToolPart key={part.toolCallId} part={part} />;
       default:
@@ -116,6 +120,20 @@ function SearchRecordsToolPart({ part }: { part: SearchRecordsPart }) {
           errorText={part.errorText}
         />
       );
+    default:
+      return null;
+  }
+}
+
+function ReadRecordToolPart({ part }: { part: ReadRecordPart }) {
+  switch (part.state) {
+    case "input-streaming":
+    case "input-available":
+      return <RecordReadCall state="reading" input={part.input} />;
+    case "output-available":
+      return <RecordReadCall state="done" input={part.input} output={part.output} />;
+    case "output-error":
+      return <RecordReadCall state="failed" input={part.input} errorText={part.errorText} />;
     default:
       return null;
   }

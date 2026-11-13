@@ -3,15 +3,19 @@
 // comes back as a `RecordError`, never thrown.
 import { z } from "zod";
 import { err, ok, type Result } from "@/lib/result";
-import type {
-  ConnectionAccess,
-  ProviderRecords,
-  RecordDetail,
-  RecordError,
-  RecordSearchPage,
-  RecordSearchQuery,
-  RecordSummary,
-  RecordTypeDeclaration,
+import {
+  cutNote,
+  cutText,
+  MODEL_LIMITS,
+  newestEntries,
+  recordType,
+  type ConnectionAccess,
+  type ProviderRecords,
+  type RecordError,
+  type RecordSearchPage,
+  type RecordSearchQuery,
+  type RecordSummary,
+  type RecordTypeDeclaration,
 } from "../../contracts";
 import { classifyGithubAnswer, githubGet } from "./api";
 
@@ -544,16 +548,18 @@ export type GithubIssueDetail = z.infer<typeof githubIssueDetailSchema>;
  */
 export const githubPullRequestDetailSchema = githubIssueDetailSchema.extend({
   merge: z.object({
-    /**
-     * GitHub's `mergeable_state`: `clean`, `unstable`, `has_hooks`, `behind`, `blocked`, `dirty`,
-     * `draft` or `unknown` (while GitHub works it out, and after a merge).
-     */
-    mergeableState: z.string(),
-    /** Not ready for review: GitHub may still call it `clean`, but it cannot be merged. */
-    draft: z.boolean(),
+    mergeableState: z
+      .string()
+      .describe(
+        "GitHub's mergeable_state: clean (can merge), unstable (can merge, but a check is failing), has_hooks (can merge, with hooks), behind (the base branch moved on), blocked (a required review or check is missing), dirty (a merge conflict), draft, or unknown (GitHub is still working it out, and after a merge).",
+      ),
+    draft: z
+      .boolean()
+      .describe("Not ready for review: GitHub may still call it clean, but it cannot be merged."),
     merged: z.boolean(),
-    /** Closed, merged or not: the mergeable state no longer applies. */
-    closed: z.boolean(),
+    closed: z
+      .boolean()
+      .describe("Closed, merged or not: the mergeable state no longer applies."),
     /** ISO 8601, when merged. */
     mergedAt: z.string().optional(),
     mergedBy: z.string().optional(),
@@ -569,8 +575,9 @@ export const githubPullRequestDetailSchema = githubIssueDetailSchema.extend({
     z.object({
       id: z.number(),
       author: z.string(),
-      /** `APPROVED`, `CHANGES_REQUESTED`, `COMMENTED`, `DISMISSED` or `PENDING`. */
-      state: z.string(),
+      state: z
+        .string()
+        .describe("APPROVED, CHANGES_REQUESTED, COMMENTED, DISMISSED or PENDING (not submitted yet)."),
       /** ISO 8601; a pending review has none. */
       submittedAt: z.string().optional(),
       body: z.string(),
@@ -595,8 +602,9 @@ export const githubPullRequestDetailSchema = githubIssueDetailSchema.extend({
       path: z.string(),
       /** Where a renamed file was. */
       previousPath: z.string().optional(),
-      /** `added`, `removed`, `modified`, `renamed`, `copied`, `changed` or `unchanged`. */
-      status: z.string(),
+      status: z
+        .string()
+        .describe("added, removed, modified, renamed, copied, changed or unchanged."),
       additions: z.number(),
       deletions: z.number(),
     }),
@@ -619,12 +627,12 @@ export const githubPullRequestDetailSchema = githubIssueDetailSchema.extend({
             id: z.number(),
             name: z.string(),
             title: z.string(),
-            /** `push`, `pull_request`, …: what started it. */
-            event: z.string(),
-            /** `queued`, `in_progress`, `completed`, … */
-            status: z.string(),
-            /** `success`, `failure`, `cancelled`, `skipped`, …, once completed. */
-            conclusion: z.string().optional(),
+            event: z.string().describe("What started the run: push, pull_request, …"),
+            status: z.string().describe("queued, in_progress, completed, …"),
+            conclusion: z
+              .string()
+              .optional()
+              .describe("Once completed: success, failure, cancelled, skipped, …"),
             /** Its page on GitHub, built from the connection's base URL. */
             url: z.string(),
           }),
@@ -635,8 +643,9 @@ export const githubPullRequestDetailSchema = githubIssueDetailSchema.extend({
       z.object({ readable: z.literal(false) }),
       z.object({
         readable: z.literal(true),
-        /** The combined state: `success`, `pending`, `failure` or `error`. */
-        state: z.string(),
+        state: z
+          .string()
+          .describe("The combined state of the commit statuses: success, pending, failure or error."),
         statuses: z.array(
           z.object({
             id: z.number(),
@@ -906,13 +915,16 @@ async function readCi(
   return ok({ headSha, actions: actions.value, statuses: statuses.value });
 }
 
-type Reader = (access: ConnectionAccess, key: string) => Promise<Result<RecordDetail, RecordError>>;
+type Reader<D> = (
+  access: ConnectionAccess,
+  key: string,
+) => Promise<Result<{ summary: RecordSummary; detail: D }, RecordError>>;
 
 /**
  * Reads an issue with its first 100 comments, in parallel. A pull request's number is
  * `not_found`, as GitHub answers a missing number.
  */
-const readIssue: Reader = async (access, key) => {
+const readIssue: Reader<GithubIssueDetail> = async (access, key) => {
   const parsed = parseKey(key);
   if (!parsed) return err({ kind: "not_found" });
   const path = `/repos/${parsed.repository}/issues/${parsed.number}`;
@@ -935,7 +947,7 @@ const readIssue: Reader = async (access, key) => {
  * first 100 changed files and, once the head commit is known, its CI. An issue's number is
  * `not_found`, as `/pulls/{n}` answers it.
  */
-const readPullRequest: Reader = async (access, key) => {
+const readPullRequest: Reader<GithubPullRequestDetail> = async (access, key) => {
   const parsed = parseKey(key);
   if (!parsed) return err({ kind: "not_found" });
   const repository = `/repos/${parsed.repository}`;
@@ -973,10 +985,96 @@ const readPullRequest: Reader = async (access, key) => {
   return ok({ summary: summaryInRepository(access.connectionId, parsed.repository, item), detail });
 };
 
+// --- Trimming a read for the model (`read_record`), within `MODEL_LIMITS`. ---
+
+type Comment = GithubIssueDetail["comments"][number];
+
+/** A comment as the model reads it: no id, its body cut. */
+const trimComment = ({ author, createdAt, body }: Comment) => ({
+  author,
+  createdAt,
+  body: cutText(body, MODEL_LIMITS.commentCharacters),
+});
+
+/**
+ * An issue (or a pull request's conversation) for the model: label names only, the body's first
+ * characters and the newest comments, each cut. `olderComments` says what was left out.
+ */
+function trimIssue(detail: GithubIssueDetail) {
+  const comments = newestEntries(detail.comments, detail.commentCount, "comments");
+  return {
+    number: detail.number,
+    author: detail.author,
+    createdAt: detail.createdAt,
+    labels: detail.labels.map((label) => label.name),
+    assignees: detail.assignees,
+    body: cutText(detail.body, MODEL_LIMITS.bodyCharacters),
+    commentCount: detail.commentCount,
+    ...(comments.note ? { olderComments: comments.note } : {}),
+    comments: comments.kept.map(trimComment),
+  };
+}
+
+type Review = GithubPullRequestDetail["reviews"][number];
+type ReviewComment = Review["comments"][number];
+
+/**
+ * A pull request for the model: its conversation as an issue's, its newest reviews and, among
+ * theirs, its newest inline comments, each cut, with the merge state, the changed files and CI as
+ * read. `olderReviews` and `olderReviewComments` say what was left out.
+ */
+function trimPullRequest(detail: GithubPullRequestDetail) {
+  const reviews = newestEntries(detail.reviews, detail.reviews.length, "reviews");
+  // The inline comments of every review read, oldest first; the newest of the kept reviews' stay.
+  const read = detail.reviews
+    .flatMap((review) => review.comments)
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  const keptReviews = new Set(reviews.kept.map((review) => review.id));
+  const shown = new Set(
+    detail.reviews
+      .filter((review) => keptReviews.has(review.id))
+      .flatMap((review) => review.comments)
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+      .slice(-MODEL_LIMITS.comments)
+      .map((comment) => comment.id),
+  );
+  const olderReviewComments = cutNote(
+    "review comments",
+    read.length - shown.size,
+    detail.reviewCommentCount - read.length,
+  );
+  const trimReviewComment = ({ author, createdAt, path, line, body }: ReviewComment) => ({
+    author,
+    createdAt,
+    path,
+    ...(line ? { line } : {}),
+    body: cutText(body, MODEL_LIMITS.commentCharacters),
+  });
+  return {
+    ...trimIssue(detail),
+    merge: detail.merge,
+    ...(reviews.note ? { olderReviews: reviews.note } : {}),
+    reviews: reviews.kept.map((review) => ({
+      author: review.author,
+      state: review.state,
+      ...(review.submittedAt ? { submittedAt: review.submittedAt } : {}),
+      body: cutText(review.body, MODEL_LIMITS.commentCharacters),
+      comments: review.comments
+        .filter((comment) => shown.has(comment.id))
+        .map(trimReviewComment),
+    })),
+    reviewCommentCount: detail.reviewCommentCount,
+    ...(olderReviewComments ? { olderReviewComments } : {}),
+    fileCount: detail.fileCount,
+    files: detail.files,
+    ci: detail.ci,
+  };
+}
+
 /** The declared types, each with its reader. */
 export const githubRecordTypes = {
-  issue: { ...declaredTypes.issue, read: readIssue },
-  "pull-request": { ...declaredTypes["pull-request"], read: readPullRequest },
+  issue: recordType(declaredTypes.issue, readIssue, trimIssue),
+  "pull-request": recordType(declaredTypes["pull-request"], readPullRequest, trimPullRequest),
 } satisfies ProviderRecords["types"];
 
 /**
