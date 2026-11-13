@@ -17,6 +17,7 @@ import {
   type CredentialRejected,
   type ProviderUnreachable,
 } from "./contracts";
+import { baseUrlRefusal } from "./address";
 import { findProvider } from "./providers";
 import {
   connectionColumns,
@@ -24,6 +25,12 @@ import {
   toConnection,
 } from "./queries";
 import { readCredential, writeSecret } from "./vault";
+
+/** The connect form shows `message` as its URL field's error. */
+const badBaseUrl = (message: string): ValidationFailed => ({
+  _tag: "ValidationFailed",
+  issues: [{ path: "baseUrl", message }],
+});
 
 /**
  * Connects to a provider: the provider checks the credential and names the account, then the
@@ -46,11 +53,9 @@ export const connectAction = action(
     if (!provider.auth.some((method) => method.kind === credential.kind))
       return err(notFound("Sign-in method", credential.kind));
     const baseUrl = (givenUrl ?? provider.baseUrl?.default)?.replace(/\/+$/, "");
-    if (!baseUrl)
-      return err({
-        _tag: "ValidationFailed",
-        issues: [{ path: "baseUrl", message: `Enter the ${provider.name} URL.` }],
-      });
+    if (!baseUrl) return err(badBaseUrl(`Enter the ${provider.name} URL.`));
+    const refused = await baseUrlRefusal(baseUrl);
+    if (refused) return err(badBaseUrl(refused));
 
     const verified = await provider.verify({
       baseUrl,

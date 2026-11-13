@@ -347,7 +347,13 @@ the built-in sample connection, which every user has and nothing stores, then th
 writes the connection and its credential in one transaction; connecting the same account again
 updates both. `testConnectionAction` asks the provider again (a refused credential is
 `needs_reconnect`; an unreachable provider changes nothing), and `disconnectAction` deletes the
-connection and, by cascade, its credential. The base URL must be HTTPS. Settings → Sources
+connection and, by cascade, its credential. The base URL must be HTTPS, and `connectAction`
+(so connecting and reconnecting) refuses one that points the server at itself or at an internal
+network (`integrations/address.ts`): a host that is `localhost`, or a loopback, private (RFC 1918,
+unique local) or link-local address, given literally or among what its name resolves to, and a
+name that does not resolve. The form shows the refusal as the URL field's error, and nothing is stored. The check runs when a
+connection is saved only: no DNS pinning and no re-check per request (decided in #44), so every
+provider request is sent with `redirect: "error"` and cannot be led elsewhere. Settings → Sources
 (`SourcesSettingsPanel`, the connect form built from the provider's `auth` and `baseUrl`) lists
 every provider and the user's connections; `IntegrationsProvider` holds them, and an action's
 answer goes into its state. `integrations/records.ts` runs a connection's reader for `sources`
@@ -368,7 +374,8 @@ seeded case found by its label, CI on the merged pull request's head, no token o
 `integrations/providers.test.ts` (every provider in the registry: unique ids, a
 way to connect, a base URL and `verify` when it takes a credential, sources in a declared
 product, records read back by id in order, nothing for an unknown key);
-`integrations/actions.integration.test.ts` (connect, reconnect, refusals, test, disconnect, a
+`integrations/actions.integration.test.ts` (connect, reconnect, refusals including each internal
+address kind with name resolution stubbed, test, disconnect, a
 visitor, `assertIsolation()`); `providers/github/api.test.ts`; `sources/queries.test.ts`; `tsc`.
 **Recorded in.** This entry; `docs/adr/0002-integrations.md`;
 `docs/adr/0003-attached-items-and-record-views.md`.

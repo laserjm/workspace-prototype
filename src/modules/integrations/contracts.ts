@@ -211,8 +211,14 @@ export function expiryLabel(expiresAt: Date, now: Date): string {
 /** Connects to a provider with a credential; connecting the same account again updates it. */
 export const connectInputSchema = z.object({
   providerId: z.string().min(1).max(100),
-  /** The provider's default when left out. HTTPS only. */
-  baseUrl: z.url({ protocol: /^https$/ }).max(500).optional(),
+  /**
+   * The provider's default when left out. HTTPS only; `connectAction` also refuses an internal
+   * address. The messages are the form's field error.
+   */
+  baseUrl: z
+    .url({ protocol: /^https$/, error: "Enter an address that starts with https://." })
+    .max(500, "That address is too long.")
+    .optional(),
   credential: credentialSchema,
 });
 export type ConnectInput = z.infer<typeof connectInputSchema>;
