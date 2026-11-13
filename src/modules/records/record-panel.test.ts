@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   closeView,
   focusView,
+  followConversation,
   initialPanelState,
   openSent,
   openView,
@@ -121,6 +122,43 @@ describe("sending a question", () => {
     const state = openSent(hidden, [issue(2)], { wide: true });
     expect(state.shown).toBe(false);
     expect(state.activeId).toBe(idOf(issue(1)));
+  });
+});
+
+describe("following the conversation", () => {
+  /** A question that attached `targets`, and a reply. */
+  const question = (id: string, ...targets: ViewTarget[]) => ({ id, role: "user", targets });
+  const reply = (id: string) => ({ id, role: "assistant", targets: [] });
+  const ids = (messages: readonly { id: string }[]) => new Set(messages.map((message) => message.id));
+
+  it("leaves the panel exactly as it is on Try again, which asks a question it has seen again", () => {
+    // The answer to u2 failed; the user read #2 since, and Try again answers u2 anew.
+    const before = [question("u1", issue(1)), reply("a1"), question("u2", issue(2))];
+    const asked = openSent(openSent(EMPTY, [issue(1)], { wide: true }), [issue(2)], { wide: true });
+    const reading = focusView(asked, idOf(issue(1)));
+    const retried = [...before, reply("a2")];
+    expect(followConversation(reading, { seen: ids(before), messages: retried, wide: true })).toBe(
+      reading,
+    );
+  });
+
+  it("starts a fork open on Attached with nothing open, and its first new question opens and focuses its items", () => {
+    // The fork copies u1 and a1; its panel stored nothing, whatever the origin thread's holds.
+    const copied = [question("u1", issue(1), issue(2)), reply("a1")];
+    const fork = initialPanelState({ stored: undefined, wide: true, hasAttached: true });
+    expect(fork).toEqual({
+      views: [],
+      activeId: null,
+      pinnedId: null,
+      shown: true,
+      rearranged: false,
+    });
+    expect(followConversation(fork, { seen: ids(copied), messages: copied, wide: true })).toBe(fork);
+
+    const asked = [...copied, question("u2", issue(3)), reply("a2")];
+    const state = followConversation(fork, { seen: ids(copied), messages: asked, wide: true });
+    expect(openIds(state)).toEqual([idOf(issue(3))]);
+    expect(state.activeId).toBe(idOf(issue(3)));
   });
 });
 

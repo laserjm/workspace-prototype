@@ -656,9 +656,15 @@ an open thread (no panel and no button on the new-thread page), and `ThreadConve
   on the pinned view shows Attached. A thread with nothing stored starts open on a wide screen when
   it has attached items, hidden otherwise; below 1200px the panel is a sheet over the conversation
   and always starts hidden (a stored pin is kept for when it is shown).
-- **Sending.** `RecordPanel` calls `openSent` for each user message that appears in the
-  conversation after it mounted, so a stored question, or one asked again by Try again, opens
-  nothing. Chips on a sent question call `open`.
+- **Sending.** `RecordPanel` hands the provider's `follow` the conversation and the message ids it
+  has seen since it mounted; `followConversation` calls `openSent` for each question it had not
+  seen. A stored question opens nothing, and Try again, which asks a question it has seen again,
+  leaves the panel exactly as it is (the same state, so nothing is set or stored), its "rearranged"
+  flag included. Chips on a sent question call `open`.
+- **Fork.** A fork is a new thread, so its panel reads nothing stored, never the origin's: it
+  starts open on a wide screen on the Attached tab, which lists every inherited item grouped by
+  question, with no views open, no pin and "rearranged" clear. Its copied questions are there when
+  the panel mounts and open nothing; its first new question opens and focuses its items.
 - **The panel.** The Attached tab lists `attachedByQuestion(conversation)` (built on
   `threadAttachedItems`), grouped by the question that attached them, each marked when its view is
   open; empty, it offers "Choose a data source", whose picks land in the composer's draft (the
@@ -676,7 +682,8 @@ an open thread (no panel and no button on the new-thread page), and `ThreadConve
   it has meanwhile. Nothing is cached on the server.
 **Enforced by.** `records/record-panel.test.ts` (open and focus, nothing twice, `openSent` with
 and without "rearranged", the neighbour on close and Attached after the last, starting open or
-hidden; pin, re-pin replacing the pin, unpin, closing a pinned view, the focus rules with a pin;
+hidden; Try again leaving the state unchanged, a fork's fresh state and its first new question;
+pin, re-pin replacing the pin, unpin, closing a pinned view, the focus rules with a pin;
 the pin stored, version 1 migrated, a stored state of another version or a corrupt one);
 `records/components/record-view-store.test.ts` (one read per view, refresh, a refusal kept until a
 retry); `records/attached-items.test.ts` (the grouping by question).

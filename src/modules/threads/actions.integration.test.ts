@@ -9,6 +9,7 @@ import { withUsers } from "@/tests/support/users";
 import { callAs } from "@/tests/support/session";
 import { aConversation, aNewThread } from "@/tests/factories/thread";
 import { aUser } from "@/tests/factories/user";
+import type { WorkspaceUIMessage } from "@/modules/agent";
 import {
   forkThreadAction,
   placeThreadAction,
@@ -141,6 +142,49 @@ describeIntegration(
         aConversation.slice(0, 2),
       );
       expect(await listThreadMessages(ana, thread.id)).toEqual(aConversation);
+    });
+
+    it("copies the questions' attached items verbatim, a removed connection's too", async () => {
+      const thread = await aConversationOf(ana);
+      // Not one of Ana's connections any more: removed since the question attached it.
+      const removed = randomUUID();
+      const attached: WorkspaceUIMessage = {
+        ...aConversation[0]!,
+        parts: [
+          ...aConversation[0]!.parts,
+          {
+            type: "data-attached-items",
+            data: {
+              connections: [
+                {
+                  connectionId: removed,
+                  provider: "github",
+                  label: "@ana",
+                  items: [
+                    {
+                      type: "pull_request",
+                      key: "acme/web#91",
+                      snapshot: { label: "web#91", title: "Fix the login", state: "merged" },
+                    },
+                  ],
+                },
+                { connectionId: randomUUID(), provider: "github", label: "@acme", items: [] },
+              ],
+            },
+          },
+        ],
+      };
+      const conversation = [attached, ...aConversation.slice(1)];
+      await saveConversation(ana, thread.id, conversation);
+
+      const id = randomUUID();
+      const result = await callAs(ana, forkThreadAction, {
+        fromThreadId: thread.id,
+        id,
+        throughMessageId: "a2",
+      });
+      expect(result.ok).toBe(true);
+      expect(await listThreadMessages(ana, id)).toEqual(conversation);
     });
 
     it("refuses to fork from a question or a response that is not stored", async () => {
