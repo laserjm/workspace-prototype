@@ -1,14 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  Cable,
-  ChevronDown,
-  PanelBottom,
-  PanelLeftOpen,
-  SquareMenu,
-  X,
-} from "lucide-react";
+import { ChevronDown, PanelLeftOpen, SquareMenu } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -19,6 +12,7 @@ import {
 import { IconButton } from "@/components/ui/icon-button";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { pluralLabels, useIntegrations } from "@/modules/integrations";
 import { ProjectForm, ProjectIcon, type Project } from "@/modules/projects";
 import { useSkillPreferences } from "@/modules/skills";
 import {
@@ -105,7 +99,6 @@ export function WorkspaceShell({
   const [historyIndex, setHistoryIndex] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const [panelOpen, setPanelOpen] = useState(false);
   const [dialog, setDialog] = useState<DialogKind>(null);
   const [settingsSection, setSettingsSection] =
     useState<SettingsSection>("general");
@@ -119,6 +112,13 @@ export function WorkspaceShell({
     (thread) => thread.id === history[historyIndex],
   );
   const currentProjectId = activeThread ? activeThread.projectId : projectId;
+  // With nothing connected, the new-thread page says what connecting the first provider offers.
+  const { providers, connections } = useIntegrations();
+  const firstProvider = providers.find((provider) => provider.records);
+  const invitation =
+    !connections.length && firstProvider?.records
+      ? `Connect ${firstProvider.name} to ask about your ${pluralLabels(firstProvider.records)}`
+      : undefined;
   const currentProject = currentProjectId
     ? projectName(currentProjectId)
     : null;
@@ -413,14 +413,6 @@ export function WorkspaceShell({
                 >
                   <SquareMenu />
                 </IconButton>
-                <IconButton
-                  label={panelOpen ? "Hide bottom panel" : "Show bottom panel"}
-                  className="max-md:hidden"
-                  aria-pressed={panelOpen}
-                  onClick={() => setPanelOpen((open) => !open)}
-                >
-                  <PanelBottom />
-                </IconButton>
                 {/* No panel, and so no button, on the new-thread page. */}
                 {activeThread && <RecordPanelToggle />}
               </div>
@@ -453,10 +445,17 @@ export function WorkspaceShell({
                     enabledSkills={enabledSkills}
                     onManageSkills={() => openSettings("skills")}
                   />
-                  <p className="mt-4 text-center text-2xs text-muted-foreground/70 max-md:text-3xs">
-                    Explore with sample data. Live enterprise connections come
-                    next.
-                  </p>
+                  {invitation && (
+                    <p className="mt-4 text-center text-2xs text-muted-foreground/70 max-md:text-3xs">
+                      <button
+                        type="button"
+                        className="underline-offset-2 hover:text-foreground hover:underline"
+                        onClick={() => openSettings("sources")}
+                      >
+                        {invitation}
+                      </button>
+                    </p>
+                  )}
                 </div>
               ) : (
                 <ThreadConversation
@@ -508,34 +507,6 @@ export function WorkspaceShell({
                 />
               )}
             </main>
-
-            {panelOpen && (
-              <section
-                className="z-25 h-47.5 shrink-0 border-t border-border bg-background max-md:h-34"
-                aria-label="Project panel"
-              >
-                <div className="flex h-10.5 items-center justify-between px-5 text-xs text-muted-foreground">
-                  <span>Thread context</span>
-                  <IconButton
-                    label="Close bottom panel"
-                    onClick={() => setPanelOpen(false)}
-                  >
-                    <X />
-                  </IconButton>
-                </div>
-                <div className="flex items-center justify-center gap-2.5 px-4 py-8 text-sm text-secondary-label max-md:flex-wrap max-md:p-4 max-md:text-xs">
-                  <Cable className="size-4.5" />
-                  <p>Choose a data source in the composer to add context to a question.</p>
-                  <button
-                    type="button"
-                    onClick={() => openSettings("sources")}
-                    className="inline-flex items-center gap-1 border-b border-input text-accent-foreground"
-                  >
-                    Explore data sources <ChevronDown className="size-3" />
-                  </button>
-                </div>
-              </section>
-            )}
           </div>
           </RecordPanelProvider>
         </div>

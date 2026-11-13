@@ -10,7 +10,6 @@ import type {
   RecordDeclarations,
 } from "./contracts";
 import { providers } from "./providers";
-import { sampleConnection } from "./providers/sample";
 
 /** The columns a `Connection` is read from; never the secret, which is in another table. */
 export const connectionColumns = {
@@ -24,19 +23,14 @@ export const connectionColumns = {
   lastVerifiedAt: connectionsTable.lastVerifiedAt,
 };
 
-export const toConnection = (row: Omit<Connection, "builtIn">): Connection => ({
-  ...row,
-  builtIn: false,
-});
-
-/** The user's connections: the sample first, then the stored ones in the order they were made. */
+/** The user's connections, in the order they were made. */
 export async function listConnections(user: User): Promise<Connection[]> {
   const rows = await db()
     .select(connectionColumns)
     .from(connectionsTable)
     .where(eq(connectionsTable.userId, user.id))
     .orderBy(asc(connectionsTable.createdAt));
-  return [sampleConnection, ...rows.map(toConnection)];
+  return rows;
 }
 
 /** One of the user's stored connections; none for another user's or a missing one. */
@@ -53,7 +47,7 @@ export async function findStoredConnection(
         eq(connectionsTable.id, connectionId),
       ),
     );
-  return row && toConnection(row);
+  return row;
 }
 
 /**

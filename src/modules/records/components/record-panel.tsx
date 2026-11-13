@@ -94,7 +94,7 @@ export function RecordPanel({
   /** The composer's attached items, which the empty Attached tab's dialog changes. */
   draft: readonly AttachedConnection[];
   onDraftChange: Dispatch<SetStateAction<readonly AttachedConnection[]>>;
-  /** Leads to Settings → Sources, to connect or reconnect. */
+  /** Leads to Settings → Data sources, to connect or reconnect. */
   onConnect: () => void;
 }) {
   const panel = useRecordPanel();

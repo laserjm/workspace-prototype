@@ -546,14 +546,14 @@ describe("GET /api/connections/[connectionId]/records", () => {
       const { response, body } = await search();
       expect(response.status).toBe(409);
       expect(body.error).toMatchObject({ kind: "needs_reconnect" });
-      const [, github] = await listConnections(connectedUser);
+      const [github] = await listConnections(connectedUser);
       expect(github).toMatchObject({ id: githubConnection.id, status: "needs_reconnect" });
     });
 
     it("leaves the connection alone on any other refusal", async () => {
       useRecordedGithub(refusal({ status: 404, body: { message: "Not Found" } }));
       await search();
-      const [, github] = await listConnections(connectedUser);
+      const [github] = await listConnections(connectedUser);
       expect(github).toMatchObject({ status: "active" });
     });
   });

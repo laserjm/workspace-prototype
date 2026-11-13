@@ -1,38 +1,8 @@
-// The provider contract (docs/adr/0002): what a provider folder in ./providers/ declares.
-// Browser-safe: types, constants and schemas only. The records a reader produces are the sources
-// module's vocabulary, imported as types only, so nothing here loads that module.
+// The provider contract (docs/adr/0002, 0003): what a provider folder in ./providers/ declares,
+// and the record vocabulary every provider answers in. Browser-safe: types, constants and schemas
+// only.
 import { z } from "zod";
 import type { Result } from "@/lib/result";
-import type { RecordPage, RecordQuery, SourceRecord } from "@/modules/sources";
-
-/** How a product's sources look in the workspace: data, never a branch on an id. */
-export type ProductPresentation = {
-  /** The mark `SourceIcon` draws, e.g. "jira". */
-  icon: string;
-  /** "ticket", "tickets". */
-  singular: string;
-  plural: string;
-};
-
-/** A collection of records in a connection, as its provider lists it. */
-export type SourceSummary = {
-  /** Unique within the connection; the provider reads it back, e.g. "laserjm/workspace-prototype". */
-  key: string;
-  /** Which of the provider's products it belongs to, which gives its presentation. */
-  product: string;
-  name: string;
-  description: string;
-  workspace: string;
-  location: string;
-  collection: string;
-  /** Breadcrumb above the collection in the explorer, e.g. "SPACE / PLATFORM". */
-  collectionPath: string;
-  /** Heading of an overview built from this source's records. */
-  overviewTitle: string;
-};
-
-/** Names one source of one connection. */
-export type SourceRef = { connectionId: string; sourceKey: string };
 
 /**
  * What a provider's code gets to reach its system: the API address and the `Authorization` header
@@ -44,27 +14,8 @@ export type ProviderAccess = { baseUrl: string; authorization?: string };
 /** `ProviderAccess` for one stored connection. */
 export type ConnectionAccess = ProviderAccess & { connectionId: string };
 
-/** Reads a provider's sources and records for one connection. */
-export type RecordReader = {
-  listSources(access: ConnectionAccess): Promise<SourceSummary[]>;
-  /** A page of the source's records; `undefined` when the connection has no such source. */
-  searchRecords(
-    access: ConnectionAccess,
-    sourceKey: string,
-    query: RecordQuery,
-  ): Promise<RecordPage | undefined>;
-  /** The records with these ids that exist, in the source's order. */
-  getRecords(
-    access: ConnectionAccess,
-    sourceKey: string,
-    ids: readonly string[],
-  ): Promise<SourceRecord[]>;
-};
-
 /** How a user connects. Phase 5 adds `oauth`. */
 export type AuthMethod =
-  /** Nothing to enter: the built-in sample. */
-  | { kind: "none" }
   /** An API key or personal access token, sent as `Bearer <token>`. */
   | { kind: "token"; label: string; help: string; placeholder?: string }
   /**
@@ -80,7 +31,7 @@ export type AuthMethod =
     };
 
 /** The kinds a user enters something for, and so the kinds a stored connection has. */
-export type CredentialKind = Exclude<AuthMethod["kind"], "none">;
+export type CredentialKind = AuthMethod["kind"];
 
 /** What a user enters to connect. Only the vault stores it, encrypted; nobody else keeps it. */
 export const credentialSchema = z.discriminatedUnion("kind", [
@@ -165,20 +116,14 @@ export type Provider = {
   name: string;
   description: string;
   auth: readonly AuthMethod[];
-  /** Where its API lives; asked for when connecting. Required for a provider one connects to. */
+  /** Where its API lives; asked for when connecting. Every provider declares it (`providers.test.ts`). */
   baseUrl?: BaseUrlSetting;
-  /** Checks a credential and says whose it is. Required for a provider one connects to. */
+  /** Checks a credential and says whose it is. Every provider declares it (`providers.test.ts`). */
   verify?: (
     access: ProviderAccess,
   ) => Promise<
     Result<VerifiedAccount, CredentialRejected | ProviderUnreachable | RateLimited>
   >;
-  /** The sample's sources (ADR 0002), which nothing attaches since the scope went (ADR 0003, #63). */
-  sources?: {
-    /** Each product's presentation, by the `product` its sources name. */
-    products: Readonly<Record<string, ProductPresentation>>;
-    reader: RecordReader;
-  };
   /** The records a user can find and attach to a question (ADR 0003 §3). */
   records?: ProviderRecords;
   /**
@@ -352,10 +297,8 @@ export type ConnectionStatus = "active" | "needs_reconnect";
 export type Connection = {
   id: string;
   providerId: string;
-  /** Who or what it is connected as: "@micha", "acme.atlassian.net", "Sample data". */
+  /** Who or what it is connected as: "@micha", "acme.atlassian.net". */
   accountLabel: string;
-  /** Part of the workspace (the sample): every user has it, nothing to test or disconnect. */
-  builtIn: boolean;
   status: ConnectionStatus;
   baseUrl: string;
   scopes: string[];

@@ -111,6 +111,8 @@ export function AttachDialog({
   const cache = useSearchCache();
   const shown = searchable.find(({ connection }) => connection.id === connectionId);
   const [picks, setPicks] = useState(attached);
+  // With nothing to search, the dialog offers the first provider that holds records.
+  const invited = providers.find((provider) => provider.records);
 
   return (
     <Dialog
@@ -146,7 +148,8 @@ export function AttachDialog({
             <DialogHeader>
               <DialogTitle>No data sources connected yet</DialogTitle>
               <DialogDescription>
-                Connect one to attach its records to your question. Your draft stays here.
+                Connect one to attach its records to your question. Your draft stays in the
+                composer.
               </DialogDescription>
             </DialogHeader>
             <div className="flex justify-end gap-2">
@@ -159,7 +162,7 @@ export function AttachDialog({
                   onConnect();
                 }}
               >
-                Connect a data source
+                {invited ? `Connect ${invited.name}` : "Connect a data source"}
               </Button>
             </div>
           </>

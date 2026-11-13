@@ -6,9 +6,7 @@ import { Input } from "@/components/ui/input";
 import { useAction } from "@/lib/actions/client";
 import { errorMessage } from "@/lib/actions/messages";
 import { connectAction } from "../actions";
-import type { AuthMethod, Connection, Credential, ProviderChoice } from "../contracts";
-
-type EnteredMethod = Exclude<AuthMethod, { kind: "none" }>;
+import type { Connection, Credential, ProviderChoice } from "../contracts";
 
 const fieldLabel = "text-xs font-medium text-secondary-foreground";
 const fieldHelp = "text-2xs leading-relaxed text-muted-foreground";
@@ -26,9 +24,7 @@ export function ConnectForm({
   onConnected: (connection: Connection) => void;
   onCancel: () => void;
 }) {
-  const methods = provider.auth.filter(
-    (method): method is EnteredMethod => method.kind !== "none",
-  );
+  const methods = provider.auth;
   const [methodIndex, setMethodIndex] = useState(0);
   const method = methods[methodIndex]!;
   const [baseUrl, setBaseUrl] = useState(provider.baseUrl?.default ?? "");

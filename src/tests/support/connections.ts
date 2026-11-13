@@ -5,32 +5,18 @@
 //   vi.mock("@/modules/integrations/queries", () => import("@/tests/support/connections"));
 //   vi.mock("@/modules/integrations/vault", () => import("@/tests/support/connections"));
 //
-// Every user has the built-in sample connection. `connectedUser` also has one ordinary GitHub
-// connection, `githubConnection`, whose credential is a fake token; answer its requests with
-// `useRecordedGithub`. Connecting is tested against Postgres (integrations/actions.integration.test.ts).
+// `connectedUser` has one GitHub connection, `githubConnection`, whose credential is a fake token;
+// answer its requests with `useRecordedGithub`. Every other user has none. Connecting is tested against Postgres (integrations/actions.integration.test.ts).
 import type { User } from "@/lib/auth/user";
 import type { Connection, Credential } from "@/modules/integrations";
 import { aUser } from "@/tests/factories/user";
 
 export const connectedUser = aUser("ana");
 
-const sampleConnection: Connection = {
-  id: "sample",
-  providerId: "sample",
-  accountLabel: "Sample data",
-  builtIn: true,
-  status: "active",
-  baseUrl: "",
-  scopes: [],
-  expiresAt: null,
-  lastVerifiedAt: null,
-};
-
 const GITHUB_CONNECTION: Connection = {
   id: "8f0e1c5a-4b9d-4e2f-9a37-2c6d1e0b7f41",
   providerId: "github",
   accountLabel: "@laserjm",
-  builtIn: false,
   status: "active",
   baseUrl: "https://api.github.com",
   scopes: [],
@@ -50,7 +36,7 @@ const ownsGithub = (user: User) => user.id === connectedUser.id;
 
 /** The same export as integrations/queries.ts. */
 export async function listConnections(user: User): Promise<Connection[]> {
-  return ownsGithub(user) ? [sampleConnection, githubConnection] : [sampleConnection];
+  return ownsGithub(user) ? [githubConnection] : [];
 }
 
 /** The same export as integrations/queries.ts. */

@@ -101,7 +101,7 @@ export function SkillSettingsPanel({
         )}
       </div>
       <p className="text-2xs leading-relaxed text-muted-foreground">
-        Demo skills use sample records and prepared response formats. Activation
+        Active skills are offered to the agent with every question. Activation
         is saved automatically in this browser.
       </p>
     </section>

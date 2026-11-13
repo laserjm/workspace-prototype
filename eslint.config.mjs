@@ -16,6 +16,13 @@ const recordsDependencies = {
     "The records module imports only @/modules/integrations and @/modules/integrations/server (ARCHITECTURE.md, \"Modules\").",
 };
 
+// `integrations` is a leaf: it imports no other module (ARCHITECTURE.md, "Modules").
+const integrationsDependencies = {
+  regex: "^@/modules/.+",
+  message:
+    "The integrations module is a leaf and imports no other module; import its own files relatively (ARCHITECTURE.md, \"Modules\").",
+};
+
 // The auth library stays behind lib/auth/ (ARCHITECTURE.md, "Sign-in").
 const authLibrary = {
   group: ["better-auth", "better-auth/*"],
@@ -58,11 +65,25 @@ export default defineConfig([
     },
   },
   {
+    files: ["src/modules/integrations/**/*.{ts,tsx}"],
+    ignores: vaultFiles,
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [authLibrary, integrationsDependencies],
+          paths: [secretsTable],
+        },
+      ],
+    },
+  },
+  // The vault files are the integrations module's, so they are a leaf too.
+  {
     files: vaultFiles,
     rules: {
       "no-restricted-imports": [
         "error",
-        { patterns: [moduleEntryPoints, authLibrary] },
+        { patterns: [authLibrary, integrationsDependencies] },
       ],
     },
   },

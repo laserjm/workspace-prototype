@@ -14,13 +14,13 @@ import {
 import { ConnectForm } from "./connect-form";
 import { useIntegrations } from "./use-integrations";
 
-/** Settings → Sources: every provider, the user's connections to it, and connecting one. */
+/** Settings → Data sources: every provider, the user's connections to it, and connecting one. */
 export function SourcesSettingsPanel() {
   const { providers, connections, putConnection } = useIntegrations();
   const [connecting, setConnecting] = useState<string | null>(null);
   return (
-    <section aria-label="Sources settings">
-      <h2 className="text-base font-medium text-foreground">Sources</h2>
+    <section aria-label="Data sources settings">
+      <h2 className="text-base font-medium text-foreground">Data sources</h2>
       <p className="mt-1 text-xs text-muted-foreground max-md:text-2xs">
         The systems your threads can read from.
       </p>
@@ -32,9 +32,6 @@ export function SourcesSettingsPanel() {
         {providers.map((provider) => {
           const own = connections.filter(
             (connection) => connection.providerId === provider.id,
-          );
-          const connectable = provider.auth.some(
-            (method) => method.kind !== "none",
           );
           return (
             <article
@@ -51,7 +48,7 @@ export function SourcesSettingsPanel() {
                     {provider.description}
                   </p>
                 </div>
-                {connectable && connecting !== provider.id && (
+                {connecting !== provider.id && (
                   <Button
                     variant="outline"
                     size="sm"
@@ -122,41 +119,37 @@ function ConnectionRow({
           <span className="truncate font-medium">{connection.accountLabel}</span>
         </span>
         <span className="text-2xs text-muted-foreground">
-          {connection.builtIn
-            ? "Built in · always connected"
-            : healthy
-              ? [
-                  connection.baseUrl === provider.baseUrl?.default
-                    ? null
-                    : connection.baseUrl,
-                  connection.expiresAt
-                    ? expiryLabel(connection.expiresAt, new Date())
-                    : "Does not expire",
-                ]
-                  .filter(Boolean)
-                  .join(" · ")
-              : `${provider.name} no longer accepts this token. Connect again to replace it.`}
+          {healthy
+            ? [
+                connection.baseUrl === provider.baseUrl?.default
+                  ? null
+                  : connection.baseUrl,
+                connection.expiresAt
+                  ? expiryLabel(connection.expiresAt, new Date())
+                  : "Does not expire",
+              ]
+                .filter(Boolean)
+                .join(" · ")
+            : `${provider.name} no longer accepts this token. Connect again to replace it.`}
         </span>
-        {!connection.builtIn && (
-          <span className="ml-auto flex gap-1">
-            <Button
-              variant="ghost"
-              size="xs"
-              disabled={test.pending || disconnect.pending}
-              onClick={() => void test.run({ connectionId: connection.id })}
-            >
-              {test.pending ? "Testing…" : "Test"}
-            </Button>
-            <Button
-              variant="destructive"
-              size="xs"
-              disabled={test.pending || disconnect.pending}
-              onClick={() => void disconnect.run({ connectionId: connection.id })}
-            >
-              {disconnect.pending ? "Disconnecting…" : "Disconnect"}
-            </Button>
-          </span>
-        )}
+        <span className="ml-auto flex gap-1">
+          <Button
+            variant="ghost"
+            size="xs"
+            disabled={test.pending || disconnect.pending}
+            onClick={() => void test.run({ connectionId: connection.id })}
+          >
+            {test.pending ? "Testing…" : "Test"}
+          </Button>
+          <Button
+            variant="destructive"
+            size="xs"
+            disabled={test.pending || disconnect.pending}
+            onClick={() => void disconnect.run({ connectionId: connection.id })}
+          >
+            {disconnect.pending ? "Disconnecting…" : "Disconnect"}
+          </Button>
+        </span>
       </div>
       {error && error._tag !== "NotFound" && (
         <p className="text-2xs text-destructive-foreground" role="alert">

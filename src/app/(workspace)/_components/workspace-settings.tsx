@@ -79,7 +79,7 @@ export function WorkspaceSettings({
           onClick={() => onSection("sources")}
         >
           <Cable />
-          Sources
+          Data sources
         </button>
       </nav>
       {section === "general" ? (
@@ -125,9 +125,9 @@ export function WorkspaceSettings({
             Manage data sources
           </Button>
           <p className={settingsNoteClassName}>
-            Conversations stay in this session. The appearance, skill
-            activation, the record panel’s width and each thread’s open
-            record views are remembered in this browser.
+            Threads and their conversations are stored with your account.
+            The appearance, skill activation, the record panel’s width and
+            each thread’s open record views are remembered in this browser.
           </p>
         </section>
       ) : section === "sources" ? (

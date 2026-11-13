@@ -20,11 +20,7 @@ import {
 } from "./contracts";
 import { baseUrlRefusal } from "./address";
 import { findProvider } from "./providers";
-import {
-  connectionColumns,
-  findStoredConnection,
-  toConnection,
-} from "./queries";
+import { connectionColumns, findStoredConnection } from "./queries";
 import { readCredential, writeSecret } from "./vault";
 
 /** The connect form shows `message` as its URL field's error. */
@@ -95,7 +91,7 @@ export const connectAction = action(
       await writeSecret(tx, user.id, row!.id, credential);
       return row!;
     });
-    return ok(toConnection(stored));
+    return ok(stored);
   },
 );
 
@@ -145,7 +141,7 @@ export const testConnectionAction = action(
         ),
       )
       .returning(connectionColumns);
-    return row ? ok(toConnection(row)) : err(notFound("Connection", connectionId));
+    return row ? ok(row) : err(notFound("Connection", connectionId));
   },
 );
 

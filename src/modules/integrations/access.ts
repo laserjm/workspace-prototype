@@ -15,8 +15,12 @@ export async function accessFor(
   user: User,
   connection: Connection,
 ): Promise<ConnectionAccess | undefined> {
-  const access = { connectionId: connection.id, baseUrl: connection.baseUrl };
-  if (connection.builtIn) return access;
   const credential = await readCredential(user.id, connection.id);
-  return credential && { ...access, authorization: authorizationOf(credential) };
+  return (
+    credential && {
+      connectionId: connection.id,
+      baseUrl: connection.baseUrl,
+      authorization: authorizationOf(credential),
+    }
+  );
 }

@@ -48,8 +48,6 @@ const connectGithub = (user: User | null, value: string, baseUrl?: string) =>
     credential: token(value),
     ...(baseUrl ? { baseUrl } : {}),
   });
-const stored = async (user: User) =>
-  (await listConnections(user)).filter((connection) => !connection.builtIn);
 const secretRows = (connectionId: string) =>
   db()
     .select()
@@ -102,7 +100,7 @@ describeIntegration(
     afterEach(async () => {
       vi.unstubAllGlobals();
       for (const user of [ana, ben])
-        for (const connection of await stored(user))
+        for (const connection of await listConnections(user))
           await callAs(user, disconnectAction, { connectionId: connection.id });
     });
 
@@ -114,7 +112,6 @@ describeIntegration(
           id: expect.any(String),
           providerId: "github",
           accountLabel: "@ana",
-          builtIn: false,
           status: "active",
           baseUrl: "https://api.github.com",
           scopes: [],
@@ -123,7 +120,7 @@ describeIntegration(
         },
       });
       const connection = result.ok ? result.value : undefined;
-      expect(await stored(ana)).toEqual([connection]);
+      expect(await listConnections(ana)).toEqual([connection]);
       expect(JSON.stringify(result)).not.toContain("tok-ana");
 
       const [secret] = await secretRows(connection!.id);
@@ -142,7 +139,7 @@ describeIntegration(
       const first = await connectGithub(ana, "tok-ana");
       const again = await connectGithub(ana, "tok-ana-2");
       expect(again.ok && again.value.id).toBe(first.ok && first.value.id);
-      const connections = await stored(ana);
+      const connections = await listConnections(ana);
       expect(connections).toHaveLength(1);
       expect(await accessFor(ana, connections[0]!)).toMatchObject({
         authorization: "Bearer tok-ana-2",
@@ -154,7 +151,7 @@ describeIntegration(
         ok: false,
         error: { _tag: "CredentialRejected", message: expect.any(String) },
       });
-      expect(await stored(ana)).toEqual([]);
+      expect(await listConnections(ana)).toEqual([]);
     });
 
     it("says when GitHub cannot be reached, and stores nothing", async () => {
@@ -163,15 +160,15 @@ describeIntegration(
         ok: false,
         error: { _tag: "ProviderUnreachable" },
       });
-      expect(await stored(ana)).toEqual([]);
+      expect(await listConnections(ana)).toEqual([]);
     });
 
-    it.each([
-      { name: "an unknown provider", providerId: "sharepoint" },
-      { name: "the built-in sample", providerId: "sample" },
-    ])("refuses $name", async ({ providerId }) => {
+    it("refuses an unknown provider", async () => {
       expect(
-        await callAs(ana, connectAction, { providerId, credential: token("tok-ana") }),
+        await callAs(ana, connectAction, {
+          providerId: "sharepoint",
+          credential: token("tok-ana"),
+        }),
       ).toMatchObject({ ok: false, error: { _tag: "NotFound", entity: "Provider" } });
     });
 
@@ -221,7 +218,7 @@ describeIntegration(
         },
       });
       expect(fetch).not.toHaveBeenCalled();
-      expect(await stored(ana)).toEqual([]);
+      expect(await listConnections(ana)).toEqual([]);
     });
 
     it("connects at a host on the internet, without following redirects", async () => {
@@ -247,7 +244,7 @@ describeIntegration(
         ok: false,
         error: { _tag: "ProviderUnreachable" },
       });
-      expect((await stored(ana))[0]?.status).toBe("active");
+      expect((await listConnections(ana))[0]?.status).toBe("active");
 
       github.down = false;
       github.accounts.delete("tok-ana");
@@ -266,13 +263,13 @@ describeIntegration(
         ok: false,
         error: { kind: "not_found" },
       });
-      expect((await stored(ana))[0]?.status).toBe("active");
+      expect((await listConnections(ana))[0]?.status).toBe("active");
 
       expect(await searchRecords(ana, connectionId, {})).toEqual({
         ok: false,
         error: { kind: "needs_reconnect" },
       });
-      expect((await stored(ana))[0]?.status).toBe("needs_reconnect");
+      expect((await listConnections(ana))[0]?.status).toBe("needs_reconnect");
     });
 
     it("disconnects: the connection and its credential are gone", async () => {
@@ -282,7 +279,7 @@ describeIntegration(
         ok: true,
         value: { id: connectionId },
       });
-      expect(await stored(ana)).toEqual([]);
+      expect(await listConnections(ana)).toEqual([]);
       expect(await secretRows(connectionId)).toEqual([]);
       expect(await callAs(ana, disconnectAction, { connectionId })).toMatchObject({
         ok: false,
@@ -295,7 +292,7 @@ describeIntegration(
         ok: false,
         error: { _tag: "SignedOut" },
       });
-      expect(await stored(ana)).toEqual([]);
+      expect(await listConnections(ana)).toEqual([]);
     });
 
     // Ben can neither see Ana's connection, nor test or disconnect it by its id.
@@ -305,9 +302,9 @@ describeIntegration(
       ownerB: ben.id,
       arrange: (owner) =>
         connectGithub(aUser(owner), owner === ana.id ? "tok-ana" : "tok-ben"),
-      read: (owner) => stored(aUser(owner)),
+      read: (owner) => listConnections(aUser(owner)),
       change: async (owner) => {
-        for (const connection of await stored(ana)) {
+        for (const connection of await listConnections(ana)) {
           await callAs(aUser(owner), testConnectionAction, {
             connectionId: connection.id,
           });

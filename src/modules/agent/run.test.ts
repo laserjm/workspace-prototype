@@ -191,7 +191,7 @@ describe("runAgent", () => {
   it.each([
     { name: "a connection without its label", connections: [{ ...laserjm, label: undefined, items: [] }] },
     { name: "an item without its snapshot", connections: [{ ...laserjm, items: [{ type: "issue", key: "a/b#1" }] }] },
-    { name: "a connection id that is not a uuid", connections: [{ ...laserjm, connectionId: "sample", items: [] }] },
+    { name: "a connection id that is not a uuid", connections: [{ ...laserjm, connectionId: "not-a-uuid", items: [] }] },
     {
       name: "11 items",
       connections: [{ ...laserjm, items: Array.from({ length: 11 }, (_, index) => issue(index + 1)) }],
