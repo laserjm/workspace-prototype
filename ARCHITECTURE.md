@@ -372,8 +372,11 @@ A provider with records (ADR 0003 §3) declares them in its manifest's `records`
 with a singular and a plural label and its states, each state with a label and a tone from
 `RECORD_TONES` (`open`, `draft`, `done`, `closed`, `neutral`; an undeclared state draws
 `neutral`); which of the dialog's generic filters (`type`, `includeClosed`) its search supports;
-and its search, which answers a `RecordSearchPage` (`RecordSummary`s, an opaque `next` cursor,
-`total`, the connection's `reach`) or a `RecordError` and never throws. The sample's older reader
+the hint the dialog shows under its search field (`hint.idle` before typing, `hint.typing` while
+typing; a provider's own terms, such as GitHub's numbers and repository names, stay in its
+declaration); and its search, which answers a `RecordSearchPage` (`RecordSummary`s, an opaque
+`next` cursor, `total`, the connection's `reach`, and `narrowedTo` when the text narrowed it,
+which the dialog shows) or a `RecordError` and never throws. The sample's older reader
 is its manifest's `sources`. The declarations, without code, reach the browser on
 `ProviderChoice.records`; each provider's marks (its own and one per type) are in its `views/`,
 gathered by provider id in `record-views.ts`. `searchRecords(user, connectionId, query)`
@@ -383,10 +386,23 @@ gathered by provider id in `record-views.ts`. `searchRecords(user, connectionId,
 /api/connections/[connectionId]/records?q=&type=&closed=&cursor=` serves it to the attach dialog,
 `private, no-store`; `record-error.ts` beside it answers a `RecordError` as a status and `{ error:
 { kind, message, retryAt? } }` (404, 403, 409 for `needs_reconnect` because 401 means the
-session ended, 429 with `Retry-After`, 502, 422). GitHub's search names the token's repositories
-(`GET /user/repos`) as `repo:a repo:b …`, adds the typed words with `in:title,body` (a word GitHub
-would read as a qualifier is quoted), `is:issue` or `is:pr` and `is:open` unless closed items
-count, 20 a page; its cursor encodes the page number. GitHub's classifier (`classifyGithubAnswer`
+session ended, 429 with `Retry-After`, 502, 422). GitHub's search (#43) names the token's
+repositories (`GET /user/repos`) as `repo:a repo:b …`, or `user:<owner>` for each distinct owner
+when that would make the query longer than 256 characters; adds the typed words with
+`in:title,body` (a word GitHub would read as a qualifier is quoted), `is:issue` or `is:pr` and
+`is:open` unless closed items count, 20 a page; its cursor encodes the page number. A word that
+names a readable repository exactly, in any case (`web` or `acme/web`), narrows the scope to it
+instead of being searched. `482` or `#482` is searched as `482`; with one repository in play
+(narrowed, or the only one the token reads) the issue or pull request of that number is also read
+(`GET /repos/{o}/{r}/issues/{n}`) and put on top when the toggles let it through. Before typing,
+two searches sorted by `updated` run in parallel, one with `involves:@me`, and their results are
+listed once each, the first's first; later pages continue the second. The attach dialog searches
+250 ms after the last keystroke, aborts the search in flight when a newer one starts, and keeps
+the answers by `(connection, q, toggles)` while it is open (`useSearchCache`); nothing is cached
+on the server. A refused search keeps the results shown and adds one quiet line (the rate limit's
+wait, or "Reconnect GitHub"). A connection that needs reconnecting shows so with **Reconnect**,
+its search is disabled, and the dialog opens on it only when no other works
+(`defaultConnectionId`, `records/contracts.ts`). GitHub's classifier (`classifyGithubAnswer`
 in `providers/github/api.ts`) is shared with `verifyGithubToken`, which reports a rate limit as
 `RateLimited` rather than a refused token: 401 is `needs_reconnect`; a 403 or 429 with
 `x-ratelimit-remaining: 0`, `retry-after` or a secondary rate limit is `rate_limited` with
@@ -412,8 +428,9 @@ address kind with name resolution stubbed, test, disconnect, a search marking on
 connection `needs_reconnect`, a visitor, `assertIsolation()`); the marks registry in
 `providers.test.ts` (a mark for each declared type, none for another); `providers/github/api.test.ts`;
 `app/api/connections/[connectionId]/records/route.test.ts` (the scoped query, the toggles and
-the cursor, the computed states, another user's connection, each classifier case and a 401
-marking the connection); `sources/queries.test.ts`; `tsc`.
+the cursor, the before-typing pair, narrowing by a repository name, the number on top, the
+`user:` fallback, the computed states, another user's connection, each classifier case and a 401
+marking the connection); `records/contracts.test.ts` (the dialog's default connection); `sources/queries.test.ts`; `tsc`.
 **Recorded in.** This entry; `docs/adr/0002-integrations.md`;
 `docs/adr/0003-attached-items-and-record-views.md`.
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { ChevronDown, LoaderCircle, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,6 +16,7 @@ import {
   ProviderMark,
   RecordKindMark,
   useIntegrations,
+  waitLabel,
   type Connection,
   type ProviderChoice,
   type RecordSummary,
@@ -23,6 +24,7 @@ import {
 import {
   applyPicks,
   canPick,
+  defaultConnectionId,
   isPicked,
   itemCount,
   MAX_ATTACHED_ITEMS,
@@ -31,7 +33,12 @@ import {
   type AttachedConnection,
   type ConnectionRef,
 } from "../contracts";
-import { useRecordSearch } from "./use-record-search";
+import {
+  useRecordSearch,
+  useSearchCache,
+  type SearchCache,
+  type SearchError,
+} from "./use-record-search";
 
 /** A connection the dialog can search: its provider declares records. */
 type Searchable = { connection: Connection; provider: ProviderChoice };
@@ -54,6 +61,25 @@ function ago(iso: string, now = Date.now()) {
   const days = Math.round(hours / 24);
   if (Math.abs(days) < 30) return relative.format(days, "day");
   return relative.format(Math.round(days / 30), "month");
+}
+
+/** The typed words worth marking in a title: a number without its `#`, other words of 2 letters on. */
+function markedWords(text: string): string[] {
+  return text
+    .split(/\s+/)
+    .map((word) => word.replace(/^#(?=\d)/, ""))
+    .filter((word) => word.length > 1 || /^\d$/.test(word));
+}
+
+/** `title` with each typed word bold where a word of the title starts with it. */
+function highlighted(title: string, words: readonly string[]): ReactNode {
+  if (!words.length) return title;
+  const escaped = words.map((word) => word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const pattern = new RegExp(`(?<![\\p{L}\\p{N}])(${escaped.join("|")})`, "giu");
+  return title.split(pattern).map((part, index) =>
+    // split() puts the matches at the odd places.
+    index % 2 ? <strong key={index} className="font-semibold text-foreground">{part}</strong> : part,
+  );
 }
 
 /**
@@ -79,12 +105,13 @@ export function AttachDialog({
     const provider = providers.find((choice) => choice.id === connection.providerId);
     return provider?.records ? [{ connection, provider }] : [];
   });
-  const [connectionId, setConnectionId] = useState(
-    () =>
-      attached.find((entry) =>
-        searchable.some(({ connection }) => connection.id === entry.connectionId),
-      )?.connectionId ?? searchable[0]?.connection.id,
+  const [connectionId, setConnectionId] = useState(() =>
+    defaultConnectionId(
+      searchable.map(({ connection }) => connection),
+      attached,
+    ),
   );
+  const cache = useSearchCache();
   const shown = searchable.find(({ connection }) => connection.id === connectionId);
   const [picks, setPicks] = useState(attached);
 
@@ -104,6 +131,7 @@ export function AttachDialog({
             shown={shown}
             searchable={searchable}
             onSwitch={setConnectionId}
+            cache={cache}
             picks={picks}
             onPicks={setPicks}
             onApply={() => {
@@ -111,6 +139,10 @@ export function AttachDialog({
               onClose();
             }}
             onCancel={onClose}
+            onReconnect={() => {
+              onClose();
+              onConnect();
+            }}
           />
         ) : (
           <>
@@ -140,36 +172,95 @@ export function AttachDialog({
   );
 }
 
+/** "GitHub's search limit is reached, try again in 40 s", counting down. */
+function RateLimitWait({ retryAt, provider }: { retryAt: string; provider: ProviderChoice }) {
+  const [now, setNow] = useState(() => Date.now());
+  const waiting = Date.parse(retryAt) > now;
+  useEffect(() => {
+    if (!waiting) return;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [waiting]);
+  return waiting
+    ? `${provider.name}'s search limit is reached, try again in ${waitLabel(retryAt, now)}.`
+    : `${provider.name}'s search limit should have reset. Change the search to try again.`;
+}
+
+/** The one quiet line a refused search leaves above the results it keeps. */
+function SearchErrorLine({
+  error,
+  broken,
+  provider,
+  onReconnect,
+}: {
+  error: SearchError | undefined;
+  broken: boolean;
+  provider: ProviderChoice;
+  onReconnect: () => void;
+}) {
+  const retryAt = error?.kind === "rate_limited" ? error.retryAt : undefined;
+  let line: ReactNode;
+  if (broken || error?.kind === "needs_reconnect")
+    line = (
+      <button type="button" className="text-info-foreground hover:underline" onClick={onReconnect}>
+        Reconnect {provider.name}
+      </button>
+    );
+  // Keyed by the wait, so each wait counts down from its own start.
+  else if (retryAt) line = <RateLimitWait key={retryAt} retryAt={retryAt} provider={provider} />;
+  else if (error) line = error.message;
+  else return null;
+  return (
+    <p role="status" className="mt-2 text-2xs text-secondary-label">
+      {line}
+    </p>
+  );
+}
+
 function ConnectionSearch({
   shown,
   searchable,
   onSwitch,
+  cache,
   picks,
   onPicks,
   onApply,
   onCancel,
+  onReconnect,
 }: {
   shown: Searchable;
   searchable: Searchable[];
   onSwitch: (connectionId: string) => void;
+  cache: SearchCache;
   picks: readonly AttachedConnection[];
   onPicks: (picks: readonly AttachedConnection[]) => void;
   onApply: () => void;
   onCancel: () => void;
+  /** Leads to Settings, where the connection is connected again. */
+  onReconnect: () => void;
 }) {
   const { connection, provider } = shown;
+  const { putConnection } = useIntegrations();
+  const broken = connection.status === "needs_reconnect";
   const records = provider.records!;
   const types = Object.entries(records.types);
   const [text, setText] = useState("");
   const [type, setType] = useState("");
   const [includeClosed, setIncludeClosed] = useState(false);
   const input = useRef<HTMLInputElement>(null);
-  const search = useRecordSearch({
-    connectionId: connection.id,
-    text,
-    type,
-    includeClosed,
-  });
+  const search = useRecordSearch(
+    { connectionId: connection.id, text, type, includeClosed },
+    {
+      cache,
+      enabled: !broken,
+      onError(error) {
+        // The server marked it; the dialog and Settings now show it too.
+        if (error.kind === "needs_reconnect")
+          putConnection({ ...connection, status: "needs_reconnect" });
+      },
+    },
+  );
+  const words = markedWords(text);
   const ref = refOf(shown);
   const count = itemCount(picks);
   const picked = picks.flatMap((entry) =>
@@ -204,10 +295,19 @@ function ConnectionSearch({
           <strong className="block text-xs font-medium">
             {provider.name} · {connection.accountLabel}
           </strong>
-          <small className="mt-1 block truncate text-3xs text-secondary-label">
-            {search.reach ?? (search.error ? "" : "Reading what this connection reaches…")}
-          </small>
+          {broken ? (
+            <small className="mt-1 block text-3xs text-warning-foreground">Needs reconnecting</small>
+          ) : (
+            <small className="mt-1 block truncate text-3xs text-secondary-label">
+              {search.reach ?? (search.error ? "" : "Reading what this connection reaches…")}
+            </small>
+          )}
         </div>
+        {broken && (
+          <Button variant="outline" size="xs" onClick={onReconnect}>
+            Reconnect
+          </Button>
+        )}
         {searchable.length > 1 && (
           <label className="relative flex items-center text-2xs text-info-foreground">
             <span className="pr-4">Switch</span>
@@ -230,7 +330,10 @@ function ConnectionSearch({
 
       <div className="flex flex-col gap-2.5">
         <div
-          className="flex min-h-9 min-w-0 cursor-text flex-wrap items-center gap-1.5 rounded-sm border border-border bg-card px-2 py-1.5 text-icon-muted focus-within:border-ring"
+          className={cn(
+            "flex min-h-9 min-w-0 cursor-text flex-wrap items-center gap-1.5 rounded-sm border border-border bg-card px-2 py-1.5 text-icon-muted focus-within:border-ring",
+            broken && "cursor-default",
+          )}
           onClick={() => input.current?.focus()}
         >
           <Search size={15} className="shrink-0" />
@@ -263,8 +366,9 @@ function ConnectionSearch({
           <input
             ref={input}
             autoFocus
+            disabled={broken}
             aria-label={`Search ${pluralLabels(records)}`}
-            className="min-w-24 flex-1 bg-transparent py-0.5 text-xs text-accent-foreground outline-none placeholder:text-placeholder"
+            className="min-w-24 flex-1 bg-transparent py-0.5 text-xs text-accent-foreground outline-none placeholder:text-placeholder disabled:cursor-not-allowed"
             placeholder={picked.length ? "Add more…" : "Search titles and descriptions…"}
             value={text}
             onChange={(event) => setText(event.target.value)}
@@ -274,10 +378,22 @@ function ConnectionSearch({
             <LoaderCircle className="size-3.5 shrink-0 animate-spin" aria-hidden />
           )}
         </div>
-        <p className="text-3xs text-secondary-label">
-          {text.trim()
-            ? "Matches every word in titles and descriptions, best matches first."
-            : "Most recently updated first. Type words to match titles and descriptions."}
+        <p className="text-3xs leading-normal text-secondary-label">
+          {search.narrowedTo && text.trim() && (
+            <>
+              Narrowed to{" "}
+              {search.narrowedTo.map((where, index) => (
+                <span key={where}>
+                  {index > 0 && ", "}
+                  <span className="rounded-xs bg-accent px-1 py-px text-secondary-foreground">
+                    {where}
+                  </span>
+                </span>
+              ))}
+              .{" "}
+            </>
+          )}
+          {text.trim() ? records.hint.typing : records.hint.idle}
         </p>
         <div className="flex items-center gap-3">
           {records.filters.includes("type") && types.length > 1 && (
@@ -287,6 +403,7 @@ function ConnectionSearch({
                   <button
                     key={value}
                     type="button"
+                    disabled={broken}
                     aria-pressed={type === value}
                     onClick={() => setType(value)}
                     className={cn(
@@ -305,6 +422,7 @@ function ConnectionSearch({
               <input
                 type="checkbox"
                 className="size-3.5 accent-primary"
+                disabled={broken}
                 checked={includeClosed}
                 onChange={(event) => setIncludeClosed(event.target.checked)}
               />
@@ -327,11 +445,12 @@ function ConnectionSearch({
             {count} of {MAX_ATTACHED_ITEMS} picked
           </span>
         </div>
-        {search.error && (
-          <p role="status" className="mt-2 text-2xs text-destructive-foreground">
-            {search.error.message}
-          </p>
-        )}
+        <SearchErrorLine
+          error={search.error}
+          broken={broken}
+          provider={provider}
+          onReconnect={onReconnect}
+        />
         <div
           role="listbox"
           aria-multiselectable
@@ -383,13 +502,13 @@ function ConnectionSearch({
                     {result.where} · {state} · {ago(result.updatedAt)}
                   </small>
                   <span className="mt-1.5 block truncate text-xs text-secondary-foreground">
-                    {result.title}
+                    {highlighted(result.title, words)}
                   </span>
                 </span>
               </div>
             );
           })}
-          {!search.loading && !search.error && search.results.length === 0 && (
+          {!search.loading && !search.error && !broken && search.results.length === 0 && (
             <p className="py-6 text-center text-xs text-muted-foreground">
               Nothing matches{text.trim() ? ` “${text.trim()}”` : ""}.
             </p>

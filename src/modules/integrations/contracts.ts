@@ -252,12 +252,23 @@ export type RecordSearchPage = {
   total?: number;
   /** What the connection reaches, e.g. "Organisation acme, 4 repositories". */
   reach?: string;
+  /** Where the typed text narrowed the search to, e.g. ["acme/web"]; the dialog shows it. */
+  narrowedTo?: string[];
+};
+
+/** The line under the attach dialog's search field: what the provider's search makes of the text. */
+export type RecordSearchHint = {
+  /** Before typing: what is listed, and what one can type. */
+  idle: string;
+  /** While typing: how the words match. */
+  typing: string;
 };
 
 /** The records part of a provider's manifest. */
 export type ProviderRecords = {
   types: Readonly<Record<string, RecordTypeDeclaration>>;
   filters: readonly RecordFilter[];
+  hint: RecordSearchHint;
   search: (
     access: ConnectionAccess,
     query: RecordSearchQuery,
@@ -265,7 +276,7 @@ export type ProviderRecords = {
 };
 
 /** The records declaration as the browser gets it: no code. */
-export type RecordDeclarations = Pick<ProviderRecords, "types" | "filters">;
+export type RecordDeclarations = Pick<ProviderRecords, "types" | "filters" | "hint">;
 
 /** The tone a record in `state` is drawn in; `neutral` for anything undeclared. */
 export function toneOf(
@@ -281,6 +292,12 @@ export function pluralLabels(declarations: RecordDeclarations): string {
   const plurals = Object.values(declarations.types).map((type) => type.plural);
   if (plurals.length <= 1) return plurals.join("");
   return `${plurals.slice(0, -1).join(", ")} and ${plurals.at(-1)}`;
+}
+
+/** "40 s", "3 min": how long until `retryAt`, at least a second. */
+export function waitLabel(retryAt: string, now = Date.now()): string {
+  const seconds = Math.max(1, Math.ceil((Date.parse(retryAt) - now) / 1000));
+  return seconds < 90 ? `${seconds} s` : `${Math.ceil(seconds / 60)} min`;
 }
 
 /** Declares a provider; only checks it against the contract. */

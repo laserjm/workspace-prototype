@@ -1,6 +1,6 @@
 // What a question is about: the records the user attached, grouped by connection (ADR 0003 §1).
 // Browser-safe: types and the composer's attachment rules, pure.
-import type { RecordSummary } from "@/modules/integrations";
+import type { Connection, RecordSummary } from "@/modules/integrations";
 
 /** At most this many items, and this many connections, go on one question. */
 export const MAX_ATTACHED_ITEMS = 10;
@@ -112,4 +112,21 @@ export function applyPicks(
 ): readonly AttachedConnection[] {
   const withItems = picks.filter((connection) => connection.items.length > 0);
   return withItems.length ? withItems : [{ ...shown, items: [] }];
+}
+
+/**
+ * The connection the attach dialog opens on, of those it can search, in their order: one already
+ * attached, or else the first. A connection that needs reconnecting only when none works (#47).
+ */
+export function defaultConnectionId(
+  connections: readonly Pick<Connection, "id" | "status">[],
+  attached: readonly AttachedConnection[],
+): string | undefined {
+  const working = connections.filter((connection) => connection.status === "active");
+  const candidates = working.length ? working : connections;
+  return (
+    candidates.find((connection) =>
+      attached.some((entry) => entry.connectionId === connection.id),
+    ) ?? candidates[0]
+  )?.id;
 }

@@ -77,6 +77,6 @@ export async function listProviderChoices(): Promise<ProviderChoice[]> {
     description,
     auth,
     ...(baseUrl ? { baseUrl } : {}),
-    ...(records ? { records: { types: records.types, filters: records.filters } } : {}),
+    ...(records ? { records: { types: records.types, filters: records.filters, hint: records.hint } } : {}),
   }));
 }

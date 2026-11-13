@@ -74,22 +74,20 @@ const repositoriesSchema = z.array(
 );
 type Repository = z.infer<typeof repositoriesSchema>[number];
 
-const searchSchema = z.object({
-  total_count: z.number(),
-  items: z.array(
-    z.object({
-      number: z.number(),
-      title: z.string(),
-      state: z.enum(["open", "closed"]),
-      state_reason: z.string().nullish(),
-      draft: z.boolean().optional(),
-      pull_request: z.object({ merged_at: z.string().nullable() }).optional(),
-      repository_url: z.string(),
-      updated_at: z.string(),
-    }),
-  ),
+/** An issue or a pull request as the search lists it, and as `GET /repos/…/issues/{n}` answers. */
+const itemSchema = z.object({
+  number: z.number(),
+  title: z.string(),
+  state: z.enum(["open", "closed"]),
+  state_reason: z.string().nullish(),
+  draft: z.boolean().nullish(),
+  pull_request: z.object({ merged_at: z.string().nullable() }).nullish(),
+  repository_url: z.string(),
+  updated_at: z.string(),
 });
-type SearchItem = z.infer<typeof searchSchema>["items"][number];
+type SearchItem = z.infer<typeof itemSchema>;
+
+const searchSchema = z.object({ total_count: z.number(), items: z.array(itemSchema) });
 
 /** "Organisation acme, 4 repositories": whose repositories the token reads, and how many. */
 function reachOf(repositories: Repository[]): string {
@@ -101,22 +99,62 @@ function reachOf(repositories: Repository[]): string {
   return `${owner.type === "Organization" ? "Organisation " : ""}${owner.login}, ${count}`;
 }
 
+/** `482` or `#482`: a typed word that names a number. */
+const numberIn = (word: string) => /^#?(\d{1,9})$/.exec(word)?.[1];
+
 /** A typed word GitHub would read as a qualifier or an operator is searched as plain text. */
 function searchWord(word: string): string {
+  const number = numberIn(word);
+  if (number) return number;
   const plain = word.replaceAll('"', "");
   return /[:()]|^-|^(AND|OR|NOT)$/.test(plain) ? `"${plain}"` : plain;
 }
 
-/** The search query: the token's repositories, the words, the type and whether closed items count. */
-function queryOf(repositories: Repository[], query: RecordSearchQuery): string {
-  const words = (query.text ?? "").split(/\s+/).filter(Boolean).map(searchWord).filter(Boolean);
-  return [
-    ...repositories.map((repo) => `repo:${repo.full_name}`),
+/** GitHub refuses a longer search query. */
+const QUERY_LIMIT = 256;
+
+/** What one search asks GitHub for, besides the dialog's toggles. */
+type SearchTerms = {
+  /** The repositories searched, e.g. "acme/web". */
+  repositories: readonly string[];
+  words: readonly string[];
+  /** Only what involves the token's user (`involves:@me`). */
+  involvesMe?: boolean;
+};
+
+/**
+ * The search query: the repositories, the words, the type and whether closed items count. When
+ * naming each repository makes it too long, it names their owners instead, which may also find
+ * an owner's public repositories the token was not given (#43).
+ */
+function queryOf({ repositories, words, involvesMe }: SearchTerms, query: RecordSearchQuery): string {
+  const rest = [
+    ...(involvesMe ? ["involves:@me"] : []),
     ...words,
     ...(words.length ? ["in:title,body"] : []),
     ...(query.type ? [QUALIFIER[query.type as GithubRecordType]] : []),
     ...(query.includeClosed ? [] : ["is:open"]),
-  ].join(" ");
+  ];
+  const byRepository = [...repositories.map((name) => `repo:${name}`), ...rest].join(" ");
+  if (byRepository.length <= QUERY_LIMIT) return byRepository;
+  const owners = new Set(repositories.map((name) => name.split("/")[0]));
+  return [...[...owners].map((owner) => `user:${owner}`), ...rest].join(" ");
+}
+
+/** One page of one search: GitHub's best matches with words, the most recently updated without. */
+function searchPage(
+  access: ConnectionAccess,
+  terms: SearchTerms,
+  query: RecordSearchQuery,
+  page: number,
+) {
+  const params = new URLSearchParams({
+    q: queryOf(terms, query),
+    ...(terms.words.length ? {} : { sort: "updated", order: "desc" }),
+    per_page: String(PAGE_SIZE),
+    ...(page > 1 ? { page: String(page) } : {}),
+  });
+  return getJson(`/search/issues?${params}`, access, searchSchema);
 }
 
 const cursorSchema = z.object({ page: z.number().int().min(2) });
@@ -161,8 +199,9 @@ function summaryOf(connectionId: string, item: SearchItem): RecordSummary {
 }
 
 /**
- * Issues and pull requests in every repository the token reads (`GET /user/repos`), 20 a page.
- * Without words, the most recently updated come first; with words, GitHub's best matches.
+ * Issues and pull requests in every repository the token reads (`GET /user/repos`), 20 a page
+ * (#43). Without words, what involves the user comes first, then the most recently updated, and
+ * later pages continue the second; with words, GitHub's best matches.
  */
 export async function searchGithubRecords(
   access: ConnectionAccess,
@@ -179,20 +218,68 @@ export async function searchGithubRecords(
   const reach = reachOf(repositories.value);
   if (repositories.value.length === 0) return ok({ results: [], total: 0, reach });
 
-  const params = new URLSearchParams({
-    q: queryOf(repositories.value, query),
-    ...(query.text?.trim() ? {} : { sort: "updated", order: "desc" }),
-    per_page: String(PAGE_SIZE),
-    ...(page > 1 ? { page: String(page) } : {}),
-  });
-  const found = await getJson(`/search/issues?${params}`, access, searchSchema);
+  const typed = (query.text ?? "").split(/\s+/).filter(Boolean);
+  const named = typed.map((word) => repositoriesNamed(repositories.value, word));
+  const narrowedTo = [...new Set(named.flat().map((repo) => repo.full_name))];
+  const inPlay = narrowedTo.length ? narrowedTo : repositories.value.map((repo) => repo.full_name);
+  const terms: SearchTerms = {
+    repositories: inPlay,
+    words: typed
+      .filter((_, index) => named[index].length === 0)
+      .map(searchWord)
+      .filter(Boolean),
+  };
+  const suggesting = typed.length === 0 && page === 1;
+  // With one repository in play, a typed number is also read directly and put on top: the search
+  // has no number qualifier.
+  const number = page === 1 && inPlay.length === 1 ? typed.map(numberIn).find(Boolean) : undefined;
+  const [found, involving, numbered] = await Promise.all([
+    searchPage(access, terms, query, page),
+    suggesting ? searchPage(access, { ...terms, involvesMe: true }, query, 1) : undefined,
+    number ? getJson(`/repos/${inPlay[0]}/issues/${number}`, access, itemSchema) : undefined,
+  ]);
   if (!found.ok) return found;
-  const { total_count: total, items } = found.value;
-  const hasNext = page * PAGE_SIZE < Math.min(total, SEARCH_LIMIT);
+  if (involving && !involving.ok) return involving;
+  // A number nothing has, or cannot be read, is only not on top.
+  const exact = numbered?.ok && matchesToggles(numbered.value, query) ? [numbered.value] : [];
+  const items = uniqueItems([...exact, ...(involving?.value.items ?? []), ...found.value.items]);
+  const foundIds = new Set(found.value.items.map(idOf));
+  const total = found.value.total_count + exact.filter((item) => !foundIds.has(idOf(item))).length;
+  const hasNext = page * PAGE_SIZE < Math.min(found.value.total_count, SEARCH_LIMIT);
   return ok({
     results: items.map((item) => summaryOf(access.connectionId, item)),
     ...(hasNext ? { next: cursorOf(page + 1) } : {}),
     total,
     reach,
+    ...(narrowedTo.length ? { narrowedTo } : {}),
+  });
+}
+
+/** The repositories a typed word names exactly, in any case: `web` (of any owner) or `acme/web`. */
+function repositoriesNamed(repositories: readonly Repository[], word: string) {
+  const name = word.toLowerCase();
+  return repositories.filter((repo) => {
+    const full = repo.full_name.toLowerCase();
+    return full === name || full.split("/")[1] === name;
+  });
+}
+
+/** Whether an item read directly is one the dialog's toggles let through. */
+function matchesToggles(item: SearchItem, query: RecordSearchQuery): boolean {
+  const type: GithubRecordType = item.pull_request ? "pull-request" : "issue";
+  if (query.type !== undefined && query.type !== type) return false;
+  return query.includeClosed === true || item.state === "open";
+}
+
+const idOf = (item: SearchItem) => `${item.repository_url}#${item.number}`;
+
+/** Each item once, where it first appears. */
+function uniqueItems(items: readonly SearchItem[]): SearchItem[] {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    const id = idOf(item);
+    if (seen.has(id)) return false;
+    seen.add(id);
+    return true;
   });
 }

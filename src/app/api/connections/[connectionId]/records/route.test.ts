@@ -82,17 +82,205 @@ describe("GET /api/connections/[connectionId]/records", () => {
   });
 
   it.each<{ params: Record<string, string>; q: string }>([
-    { params: { type: "issue" }, q: `${SCOPE} is:issue is:open` },
-    { params: { type: "pull-request" }, q: `${SCOPE} is:pr is:open` },
-    { params: { closed: "1" }, q: SCOPE },
-    { params: { type: "issue", closed: "1" }, q: `${SCOPE} is:issue` },
-  ])("narrows by the toggles $params, newest first before typing", async ({ params, q }) => {
+    { params: { type: "issue", q: "status" }, q: `${SCOPE} status in:title,body is:issue is:open` },
+    { params: { type: "pull-request", q: "status" }, q: `${SCOPE} status in:title,body is:pr is:open` },
+    { params: { closed: "1", q: "status" }, q: `${SCOPE} status in:title,body` },
+    { params: { type: "issue", closed: "1", q: "status" }, q: `${SCOPE} status in:title,body is:issue` },
+  ])("narrows by the toggles $params", async ({ params, q }) => {
     const { requests } = useRecordedGithub({
       [REPOS]: "repositories.json",
-      [`GET /search/issues?q=${q}&sort=updated&order=desc&per_page=20`]: "search.json",
+      [`GET /search/issues?q=${q}&per_page=20`]: "search-narrowed.json",
     });
     expect((await search(params)).response.status).toBe(200);
     expect(requests).toHaveLength(2);
+  });
+
+  describe("a word naming a repository", () => {
+    /** The token's repositories: the sandbox and one more of the same owner. */
+    const twoRepositories = {
+      status: 200,
+      body: [
+        ...JSON.parse(readFixture("repositories.json")),
+        { full_name: "laserjm/other", owner: { login: "laserjm", type: "User" } },
+      ],
+    };
+
+    it.each(["workspace-fixtures", "Workspace-Fixtures", "laserjm/workspace-fixtures", "LaserJM/Workspace-Fixtures"])(
+      "narrows the search to it, as %s",
+      async (word) => {
+        useRecordedGithub({
+          [REPOS]: twoRepositories,
+          [`GET /search/issues?q=${SCOPE} status in:title,body is:open&per_page=20`]:
+            "search-narrowed.json",
+        });
+        const { response, body } = await search({ q: `${word} status` });
+        expect(response.status).toBe(200);
+        expect(body.narrowedTo).toEqual(["laserjm/workspace-fixtures"]);
+        expect(body.results).toHaveLength(1);
+      },
+    );
+
+    it("lists the repository newest first when nothing else is typed", async () => {
+      useRecordedGithub({
+        [REPOS]: twoRepositories,
+        [`GET /search/issues?q=${SCOPE} is:open&sort=updated&order=desc&per_page=20`]: "search.json",
+      });
+      const { body } = await search({ q: "workspace-fixtures" });
+      expect(body.narrowedTo).toEqual(["laserjm/workspace-fixtures"]);
+    });
+
+    it("is searched as a word when it names no repository exactly", async () => {
+      useRecordedGithub({
+        [REPOS]: twoRepositories,
+        [`GET /search/issues?q=${SCOPE} repo:laserjm/other workspace in:title,body is:open&per_page=20`]:
+          "search-narrowed.json",
+      });
+      const { body } = await search({ q: "workspace" });
+      expect(body).not.toHaveProperty("narrowedTo");
+    });
+  });
+
+  describe("a number", () => {
+    /** A recorded search answer without #6. */
+    const withoutSix = {
+      status: 200,
+      body: { total_count: 1, incomplete_results: false, items: [recordedItem("search.json", 9)] },
+    };
+
+    it.each(["6", "#6"])(
+      "is fetched directly and put on top when one repository is in play, as %s",
+      async (word) => {
+        useRecordedGithub({
+          [REPOS]: "repositories.json",
+          [`GET /search/issues?q=${SCOPE} 6 in:title,body is:open&per_page=20`]: withoutSix,
+          "GET /repos/laserjm/workspace-fixtures/issues/6": "issue.json",
+        });
+        const { body } = await search({ q: word });
+        expect(body.results.map((result: { key: string }) => result.key)).toEqual([
+          "laserjm/workspace-fixtures#6",
+          "laserjm/workspace-fixtures#9",
+        ]);
+        expect(body.results[0]).toMatchObject({ type: "issue", state: "open" });
+      },
+    );
+
+    it("is listed once when the search finds it too", async () => {
+      useRecordedGithub({
+        [REPOS]: "repositories.json",
+        [`GET /search/issues?q=${SCOPE} 6 in:title,body is:open&per_page=20`]: "search-narrowed.json",
+        "GET /repos/laserjm/workspace-fixtures/issues/6": "issue.json",
+      });
+      const { body } = await search({ q: "6" });
+      expect(body.results).toHaveLength(1);
+    });
+
+    it("is left to the search when it is not of the toggled type", async () => {
+      useRecordedGithub({
+        [REPOS]: "repositories.json",
+        [`GET /search/issues?q=${SCOPE} 6 in:title,body is:pr is:open&per_page=20`]: withoutSix,
+        "GET /repos/laserjm/workspace-fixtures/issues/6": "issue.json",
+      });
+      const { body } = await search({ q: "6", type: "pull-request" });
+      expect(body.results).toHaveLength(1);
+    });
+
+    it("is left to the search when several repositories are in play", async () => {
+      const { requests } = useRecordedGithub({
+        [REPOS]: {
+          status: 200,
+          body: [
+            ...JSON.parse(readFixture("repositories.json")),
+            { full_name: "laserjm/other", owner: { login: "laserjm", type: "User" } },
+          ],
+        },
+        [`GET /search/issues?q=${SCOPE} repo:laserjm/other 6 in:title,body is:open&per_page=20`]:
+          withoutSix,
+      });
+      const { body } = await search({ q: "#6" });
+      expect(body.results).toHaveLength(1);
+      expect(requests).toHaveLength(2);
+    });
+  });
+
+  it("names each owner instead when the repositories make the query longer than 256 characters", async () => {
+    // 2 owners × 6 repositories × "repo:<owner>/a-repository-with-a-long-name-N " ≈ 540 characters.
+    const repositories = ["acme", "bo"].flatMap((owner) =>
+      Array.from({ length: 6 }, (_, index) => ({
+        full_name: `${owner}/a-repository-with-a-long-name-${index}`,
+        owner: { login: owner, type: owner === "acme" ? "Organization" : "User" },
+      })),
+    );
+    const { requests } = useRecordedGithub({
+      [REPOS]: { status: 200, body: repositories },
+      "GET /search/issues?q=user:acme user:bo status in:title,body is:open&per_page=20":
+        "search-narrowed.json",
+    });
+    const { response, body } = await search({ q: "status" });
+    expect(response.status).toBe(200);
+    expect(body.results).toHaveLength(1);
+    expect(body.reach).toBe("12 repositories across 2 accounts");
+    expect(requests).toHaveLength(2);
+  });
+
+  describe("before typing", () => {
+    const involving = (q: string) =>
+      `GET /search/issues?q=${SCOPE} involves:@me${q}&sort=updated&order=desc&per_page=20`;
+    const recent = (q: string, page?: number) =>
+      `GET /search/issues?q=${SCOPE}${q}&sort=updated&order=desc&per_page=20${page ? `&page=${page}` : ""}`;
+    /** A recorded search answer cut to these numbers, in this order. */
+    const answerWith = (...numbers: number[]) => ({
+      status: 200,
+      body: {
+        total_count: numbers.length,
+        incomplete_results: false,
+        items: numbers.map((number) => recordedItem("search.json", number)),
+      },
+    });
+    const numbersOf = (results: { key: string }[]) =>
+      results.map((result) => Number(result.key.split("#")[1]));
+
+    it("lists what involves the user first, then the rest by when it changed, each once", async () => {
+      useRecordedGithub({
+        [REPOS]: "repositories.json",
+        [involving("")]: answerWith(9, 6),
+        [recent("")]: "search.json",
+      });
+      const { body } = await search({ closed: "1" });
+      // search.json lists 10, 9, 8, 7, 6, 5, 3, 4, 2, 1.
+      expect(numbersOf(body.results)).toEqual([9, 6, 10, 8, 7, 5, 3, 4, 2, 1]);
+      expect(body.total).toBe(10);
+    });
+
+    it.each<{ params: Record<string, string>; q: string }>([
+      { params: { type: "issue" }, q: " is:issue is:open" },
+      { params: { type: "pull-request" }, q: " is:pr is:open" },
+      { params: { closed: "1" }, q: "" },
+      { params: { type: "issue", closed: "1" }, q: " is:issue" },
+    ])("runs both searches with the toggles $params", async ({ params, q }) => {
+      const { requests } = useRecordedGithub({
+        [REPOS]: "repositories.json",
+        [involving(q)]: answerWith(6),
+        [recent(q)]: answerWith(6, 1),
+      });
+      const { response, body } = await search(params);
+      expect(response.status).toBe(200);
+      expect(numbersOf(body.results)).toEqual([6, 1]);
+      expect(requests).toHaveLength(3);
+    });
+
+    it("loads more from the second search alone", async () => {
+      const many = { status: 200, body: { total_count: 45, incomplete_results: false, items: [] } };
+      const { requests } = useRecordedGithub({
+        [REPOS]: "repositories.json",
+        [involving(" is:open")]: answerWith(6),
+        [recent(" is:open")]: many,
+        [recent(" is:open", 2)]: answerWith(1),
+      });
+      const first = await search();
+      const second = await search({ cursor: first.body.next });
+      expect(numbersOf(second.body.results)).toEqual([1]);
+      expect(requests.filter((request) => request.includes("involves"))).toHaveLength(1);
+    });
   });
 
   it("refuses a type GitHub does not declare", async () => {
@@ -105,7 +293,14 @@ describe("GET /api/connections/[connectionId]/records", () => {
     const page = (number: number) =>
       `GET /search/issues?q=${SCOPE} is:open&sort=updated&order=desc&per_page=20${number > 1 ? `&page=${number}` : ""}`;
     const many = { status: 200, body: { total_count: 45, incomplete_results: false, items: [] } };
-    useRecordedGithub({ [REPOS]: "repositories.json", [page(1)]: many, [page(2)]: many, [page(3)]: many });
+    const involving = `GET /search/issues?q=${SCOPE} involves:@me is:open&sort=updated&order=desc&per_page=20`;
+    useRecordedGithub({
+      [REPOS]: "repositories.json",
+      [involving]: many,
+      [page(1)]: many,
+      [page(2)]: many,
+      [page(3)]: many,
+    });
 
     const first = await search();
     expect(first.body.next).toEqual(expect.any(String));
@@ -130,6 +325,8 @@ describe("GET /api/connections/[connectionId]/records", () => {
     const recorded = JSON.parse(readFixture("search.json"));
     useRecordedGithub({
       [REPOS]: "repositories.json",
+      [`GET /search/issues?q=${SCOPE} involves:@me&sort=updated&order=desc&per_page=20`]:
+        "search-involves-me.json",
       [`GET /search/issues?q=${SCOPE}&sort=updated&order=desc&per_page=20`]: {
         status: 200,
         body: { ...recorded, items: [...recorded.items, closedIssue] },
@@ -159,6 +356,7 @@ describe("GET /api/connections/[connectionId]/records", () => {
 
   describe("when GitHub refuses", () => {
     const SEARCH = `GET /search/issues?q=${SCOPE} is:open&sort=updated&order=desc&per_page=20`;
+    const INVOLVING = `GET /search/issues?q=${SCOPE} involves:@me is:open&sort=updated&order=desc&per_page=20`;
     const NOW = new Date("2026-11-13T12:00:00Z");
 
     beforeEach(() => {
@@ -168,9 +366,10 @@ describe("GET /api/connections/[connectionId]/records", () => {
       vi.useRealTimers();
     });
 
-    /** The recorded answers when the search gets `answer`. */
+    /** The recorded answers when both searches before typing get `answer`. */
     const refusal = (answer: RecordedAnswer) => ({
       [REPOS]: "repositories.json",
+      [INVOLVING]: answer,
       [SEARCH]: answer,
     });
 

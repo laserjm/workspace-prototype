@@ -12,6 +12,7 @@ import {
   type RateLimited,
   type RecordError,
   type VerifiedAccount,
+  waitLabel,
 } from "../../contracts";
 
 const TIMEOUT_MS = 10_000;
@@ -79,12 +80,6 @@ async function messageOf(response: Response): Promise<string> {
     .safeParse(await response.clone().json().catch(() => undefined));
   if (!body.success) return "";
   return [body.data.message, body.data.errors?.[0]?.message].filter(Boolean).join(": ");
-}
-
-/** "about 40 s", "about 3 min": how long until `retryAt`. */
-export function waitLabel(retryAt: string, now = Date.now()): string {
-  const seconds = Math.max(1, Math.ceil((Date.parse(retryAt) - now) / 1000));
-  return seconds < 90 ? `${seconds} s` : `${Math.ceil(seconds / 60)} min`;
 }
 
 const userSchema = z.object({ id: z.number(), login: z.string() });
