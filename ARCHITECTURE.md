@@ -425,7 +425,8 @@ declaration); and its search, which answers a `RecordSearchPage` (`RecordSummary
 `next` cursor, `total`, the connection's `reach`, and `narrowedTo` when the text narrowed it,
 which the dialog shows) or a `RecordError` and never throws. Each declared type also has a
 `read(access, key)`, which answers the record's live `RecordSummary` and the provider's own detail
-(`GithubIssueDetail`, a zod schema beside the reader; there is no generic detail type), and the
+(`GithubIssueDetail` or `GithubPullRequestDetail`, zod schemas beside the readers; there is no
+generic detail type), and the
 manifest's `url(baseUrl, type, key)` builds the record's page from the connection's base URL and
 the key, without asking the provider. The sample's older reader is its manifest's `sources`. The
 declarations, without code (`listProviderChoices` drops the readers), reach the browser on
@@ -450,12 +451,21 @@ connection, and a refusal carries the record's `url`. `GET
 /api/connections/[connectionId]/records/[type]/[key]` serves it to the record views (the key
 URL-encoded, parsed only by the provider), `private, no-store`, answering `{ summary:
 RecordSummary & { url }, detail }` or the same `{ error }`. GitHub's issue reader (#60) reads
-`/repos/{o}/{r}/issues/{n}` and its first 100 comments in parallel; a pull request is read the same
-way plus `/pulls/{n}` for its draft and merge state until #61 gives it its own detail. Both strip
+`/repos/{o}/{r}/issues/{n}` and its first 100 comments in parallel. Its pull request reader (#61)
+fans out in parallel: `/pulls/{n}` (the body, the counts, `mergeable_state`, the head commit), the
+conversation's first 100 comments (`/issues/{n}/comments`), the first 100 reviews and inline
+review comments, and the first 100 changed files (path, status, additions, deletions; the patch is
+never kept, and `fileCount` says how many more GitHub has); once `/pulls/{n}` names the head
+commit, its CI: the GitHub Actions runs (`/actions/runs?head_sha=`) and the combined commit status.
+Check runs are not read, because a fine-grained token cannot read them (#43). A 403 on either CI
+part makes that part `readable: false` and the view says which permission to give (Actions: read,
+Commit statuses: read); a 404 is an empty part; any other refusal fails the view. Both readers strip
 invisible and bidirectional Unicode (zero-width characters, the bidi embeddings, overrides and
 isolates, the byte order mark, tag characters; the zero-width joiner stays for emoji) from titles,
-bodies, labels and comments (the bidi marks including U+061C, the combining grapheme joiner and
-the Hangul fillers too). GitHub's search (#43) names the token's
+bodies, labels and comments, and the pull request reader also from reviews, file paths, branch
+names and CI names (the bidi marks including U+061C, the combining grapheme joiner and the Hangul
+fillers too). GitHub's token help names the permissions the views need: Metadata, Issues, Pull
+requests, Commit statuses and Actions, all read. GitHub's search (#43) names the token's
 repositories (`GET /user/repos`) as `repo:a repo:b …`, or `user:<owner>` for each distinct owner
 when that would make the query longer than 256 characters; adds the typed words with
 `in:title,body` (a word GitHub would read as a qualifier is quoted), `is:issue` or `is:pr` and

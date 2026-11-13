@@ -10,7 +10,7 @@ import {
   listConnections,
   resetConnections,
 } from "@/tests/support/connections";
-import { useRecordedGithub } from "@/tests/support/recorded-github";
+import { useRecordedGithub, type RecordedAnswer } from "@/tests/support/recorded-github";
 import { aUser } from "@/tests/factories/user";
 import { GET } from "./route";
 
@@ -119,34 +119,230 @@ describe("GET /api/connections/[connectionId]/records/[type]/[key]", () => {
     expect(body.detail.comments).toEqual([]);
   });
 
-  it("reads a pull request's description and conversation, merged, linking to its page", async () => {
-    const pull = readFixture("pull-request.json");
-    useRecordedGithub({
-      // `/issues/{n}` answers a pull request as an issue that has a `pull_request`.
-      "GET /repos/laserjm/workspace-fixtures/issues/8": {
-        status: 200,
-        body: {
-          ...readFixture("issue.json"),
-          number: 8,
-          title: pull.title,
-          state: pull.state,
-          body: pull.body,
-          comments: 1,
-          pull_request: { merged_at: null },
+  describe("a pull request", () => {
+    const REPO = "GET /repos/laserjm/workspace-fixtures";
+    const HEAD = "7b55399cea249bb3579d78746cbb25ca5567ec80";
+    /** The merged pull request #8, whose head has two Actions runs and two commit statuses. */
+    const merged = {
+      [`${REPO}/pulls/8`]: "pull-request.json",
+      [`${REPO}/issues/8/comments?per_page=100`]: "pull-request-comments.json",
+      [`${REPO}/pulls/8/reviews?per_page=100`]: "pull-request-reviews.json",
+      [`${REPO}/pulls/8/comments?per_page=100`]: "pull-request-review-comments.json",
+      [`${REPO}/pulls/8/files?per_page=100`]: "pull-request-files.json",
+      [`${REPO}/commits/${HEAD}/status`]: "pull-request-status.json",
+      [`${REPO}/actions/runs?head_sha=${HEAD}`]: "pull-request-workflow-runs.json",
+    } satisfies Record<string, RecordedAnswer>;
+
+    it("reads a merged one for review: its reviews, comments, changed files and merge state", async () => {
+      useRecordedGithub(merged);
+      const { response, body } = await read("pull-request", "laserjm/workspace-fixtures#8");
+      expect(response.status).toBe(200);
+      expect(body.summary).toMatchObject({
+        type: "pull-request",
+        title: "Sample: add the status page data",
+        state: "merged",
+        url: "https://github.com/laserjm/workspace-fixtures/pull/8",
+      });
+      expect(body.detail).toMatchObject({ number: 8, author: "laserjm", commentCount: 1 });
+      expect(body.detail.body).not.toBe("");
+      expect(body.detail.comments).toHaveLength(1);
+      expect(body.detail.reviews).toHaveLength(1);
+      expect(body.detail.reviews[0]).toMatchObject({
+        author: "laserjm",
+        state: "COMMENTED",
+        body: "Reads well. One question on the component list.",
+        comments: [
+          {
+            path: "status/components.json",
+            body: "Should a degraded component link to its incident?",
+          },
+        ],
+      });
+      expect(body.detail.merge).toMatchObject({
+        mergeableState: "unknown",
+        merged: true,
+        closed: true,
+        base: "main",
+        head: "fixtures/status-page",
+      });
+      expect(body.detail.fileCount).toBe(4);
+      expect(
+        body.detail.files.map(
+          (file: { status: string; path: string; additions: number; deletions: number }) =>
+            `${file.status} ${file.path} +${file.additions} -${file.deletions}`,
+        ),
+      ).toEqual([
+        "modified README.md +2 -0",
+        "added status/README.md +4 -0",
+        "added status/components.json +7 -0",
+        "added status/incidents.md +4 -0",
+      ]);
+      expect(JSON.stringify(body.detail.files)).not.toContain("patch");
+    });
+
+    it("reads the GitHub Actions runs and the combined commit status of its head", async () => {
+      useRecordedGithub(merged);
+      const { body } = await read("pull-request", "laserjm/workspace-fixtures#8");
+      expect(body.detail.ci.headSha).toBe(HEAD);
+      expect(body.detail.ci.actions.readable).toBe(true);
+      expect(body.detail.ci.actions.total).toBe(2);
+      expect(
+        body.detail.ci.actions.runs.map(
+          (run: { name: string; event: string; status: string; conclusion: string }) =>
+            `${run.name} ${run.event} ${run.status} ${run.conclusion}`,
+        ),
+      ).toEqual([
+        "Fixture checks pull_request completed success",
+        "Fixture checks push completed success",
+      ]);
+      expect(body.detail.ci.actions.runs[0].url).toBe(
+        "https://github.com/laserjm/workspace-fixtures/actions/runs/43413512557",
+      );
+      expect(body.detail.ci.statuses).toMatchObject({ readable: true, state: "failure" });
+      expect(
+        body.detail.ci.statuses.statuses.map(
+          (status: { context: string; state: string; description: string }) =>
+            `${status.context} ${status.state}: ${status.description}`,
+        ),
+      ).toEqual([
+        "fixtures/schema success: components.json matches the schema",
+        "fixtures/links failure: 1 broken link in incidents.md",
+      ]);
+    });
+
+    it("still loads when the token lacks Actions: read, and says the runs are not readable", async () => {
+      useRecordedGithub({
+        ...merged,
+        [`${REPO}/actions/runs?head_sha=${HEAD}`]: {
+          status: 403,
+          body: {
+            message: "Resource not accessible by personal access token",
+            documentation_url:
+              "https://docs.github.com/rest/actions/workflow-runs#list-workflow-runs-for-a-repository",
+            status: "403",
+          },
         },
-      },
-      "GET /repos/laserjm/workspace-fixtures/issues/8/comments?per_page=100": "pull-request-comments.json",
-      "GET /repos/laserjm/workspace-fixtures/pulls/8": "pull-request.json",
+      });
+      const { response, body } = await read("pull-request", "laserjm/workspace-fixtures#8");
+      expect(response.status).toBe(200);
+      expect(body.detail.ci.actions).toEqual({ readable: false });
+      expect(body.detail.ci.statuses).toMatchObject({ readable: true, state: "failure" });
+      expect(body.detail.reviews).toHaveLength(1);
+      expect(body.detail.files).toHaveLength(4);
     });
-    const { response, body } = await read("pull-request", "laserjm/workspace-fixtures#8");
-    expect(response.status).toBe(200);
-    expect(body.summary).toMatchObject({
-      type: "pull-request",
-      state: "merged",
-      url: "https://github.com/laserjm/workspace-fixtures/pull/8",
+
+    it("reads a draft one, mergeable, with no reviews or CI yet", async () => {
+      const DRAFT_HEAD = "fb96c63f0a07fec0962c22e8afd3072b9a58c114";
+      const none = { status: 200, body: [] };
+      useRecordedGithub({
+        [`${REPO}/pulls/9`]: "pull-request-draft.json",
+        [`${REPO}/issues/9/comments?per_page=100`]: none,
+        [`${REPO}/pulls/9/reviews?per_page=100`]: none,
+        [`${REPO}/pulls/9/comments?per_page=100`]: none,
+        [`${REPO}/pulls/9/files?per_page=100`]: {
+          status: 200,
+          body: [{ filename: "status/history.md", status: "added", additions: 5, deletions: 0, patch: "@@ -0,0 +1,5 @@" }],
+        },
+        [`${REPO}/commits/${DRAFT_HEAD}/status`]: {
+          status: 200,
+          body: { state: "pending", sha: DRAFT_HEAD, total_count: 0, statuses: [] },
+        },
+        [`${REPO}/actions/runs?head_sha=${DRAFT_HEAD}`]: {
+          status: 200,
+          body: { total_count: 0, workflow_runs: [] },
+        },
+      });
+      const { response, body } = await read("pull-request", "laserjm/workspace-fixtures#9");
+      expect(response.status).toBe(200);
+      expect(body.summary).toMatchObject({
+        title: "Sample: keep older incidents on a history page",
+        state: "draft",
+      });
+      expect(body.detail.merge).toMatchObject({
+        mergeableState: "clean",
+        merged: false,
+        closed: false,
+      });
+      expect(body.detail.merge.mergedAt).toBeUndefined();
+      expect(body.detail.reviews).toEqual([]);
+      expect(body.detail.files).toEqual([
+        { path: "status/history.md", status: "added", additions: 5, deletions: 0 },
+      ]);
+      expect(body.detail.ci).toEqual({
+        headSha: DRAFT_HEAD,
+        actions: { readable: true, total: 0, runs: [] },
+        statuses: { readable: true, state: "pending", statuses: [] },
+      });
     });
-    expect(body.detail.commentCount).toBe(1);
-    expect(body.detail.comments).toHaveLength(1);
+
+    it("keeps the first 100 changed files and counts the rest", async () => {
+      const pull = readFixture("pull-request.json");
+      const files = Array.from({ length: 100 }, (_, index) => ({
+        filename: `src/file-${index}.ts`,
+        status: "modified",
+        additions: 1,
+        deletions: 1,
+      }));
+      useRecordedGithub({
+        ...merged,
+        [`${REPO}/pulls/8`]: { status: 200, body: { ...pull, changed_files: 130 } },
+        [`${REPO}/pulls/8/files?per_page=100`]: { status: 200, body: files },
+      });
+      const { body } = await read("pull-request", "laserjm/workspace-fixtures#8");
+      expect(body.detail.files).toHaveLength(100);
+      expect(body.detail.fileCount).toBe(130);
+      expect(body.detail.fileCount - body.detail.files.length).toBe(30);
+    });
+
+    it("answers 404 for an issue read as a pull request", async () => {
+      useRecordedGithub({
+        ...merged,
+        [`${REPO}/pulls/8`]: { status: 404, body: { message: "Not Found" } },
+      });
+      const { response, body } = await read("pull-request", "laserjm/workspace-fixtures#8");
+      expect(response.status).toBe(404);
+      expect(body.error.url).toBe("https://github.com/laserjm/workspace-fixtures/pull/8");
+    });
+
+    it("strips invisible and bidirectional characters from reviews, file paths and CI", async () => {
+      const hidden = "‮​";
+      const reviews = readFixture("pull-request-reviews.json");
+      const files = readFixture("pull-request-files.json");
+      const status = readFixture("pull-request-status.json");
+      useRecordedGithub({
+        ...merged,
+        [`${REPO}/pulls/8/reviews?per_page=100`]: {
+          status: 200,
+          body: [{ ...reviews[0], body: `Reads${hidden} well` }],
+        },
+        [`${REPO}/pulls/8/files?per_page=100`]: {
+          status: 200,
+          body: [{ ...files[0], filename: `READ${hidden}ME.md` }],
+        },
+        [`${REPO}/commits/${HEAD}/status`]: {
+          status: 200,
+          body: { ...status, statuses: [{ ...status.statuses[0], description: `ok${hidden}` }] },
+        },
+      });
+      const { body } = await read("pull-request", "laserjm/workspace-fixtures#8");
+      expect(body.detail.reviews[0].body).toBe("Reads well");
+      expect(body.detail.files[0].path).toBe("README.md");
+      expect(body.detail.ci.statuses.statuses[0].description).toBe("ok");
+    });
+
+    it("fails the view when CI hits the rate limit", async () => {
+      useRecordedGithub({
+        ...merged,
+        [`${REPO}/commits/${HEAD}/status`]: {
+          status: 429,
+          headers: { "retry-after": "30" },
+          body: { message: "You have exceeded a secondary rate limit." },
+        },
+      });
+      const { response, body } = await read("pull-request", "laserjm/workspace-fixtures#8");
+      expect(response.status).toBe(429);
+      expect(body.error.kind).toBe("rate_limited");
+    });
   });
 
   describe("refusals", () => {

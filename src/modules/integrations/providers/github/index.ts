@@ -15,7 +15,7 @@ export const github = defineProvider({
     {
       kind: "token",
       label: "Fine-grained personal access token",
-      help: "Create one under GitHub → Settings → Developer settings → Fine-grained tokens, with read access to Issues, Pull requests and Metadata on the repositories you want here.",
+      help: "Create one under GitHub → Settings → Developer settings → Fine-grained tokens, with read access to Metadata, Issues, Pull requests, Commit statuses and Actions on the repositories you want here.",
       placeholder: "github_pat_…",
     },
   ],
