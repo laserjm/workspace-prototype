@@ -26,15 +26,12 @@ import { IconButton, iconButtonClassName } from "@/components/ui/icon-button";
 import { inlineTriggerClassName } from "@/components/ui/inline-trigger";
 import { cn } from "@/lib/utils";
 import { SkillPicker, useSkills } from "@/modules/skills";
-import {
-  recordCountLabel,
-  SourcePicker,
-  SourceScopeSummary,
-  useSources,
-} from "@/modules/sources";
+import { SourcePicker, SourceScopeSummary } from "@/modules/sources";
 import {
   AttachDialog,
   AttachedItemChip,
+  attachedPhrase,
+  itemCount,
   removeConnection,
   removeItem,
   type AttachedConnection,
@@ -43,6 +40,7 @@ import type { ModelChoice } from "@/modules/agent";
 import type { ThreadScope } from "../contracts";
 import { attachmentChipClassName } from "./attachment-chip";
 import { ProviderIcon } from "./provider-icon";
+import type { Question } from "./use-thread-chat";
 
 // The send button's two looks: idle grey, ready dark. Disabled stays opaque.
 const sendButton =
@@ -71,12 +69,7 @@ export function PromptForm({
 }: {
   models: ModelChoice[];
   /** Resolves false when the message was not taken; the form then keeps it. */
-  onSend: (
-    prompt: string,
-    attachments: string[],
-    modelId: string,
-    skillId?: string,
-  ) => Promise<boolean>;
+  onSend: (question: Question, modelId: string, skillId?: string) => Promise<boolean>;
   onSources: () => void;
   compact?: boolean;
   scope?: ThreadScope;
@@ -90,16 +83,12 @@ export function PromptForm({
   /** Shown in place of send while busy. */
   onStop?: () => void;
 }) {
-  const { sourceById } = useSources();
   const { skillById } = useSkills();
-  const source = scope ? sourceById(scope.sourceId) : undefined;
-  const scopeLabel =
-    source && scope ? recordCountLabel(source, scope.recordIds.length) : "";
   const [prompt, setPrompt] = useState("");
   const [model, setModel] = useState(models[0]);
   const [permission, setPermission] = useState("Full access");
   const [attachments, setAttachments] = useState<File[]>([]);
-  // The records the question is about; sending them comes with the data part (#59).
+  // The records the question is about, sent as its data part. Each question starts with none.
   const [attached, setAttached] = useState<readonly AttachedConnection[]>([]);
   const [attaching, setAttaching] = useState(false);
   const [error, setError] = useState("");
@@ -114,6 +103,10 @@ export function PromptForm({
   const fileInput = useRef<HTMLInputElement>(null);
   const textarea = useRef<HTMLTextAreaElement>(null);
   const canSend = prompt.trim().length > 0 && !busy;
+  // The example question, once something is attached: "Create a summary of these 3 items".
+  const phrase = attachedPhrase(attached);
+  const suggestion =
+    phrase && `${skill?.prompt ?? "Create a summary of"} ${phrase}`;
 
   async function submit() {
     if (!canSend) return;
@@ -122,8 +115,11 @@ export function PromptForm({
     setAttachments([]);
     setAttached([]);
     const sent = await onSend(
-      draft.prompt.trim(),
-      draft.attachments.map((file) => file.name),
+      {
+        text: draft.prompt.trim(),
+        attachments: draft.attachments.map((file) => file.name),
+        attached: draft.attached,
+      },
       model.id,
       selectedSkill,
     );
@@ -135,21 +131,19 @@ export function PromptForm({
 
   return (
     <div className="relative w-full shrink-0">
-      {!compact && scope && (
+      {!compact && suggestion && (
         <button
           type="button"
           className="mx-2 mb-3 flex items-center gap-2 rounded-sm text-left text-2xs text-secondary-label hover:text-info-foreground max-md:ml-1 max-md:max-w-full max-md:gap-1 max-md:text-3xs"
           onClick={() => {
-            setPrompt(
-              `${skill?.prompt ?? "Create a summary of these"} ${scopeLabel}.`,
-            );
+            setPrompt(`${suggestion}.`);
             requestAnimationFrame(() => textarea.current?.focus());
           }}
         >
           <span className="rounded-sm bg-accent px-1.5 py-px text-3xs text-muted-foreground max-md:hidden">
             Try it
           </span>
-          {skill?.prompt ?? "Create a summary of these"} {scopeLabel}{" "}
+          {suggestion}{" "}
           <ArrowUp size={12} className="shrink-0 rotate-45" />
         </button>
       )}
@@ -252,9 +246,11 @@ export function PromptForm({
           )}
           aria-label="Message"
           placeholder={
-            source
-              ? `Ask about these ${source.plural}…`
-              : "Ask anything, or choose a source to add context…"
+            itemCount(attached) > 0
+              ? "Ask about these items…"
+              : phrase
+                ? `Ask about ${phrase}…`
+                : "Ask anything, or choose a data source…"
           }
           value={prompt}
           rows={compact ? 2 : 3}
@@ -427,9 +423,9 @@ export function PromptForm({
       {skill && (
         <p className="mx-1.5 mt-2 text-3xs leading-relaxed text-muted-foreground/70">
           <span className="text-muted-foreground">{skill.name}</span> ·{" "}
-          {scope
+          {attached.length > 0
             ? skill.output
-            : "Choose a source to try this skill with sample data"}
+            : "Choose a data source to try this skill"}
         </p>
       )}
     </div>

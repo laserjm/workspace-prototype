@@ -1,5 +1,6 @@
 import { defineProvider } from "../../contracts";
 import { verifyGithubToken } from "./api";
+import guide from "./guide.md";
 import { githubRecordTypes, searchGithubRecords } from "./records";
 
 /**
@@ -34,4 +35,5 @@ export const github = defineProvider({
     },
     search: searchGithubRecords,
   },
+  guide,
 });

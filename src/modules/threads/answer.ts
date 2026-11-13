@@ -9,6 +9,7 @@ import { threadMessagesTable, threadsTable } from "@/lib/db/schema";
 import { bug } from "@/lib/errors";
 import type { WorkspaceUIMessage } from "@/modules/agent";
 import { runAgent } from "@/modules/agent/server";
+import { foreignConnectionIds } from "@/modules/records/server";
 import {
   chatTurnDtoSchema,
   continueThread,
@@ -46,6 +47,11 @@ export async function answerThread(
   const thread = await findThread(user, threadId);
   if (!thread) return threadNotFound();
   const stored = await listThreadMessages(user, thread.id);
+  // A new question may attach only the user's connections. One the thread already holds, sent
+  // again by Try again, is answered: a connection removed since is skipped by the agent.
+  const isNew = !stored.some((storedMessage) => storedMessage.id === message.id);
+  if (isNew && (await foreignConnectionIds(user, message)).length > 0)
+    return badRequest("Invalid chat request.");
   const run = await runAgent({
     user,
     options,

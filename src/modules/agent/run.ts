@@ -11,6 +11,12 @@ import { z } from "zod";
 import type { User } from "@/lib/auth/user";
 import type { NotFound, ValidationFailed } from "@/lib/errors";
 import { err, ok, type Result } from "@/lib/result";
+import {
+  allowedConnections,
+  attachedConnectionsOf,
+  attachedItemsText,
+  recordsDataSchemas,
+} from "@/modules/records/server";
 import { listSkills } from "@/modules/skills/server";
 import { listScopedRecords, listSources } from "@/modules/sources/server";
 import { resolveContext, type AgentContext } from "./context";
@@ -114,6 +120,7 @@ export async function runAgent({
   const validated = await safeValidateUIMessages<WorkspaceUIMessage>({
     messages,
     tools,
+    dataSchemas: recordsDataSchemas,
   });
   if (!validated.success) {
     return err({
@@ -121,11 +128,24 @@ export async function runAgent({
       issues: [{ path: "messages", message: validated.error.message }],
     });
   }
+  // A connection the user no longer has, or that needs reconnecting, is left out silently: an
+  // older question keeps its items, and the model says it cannot read them.
+  const attachedAny = validated.data.some(
+    (message) => attachedConnectionsOf(message).length > 0,
+  );
+  const answerContext: AgentContext = attachedAny
+    ? {
+        ...context.value,
+        connections: await allowedConnections(user, validated.data),
+      }
+    : context.value;
 
   const response = await createAgentUIStreamResponse({
     agent: workspaceAgent,
     uiMessages: validated.data,
     originalMessages: validated.data,
+    // A question's attached items reach the model as reference lines, never their bodies.
+    convertDataPart: attachedItemsText,
     generateMessageId,
     consumeSseStream: consumeStream,
     onEnd: async ({ messages: conversation }) => {
@@ -135,7 +155,7 @@ export async function runAgent({
         console.error("[runAgent] the conversation was not stored", error);
       }
     },
-    options: { context: context.value },
+    options: { context: answerContext },
     abortSignal: signal,
     messageMetadata: ({ part }) => {
       if (part.type === "start") {

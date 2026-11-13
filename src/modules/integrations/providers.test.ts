@@ -59,6 +59,19 @@ describe("providers", () => {
   });
 });
 
+// A guide is in the system prompt of every answer that may use one of the provider's connections.
+const GUIDE_MAX_LENGTH = 4000;
+
+describe("provider guides", () => {
+  it("stay short, and say something", () => {
+    for (const provider of providers) {
+      if (provider.guide === undefined) continue;
+      expect(provider.guide.trim(), provider.id).not.toBe("");
+      expect(provider.guide.length, provider.id).toBeLessThanOrEqual(GUIDE_MAX_LENGTH);
+    }
+  });
+});
+
 describe.each(
   providers.flatMap((provider) =>
     provider.sources ? [{ id: provider.id, records: provider.sources }] : [],

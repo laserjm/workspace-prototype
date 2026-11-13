@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { RecordSummary } from "@/modules/integrations";
 import {
   applyPicks,
+  attachedPhrase,
   canPick,
   defaultConnectionId,
   itemCount,
@@ -131,5 +132,31 @@ describe("the connection the dialog opens on", () => {
 
   it("is nothing without connections", () => {
     expect(defaultConnectionId([], [])).toBeUndefined();
+  });
+});
+
+describe("what the composer calls the attached items", () => {
+  it("counts the items", () => {
+    expect(attachedPhrase(pickMany(3))).toBe("these 3 items");
+    expect(attachedPhrase(pickMany(1))).toBe("this item");
+  });
+
+  it("names a whole connection, or several", () => {
+    const beta = { ...acme, connectionId: "c-beta", label: "@beta" };
+    expect(attachedPhrase([{ ...acme, items: [] }])).toBe("@acme");
+    expect(attachedPhrase([{ ...acme, items: [] }, { ...beta, items: [] }])).toBe("@acme and @beta");
+  });
+
+  it("counts the items and names the whole connections beside them", () => {
+    const beta = { ...acme, connectionId: "c-beta", label: "@beta" };
+    const gamma = { ...acme, connectionId: "c-gamma", label: "@gamma" };
+    expect(attachedPhrase([...pickMany(2), { ...beta, items: [] }])).toBe("these 2 items and @beta");
+    expect(attachedPhrase([...pickMany(1), { ...beta, items: [] }, { ...gamma, items: [] }])).toBe(
+      "this item, @beta and @gamma",
+    );
+  });
+
+  it("is nothing when nothing is attached", () => {
+    expect(attachedPhrase([])).toBeUndefined();
   });
 });

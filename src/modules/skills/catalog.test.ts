@@ -7,7 +7,7 @@ const valid = [
   "name: Summary",
   "description: An overview.",
   "output: Overview",
-  "prompt: Create a summary of these",
+  "prompt: Create a summary of",
   "enabledByDefault: true",
   "order: 1",
 ].join("\n");
@@ -36,7 +36,7 @@ describe("parseSkill", () => {
         name: "Summary",
         description: "An overview.",
         output: "Overview",
-        prompt: "Create a summary of these",
+        prompt: "Create a summary of",
         enabledByDefault: true,
         instructions: "Do the thing.",
       },

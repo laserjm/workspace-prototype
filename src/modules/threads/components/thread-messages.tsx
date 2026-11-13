@@ -5,6 +5,11 @@ import { FileText } from "lucide-react";
 import { Markdown } from "@/components/ui/markdown";
 import { cn } from "@/lib/utils";
 import type { ModelChoice, WorkspaceUIMessage } from "@/modules/agent";
+import {
+  AttachedItemChip,
+  attachedConnectionsOf,
+  type AttachedConnection,
+} from "@/modules/records";
 import type { Thread } from "../contracts";
 import { attachmentChipClassName } from "./attachment-chip";
 import { LiveResponse } from "./live-response";
@@ -129,6 +134,7 @@ export function ThreadMessages({
                   inSession={!!thread.scope}
                   text={textOf(message)}
                   attachments={message.metadata?.attachments}
+                  attached={attachedConnectionsOf(message)}
                 />
                 {awaitingReply && inFlight && message === last && (
                   <LiveResponse
@@ -195,10 +201,13 @@ export function ThreadMessages({
 function UserMessage({
   text,
   attachments,
+  attached,
   inSession,
 }: {
   text: string;
   attachments?: string[];
+  /** The records and connections the question attached, drawn from their snapshots. */
+  attached: readonly AttachedConnection[];
   inSession: boolean;
 }) {
   return (
@@ -218,6 +227,23 @@ function UserMessage({
           {name}
         </span>
       ))}
+      {attached.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {attached.map((connection) =>
+            connection.items.length ? (
+              connection.items.map((item) => (
+                <AttachedItemChip
+                  key={`${connection.connectionId}:${item.type}:${item.key}`}
+                  connection={connection}
+                  item={item}
+                />
+              ))
+            ) : (
+              <AttachedItemChip key={connection.connectionId} connection={connection} />
+            ),
+          )}
+        </div>
+      )}
     </div>
   );
 }
