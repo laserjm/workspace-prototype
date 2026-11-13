@@ -91,6 +91,8 @@ const itemSchema = z.object({
   updated_at: z.string(),
 });
 type GithubItem = z.infer<typeof itemSchema>;
+/** An item without where it lives: what a summary needs, wherever the item was read. */
+type ItemWithoutRepository = Omit<GithubItem, "repository_url">;
 
 const searchSchema = z.object({ total_count: z.number(), items: z.array(itemSchema) });
 
@@ -235,7 +237,7 @@ function cursorFrom(encoded: string | undefined, asked: readonly GithubRecordTyp
 }
 
 /** The state GitHub's search item is in, as declared above. */
-function stateOf(item: GithubItem): string {
+function stateOf(item: ItemWithoutRepository): string {
   if (item.pull_request) {
     if (item.pull_request.merged_at) return "merged";
     if (item.state === "closed") return "closed";
@@ -245,10 +247,13 @@ function stateOf(item: GithubItem): string {
   return item.state_reason === "not_planned" ? "not_planned" : "closed";
 }
 
-const typeOf = (item: GithubItem): GithubRecordType => (item.pull_request ? "pull-request" : "issue");
+const typeOf = (item: ItemWithoutRepository): GithubRecordType => (item.pull_request ? "pull-request" : "issue");
 
-function summaryOf(connectionId: string, item: GithubItem): RecordSummary {
-  const repository = item.repository_url.split("/").slice(-2).join("/");
+const summaryOf = (connectionId: string, item: GithubItem): RecordSummary =>
+  summaryInRepository(connectionId, item.repository_url.split("/").slice(-2).join("/"), item);
+
+/** The summary of an item of `repository` (`acme/web`). */
+function summaryInRepository(connectionId: string, repository: string, item: ItemWithoutRepository): RecordSummary {
   const name = repository.split("/")[1];
   return {
     connectionId,
@@ -365,8 +370,8 @@ function uniqueItems(items: readonly GithubItem[]): GithubItem[] {
 
 // --- Reading one record (ADR 0003 §3): what its record view shows. ---
 
-/** How many comments a view shows: GitHub's largest page. */
-const COMMENT_LIMIT = 100;
+/** How many comments, reviews or changed files a view shows: GitHub's largest page. */
+const PAGE_LIMIT = 100;
 
 /**
  * Characters that draw nothing or reorder what follows: zero-width spaces and marks, the Arabic
@@ -398,6 +403,119 @@ export const githubIssueDetailSchema = z.object({
 });
 export type GithubIssueDetail = z.infer<typeof githubIssueDetailSchema>;
 
+/**
+ * A pull request laid out for review (#61): its description and conversation as an issue's, its
+ * reviews with their inline comments, the merge state and the changed files without their patches.
+ */
+export const githubPullRequestDetailSchema = githubIssueDetailSchema.extend({
+  merge: z.object({
+    /**
+     * GitHub's `mergeable_state`: `clean`, `unstable`, `has_hooks`, `behind`, `blocked`, `dirty`,
+     * `draft` or `unknown` (while GitHub works it out, and after a merge).
+     */
+    mergeableState: z.string(),
+    /** Not ready for review: GitHub may still call it `clean`, but it cannot be merged. */
+    draft: z.boolean(),
+    merged: z.boolean(),
+    /** Closed, merged or not: the mergeable state no longer applies. */
+    closed: z.boolean(),
+    /** ISO 8601, when merged. */
+    mergedAt: z.string().optional(),
+    mergedBy: z.string().optional(),
+    /** The branch it merges into, and the branch it merges. */
+    base: z.string(),
+    head: z.string(),
+    commits: z.number(),
+    additions: z.number(),
+    deletions: z.number(),
+  }),
+  /** The first 100 reviews, each with its inline comments among the first 100 of those. */
+  reviews: z.array(
+    z.object({
+      id: z.number(),
+      author: z.string(),
+      /** `APPROVED`, `CHANGES_REQUESTED`, `COMMENTED`, `DISMISSED` or `PENDING`. */
+      state: z.string(),
+      /** ISO 8601; a pending review has none. */
+      submittedAt: z.string().optional(),
+      body: z.string(),
+      comments: z.array(
+        z.object({
+          id: z.number(),
+          author: z.string(),
+          createdAt: z.string(),
+          path: z.string(),
+          line: z.number().optional(),
+          body: z.string(),
+        }),
+      ),
+    }),
+  ),
+  /** All inline review comments, shown or not. */
+  reviewCommentCount: z.number(),
+  /** All changed files; `files` holds the first 100. */
+  fileCount: z.number(),
+  files: z.array(
+    z.object({
+      path: z.string(),
+      /** Where a renamed file was. */
+      previousPath: z.string().optional(),
+      /** `added`, `removed`, `modified`, `renamed`, `copied`, `changed` or `unchanged`. */
+      status: z.string(),
+      additions: z.number(),
+      deletions: z.number(),
+    }),
+  ),
+  /**
+   * CI for the head commit: its GitHub Actions runs and its combined commit status. Check runs
+   * from other apps are not read, because a fine-grained token cannot read them (#43). Each part
+   * is `readable: false` when the token lacks its permission, and the rest of the view still loads.
+   */
+  ci: z.object({
+    headSha: z.string(),
+    actions: z.discriminatedUnion("readable", [
+      z.object({ readable: z.literal(false) }),
+      z.object({
+        readable: z.literal(true),
+        /** All runs for the head commit; `runs` holds the first page. */
+        total: z.number(),
+        runs: z.array(
+          z.object({
+            id: z.number(),
+            name: z.string(),
+            title: z.string(),
+            /** `push`, `pull_request`, …: what started it. */
+            event: z.string(),
+            /** `queued`, `in_progress`, `completed`, … */
+            status: z.string(),
+            /** `success`, `failure`, `cancelled`, `skipped`, …, once completed. */
+            conclusion: z.string().optional(),
+            /** Its page on GitHub, built from the connection's base URL. */
+            url: z.string(),
+          }),
+        ),
+      }),
+    ]),
+    statuses: z.discriminatedUnion("readable", [
+      z.object({ readable: z.literal(false) }),
+      z.object({
+        readable: z.literal(true),
+        /** The combined state: `success`, `pending`, `failure` or `error`. */
+        state: z.string(),
+        statuses: z.array(
+          z.object({
+            id: z.number(),
+            context: z.string(),
+            state: z.string(),
+            description: z.string().optional(),
+          }),
+        ),
+      }),
+    ]),
+  }),
+});
+export type GithubPullRequestDetail = z.infer<typeof githubPullRequestDetailSchema>;
+
 /** `acme/web#482`: the repository and the number. */
 function parseKey(key: string) {
   const match = /^([\w.-]+\/[\w.-]+)#(\d{1,9})$/.exec(key);
@@ -407,8 +525,8 @@ function parseKey(key: string) {
 const userSchema = z.object({ login: z.string() }).nullable();
 const login = (user: z.infer<typeof userSchema>) => user?.login ?? "ghost";
 
-/** The parts of `GET /repos/{o}/{r}/issues/{n}` (and of `/pulls/{n}`) a view shows. */
-const issueSchema = itemSchema.extend({
+/** What `/issues/{n}` and `/pulls/{n}` both answer and a view shows. */
+const conversationFields = {
   user: userSchema,
   labels: z.array(
     z.union([
@@ -418,17 +536,77 @@ const issueSchema = itemSchema.extend({
   ),
   assignees: z.array(z.object({ login: z.string() })).nullish(),
   body: z.string().nullish(),
+  /** How many comments the conversation has, review comments aside. */
   comments: z.number(),
   created_at: z.string(),
+};
+
+/** An issue's or a pull request's conversation, as `detailOf` reads it. */
+type GithubConversation = z.infer<z.ZodObject<typeof conversationFields>> & { number: number };
+
+/** The parts of `GET /repos/{o}/{r}/issues/{n}` a view shows. */
+const issueSchema = itemSchema.extend(conversationFields);
+
+/** The parts of `GET /repos/{o}/{r}/pulls/{n}` a view shows. */
+const pullSchema = itemSchema.omit({ repository_url: true, pull_request: true }).extend({
+  ...conversationFields,
+  merged_at: z.string().nullable(),
+  merged: z.boolean().nullish(),
+  merged_by: userSchema.optional(),
+  mergeable_state: z.string().nullish(),
+  base: z.object({ ref: z.string() }),
+  head: z.object({ ref: z.string(), sha: z.string() }),
+  review_comments: z.number(),
+  commits: z.number(),
+  additions: z.number(),
+  deletions: z.number(),
+  changed_files: z.number(),
 });
-type GithubIssue = z.infer<typeof issueSchema>;
+type GithubPull = z.infer<typeof pullSchema>;
 
 const commentsSchema = z.array(
   z.object({ id: z.number(), user: userSchema, created_at: z.string(), body: z.string().nullish() }),
 );
 
+const reviewsSchema = z.array(
+  z.object({
+    id: z.number(),
+    user: userSchema,
+    state: z.string(),
+    body: z.string().nullish(),
+    submitted_at: z.string().nullish(),
+  }),
+);
+
+const reviewCommentsSchema = z.array(
+  z.object({
+    id: z.number(),
+    pull_request_review_id: z.number().nullish(),
+    user: userSchema,
+    path: z.string(),
+    line: z.number().nullish(),
+    original_line: z.number().nullish(),
+    created_at: z.string(),
+    body: z.string().nullish(),
+  }),
+);
+
+/** The changed files; the patch is left out of the schema, so it is never kept. */
+const filesSchema = z.array(
+  z.object({
+    filename: z.string(),
+    previous_filename: z.string().nullish(),
+    status: z.string(),
+    additions: z.number(),
+    deletions: z.number(),
+  }),
+);
+
 /** What a view shows of an issue (or a pull request's conversation) and its first comments. */
-function detailOf(issue: GithubIssue, comments: z.infer<typeof commentsSchema>): GithubIssueDetail {
+function detailOf(
+  issue: GithubConversation,
+  comments: z.infer<typeof commentsSchema>,
+): GithubIssueDetail {
   return {
     number: issue.number,
     author: login(issue.user),
@@ -449,51 +627,221 @@ function detailOf(issue: GithubIssue, comments: z.infer<typeof commentsSchema>):
   };
 }
 
-/** The pull request fields `/issues/{n}` leaves out, which its state needs. */
-const pullSchema = z.object({
-  draft: z.boolean().nullish(),
-  merged_at: z.string().nullable(),
-});
+/** The pull request's reviews, each with its inline comments. */
+function reviewsOf(
+  reviews: z.infer<typeof reviewsSchema>,
+  comments: z.infer<typeof reviewCommentsSchema>,
+): GithubPullRequestDetail["reviews"] {
+  return reviews.map((review) => ({
+    id: review.id,
+    author: login(review.user),
+    state: review.state,
+    ...(review.submitted_at ? { submittedAt: review.submitted_at } : {}),
+    body: visibleText(review.body ?? ""),
+    comments: comments
+      .filter((comment) => comment.pull_request_review_id === review.id)
+      .map((comment) => {
+        const line = comment.line ?? comment.original_line;
+        return {
+          id: comment.id,
+          author: login(comment.user),
+          createdAt: comment.created_at,
+          path: visibleText(comment.path),
+          ...(line ? { line } : {}),
+          body: visibleText(comment.body ?? ""),
+        };
+      }),
+  }));
+}
 
-/**
- * Reads an issue, or a pull request's description and conversation, with its first 100 comments,
- * in parallel. A key of the other type is `not_found`, as GitHub answers a missing number.
- */
-function readerOf(type: GithubRecordType) {
-  return async (access: ConnectionAccess, key: string): Promise<Result<RecordDetail, RecordError>> => {
-    const parsed = parseKey(key);
-    if (!parsed) return err({ kind: "not_found" });
-    const base = `/repos/${parsed.repository}`;
-    const [issue, comments, pull] = await Promise.all([
-      getJson(`${base}/issues/${parsed.number}`, access, issueSchema),
-      getJson(`${base}/issues/${parsed.number}/comments?per_page=${COMMENT_LIMIT}`, access, commentsSchema),
-      type === "pull-request"
-        ? getJson(`${base}/pulls/${parsed.number}`, access, pullSchema)
-        : undefined,
-    ]);
-    if (!issue.ok) return issue;
-    if (typeOf(issue.value) !== type) return err({ kind: "not_found" });
-    if (!comments.ok) return comments;
-    if (pull && !pull.ok) return pull;
-    // `/issues/{n}` says whether a pull request was merged, but not whether it is a draft.
-    const item: GithubItem = pull
-      ? {
-          ...issue.value,
-          draft: pull.value.draft,
-          pull_request: { merged_at: pull.value.merged_at },
-        }
-      : issue.value;
-    return ok({
-      summary: summaryOf(access.connectionId, item),
-      detail: detailOf(issue.value, comments.value),
-    });
+/** Whether, and where, the pull request merges. */
+function mergeOf(pull: GithubPull): GithubPullRequestDetail["merge"] {
+  return {
+    mergeableState: pull.mergeable_state ?? "unknown",
+    draft: pull.draft === true,
+    merged: pull.merged ?? pull.merged_at !== null,
+    closed: pull.state === "closed",
+    ...(pull.merged_at ? { mergedAt: pull.merged_at } : {}),
+    ...(pull.merged_by ? { mergedBy: login(pull.merged_by) } : {}),
+    base: visibleText(pull.base.ref),
+    head: visibleText(pull.head.ref),
+    commits: pull.commits,
+    additions: pull.additions,
+    deletions: pull.deletions,
   };
 }
 
+const filesOf = (files: z.infer<typeof filesSchema>): GithubPullRequestDetail["files"] =>
+  files.map((file) => ({
+    path: visibleText(file.filename),
+    ...(file.previous_filename ? { previousPath: visibleText(file.previous_filename) } : {}),
+    status: file.status,
+    additions: file.additions,
+    deletions: file.deletions,
+  }));
+
+const workflowRunsSchema = z.object({
+  total_count: z.number(),
+  workflow_runs: z.array(
+    z.object({
+      id: z.number(),
+      name: z.string().nullish(),
+      display_title: z.string().nullish(),
+      event: z.string(),
+      status: z.string().nullish(),
+      conclusion: z.string().nullish(),
+    }),
+  ),
+});
+
+const combinedStatusSchema = z.object({
+  state: z.string(),
+  statuses: z.array(
+    z.object({
+      id: z.number(),
+      context: z.string(),
+      state: z.string(),
+      description: z.string().nullish(),
+    }),
+  ),
+});
+
+type Ci = GithubPullRequestDetail["ci"];
+
+/**
+ * A CI part as read: `readable: false` when the token lacks the permission (403), nothing when
+ * GitHub has nothing there (404, e.g. Actions turned off); any other refusal fails the view.
+ */
+function ciPart<T, P>(
+  read: Result<T, RecordError>,
+  shown: (value: T) => P,
+  none: P,
+): Result<P | { readable: false }, RecordError> {
+  if (read.ok) return ok(shown(read.value));
+  if (read.error.kind === "no_access") return ok({ readable: false });
+  if (read.error.kind === "not_found") return ok(none);
+  return read;
+}
+
+/** The head commit's GitHub Actions runs and combined commit status, in parallel. */
+async function readCi(
+  access: ConnectionAccess,
+  repository: string,
+  headSha: string,
+): Promise<Result<Ci, RecordError>> {
+  const path = `/repos/${repository}`;
+  const [runs, status] = await Promise.all([
+    getJson(`${path}/actions/runs?head_sha=${headSha}`, access, workflowRunsSchema),
+    getJson(`${path}/commits/${headSha}/status`, access, combinedStatusSchema),
+  ]);
+  const site = siteOf(access.baseUrl);
+  const actions = ciPart(
+    runs,
+    (found): Ci["actions"] => ({
+      readable: true,
+      total: found.total_count,
+      runs: found.workflow_runs.map((run) => ({
+        id: run.id,
+        name: visibleText(run.name ?? "Workflow"),
+        title: visibleText(run.display_title ?? ""),
+        event: run.event,
+        status: run.status ?? "unknown",
+        ...(run.conclusion ? { conclusion: run.conclusion } : {}),
+        url: `${site}/${repository}/actions/runs/${run.id}`,
+      })),
+    }),
+    { readable: true, total: 0, runs: [] },
+  );
+  if (!actions.ok) return actions;
+  const statuses = ciPart(
+    status,
+    (found): Ci["statuses"] => ({
+      readable: true,
+      state: found.state,
+      statuses: found.statuses.map((item) => ({
+        id: item.id,
+        context: visibleText(item.context),
+        state: item.state,
+        ...(item.description ? { description: visibleText(item.description) } : {}),
+      })),
+    }),
+    { readable: true, state: "pending", statuses: [] },
+  );
+  if (!statuses.ok) return statuses;
+  return ok({ headSha, actions: actions.value, statuses: statuses.value });
+}
+
+type Reader = (access: ConnectionAccess, key: string) => Promise<Result<RecordDetail, RecordError>>;
+
+/**
+ * Reads an issue with its first 100 comments, in parallel. A pull request's number is
+ * `not_found`, as GitHub answers a missing number.
+ */
+const readIssue: Reader = async (access, key) => {
+  const parsed = parseKey(key);
+  if (!parsed) return err({ kind: "not_found" });
+  const path = `/repos/${parsed.repository}/issues/${parsed.number}`;
+  const [issue, comments] = await Promise.all([
+    getJson(path, access, issueSchema),
+    getJson(`${path}/comments?per_page=${PAGE_LIMIT}`, access, commentsSchema),
+  ]);
+  if (!issue.ok) return issue;
+  if (typeOf(issue.value) !== "issue") return err({ kind: "not_found" });
+  if (!comments.ok) return comments;
+  return ok({
+    summary: summaryOf(access.connectionId, issue.value),
+    detail: detailOf(issue.value, comments.value),
+  });
+};
+
+/**
+ * Reads a pull request for review, fanned out in parallel (#61): the pull request, its
+ * conversation's first 100 comments, its first 100 reviews and inline review comments, its
+ * first 100 changed files and, once the head commit is known, its CI. An issue's number is
+ * `not_found`, as `/pulls/{n}` answers it.
+ */
+const readPullRequest: Reader = async (access, key) => {
+  const parsed = parseKey(key);
+  if (!parsed) return err({ kind: "not_found" });
+  const repository = `/repos/${parsed.repository}`;
+  const path = `${repository}/pulls/${parsed.number}`;
+  const page = `?per_page=${PAGE_LIMIT}`;
+  const pullRead = getJson(path, access, pullSchema);
+  // CI needs the head commit, so it starts as soon as the pull request is read.
+  const ciRead = pullRead.then((read) =>
+    read.ok ? readCi(access, parsed.repository, read.value.head.sha) : read,
+  );
+  const [pull, comments, reviews, reviewComments, files, ci] = await Promise.all([
+    pullRead,
+    getJson(`${repository}/issues/${parsed.number}/comments${page}`, access, commentsSchema),
+    getJson(`${path}/reviews${page}`, access, reviewsSchema),
+    getJson(`${path}/comments${page}`, access, reviewCommentsSchema),
+    getJson(`${path}/files${page}`, access, filesSchema),
+    ciRead,
+  ]);
+  if (!pull.ok) return pull;
+  if (!comments.ok) return comments;
+  if (!reviews.ok) return reviews;
+  if (!reviewComments.ok) return reviewComments;
+  if (!files.ok) return files;
+  if (!ci.ok) return ci;
+  const item = { ...pull.value, pull_request: { merged_at: pull.value.merged_at } };
+  const detail: GithubPullRequestDetail = {
+    ...detailOf(pull.value, comments.value),
+    merge: mergeOf(pull.value),
+    reviews: reviewsOf(reviews.value, reviewComments.value),
+    reviewCommentCount: pull.value.review_comments,
+    fileCount: pull.value.changed_files,
+    files: filesOf(files.value),
+    ci: ci.value,
+  };
+  return ok({ summary: summaryInRepository(access.connectionId, parsed.repository, item), detail });
+};
+
 /** The declared types, each with its reader. */
 export const githubRecordTypes = {
-  issue: { ...declaredTypes.issue, read: readerOf("issue") },
-  "pull-request": { ...declaredTypes["pull-request"], read: readerOf("pull-request") },
+  issue: { ...declaredTypes.issue, read: readIssue },
+  "pull-request": { ...declaredTypes["pull-request"], read: readPullRequest },
 } satisfies ProviderRecords["types"];
 
 /**
@@ -503,9 +851,13 @@ export const githubRecordTypes = {
 export function githubRecordUrl(baseUrl: string, type: string, key: string): string | undefined {
   const parsed = parseKey(key);
   if (!parsed || !isRecordType(type)) return undefined;
+  const page = type === "issue" ? "issues" : "pull";
+  return `${siteOf(baseUrl)}/${parsed.repository}/${page}/${parsed.number}`;
+}
+
+/** GitHub's site for an API base URL: without `api.` or `/api/v3` (GitHub Enterprise). */
+function siteOf(baseUrl: string): string {
   const site = new URL(baseUrl);
   if (site.hostname.startsWith("api.")) site.hostname = site.hostname.slice("api.".length);
-  const root = site.origin + site.pathname.replace(/\/api\/v3\/?$/, "").replace(/\/$/, "");
-  const page = type === "issue" ? "issues" : "pull";
-  return `${root}/${parsed.repository}/${page}/${parsed.number}`;
+  return site.origin + site.pathname.replace(/\/api\/v3\/?$/, "").replace(/\/$/, "");
 }

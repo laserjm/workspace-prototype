@@ -1,7 +1,7 @@
 # 0003. Attached items and record views
 
-- **Status:** Accepted (2026-11-13); being implemented (attached items, the record panel and
-  the issue view so far). Replaces the records, scope and panel parts of ADR 0002:
+- **Status:** Accepted (2026-11-13); being implemented (attached items, the record panel,
+  the issue view and the pull request view so far). Replaces the records, scope and panel parts of ADR 0002:
   - the "Source" vocabulary and the products;
   - §1's exception for type-only imports into `integrations`;
   - §2's `RecordReader` and `ExternalRecord`;

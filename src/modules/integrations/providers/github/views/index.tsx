@@ -13,13 +13,13 @@ function GithubMark({ className }: { className?: string }) {
   );
 }
 
-// One chunk for both until #61 gives the pull request its own view, laid out for review.
 const IssueView = lazy(() => import("./issue-view"));
+const PullRequestView = lazy(() => import("./pull-request-view"));
 
 export const githubViews: ProviderViews = {
   icon: GithubMark,
   types: {
     issue: { view: IssueView, icon: CircleDot },
-    "pull-request": { view: IssueView, icon: GitPullRequest },
+    "pull-request": { view: PullRequestView, icon: GitPullRequest },
   },
 };

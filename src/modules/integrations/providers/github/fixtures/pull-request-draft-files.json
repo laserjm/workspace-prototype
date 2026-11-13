@@ -1,0 +1,14 @@
+[
+    {
+        "sha": "6dcff2a23add0f1336ab109a4af60dead9989b7b",
+        "filename": "status/history.md",
+        "status": "added",
+        "additions": 3,
+        "deletions": 0,
+        "changes": 3,
+        "blob_url": "https://github.com/laserjm/workspace-fixtures/blob/fb96c63f0a07fec0962c22e8afd3072b9a58c114/status%2Fhistory.md",
+        "raw_url": "https://github.com/laserjm/workspace-fixtures/raw/fb96c63f0a07fec0962c22e8afd3072b9a58c114/status%2Fhistory.md",
+        "contents_url": "https://api.github.com/repos/laserjm/workspace-fixtures/contents/status%2Fhistory.md?ref=fb96c63f0a07fec0962c22e8afd3072b9a58c114",
+        "patch": "@@ -0,0 +1,3 @@\n+# Incident history\n+\n+Older incidents move here from `incidents.md`. Not started yet."
+    }
+]
