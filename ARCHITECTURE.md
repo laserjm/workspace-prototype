@@ -502,7 +502,8 @@ sandbox. A test answers `fetch` with `useRecordedGithub({ "GET /path": "file.jso
 fails the test and names it), and swaps the connection query and the vault for
 `tests/support/connections.ts`, whose `connectedUser` has one GitHub connection with a fake token.
 **Enforced by.** `providers/github/fixtures.test.ts` (README lines and files one to one, each
-seeded case found by its label, CI on the merged pull request's head, no token or `Authorization`);
+seeded case found by its label, CI on the heads of the merged and the draft pull request, no token
+or `Authorization`);
 `integrations/providers.test.ts` (every provider in the registry: unique ids, a
 way to connect, a base URL and `verify` when it takes a credential, declared record types whose
 states' tones are in the set, every declared type with a reader, a view and an icon and every
@@ -516,9 +517,12 @@ the cursor, one search per type for "All", the before-typing pair, narrowing by 
 name, the number on top, the
 `user:` fallback, the computed states, another user's connection, each classifier case and a 401
 marking the connection); `app/api/connections/[connectionId]/records/[type]/[key]/route.test.ts`
-(an issue's fields and comment count, a pull request's merged state and page, the summary's live
-state and URL, Unicode stripped, a pull request read as an issue, an unparsable key, another
-user's connection, 403, 429 with `retryAt`, 502 and a 409 marking the connection);
+(an issue's fields and comment count, the summary's live state and URL, Unicode stripped, a pull
+request read as an issue and an issue read as a pull request, an unparsable key, another user's
+connection, 403, 429 with `retryAt`, 502 and a 409 marking the connection; the recorded merged and
+draft pull requests' reviews and their inline comments, changed files, merge state and CI, the
+100-file cap with `fileCount`, a 403 on Actions leaving the view loaded, a CI rate limit failing
+it, and Unicode stripped from reviews, file paths and CI);
 `records/contracts.test.ts` (the dialog's default connection);
 `sources/queries.test.ts`; `tsc`.
 **Recorded in.** This entry; `docs/adr/0002-integrations.md`;

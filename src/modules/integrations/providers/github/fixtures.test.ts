@@ -63,10 +63,22 @@ describe("the recorded GitHub answers", () => {
     expect(issue).toMatchObject({ state: "closed", state_reason: "not_planned" });
   });
 
-  it("hold the draft pull request", () => {
+  it("hold the draft pull request with its one file and its Actions runs", () => {
     const pull = recorded<PullRequest>("pull-request-draft.json");
     expect(isCase("draft-pr")(pull)).toBe(true);
     expect(pull).toMatchObject({ state: "open", draft: true });
+    expect(recorded<{ filename: string }[]>("pull-request-draft-files.json")).toEqual([
+      expect.objectContaining({ filename: "status/history.md", status: "added" }),
+    ]);
+    expect(recorded<{ sha: string; statuses: unknown[] }>("pull-request-draft-status.json")).toMatchObject({
+      sha: pull.head.sha,
+      statuses: [],
+    });
+    const { workflow_runs: runs } = recorded<{ workflow_runs: { head_sha: string }[] }>(
+      "pull-request-draft-workflow-runs.json",
+    );
+    expect(runs.length).toBeGreaterThan(0);
+    expect(runs.every((run) => run.head_sha === pull.head.sha)).toBe(true);
   });
 
   it("hold the merged pull request with its review, comments and changed files", () => {

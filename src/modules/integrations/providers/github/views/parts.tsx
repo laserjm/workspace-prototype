@@ -11,10 +11,10 @@ const day = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
 export const dayOf = (iso: string) => day.format(new Date(iso));
 
 /** `1 comment`, `3 comments`. */
-export const counted = (count: number, singular: string, plural = `${singular}s`) =>
-  `${count} ${count === 1 ? singular : plural}`;
+export const counted = (count: number, singular: string) =>
+  `${count} ${singular}${count === 1 ? "" : "s"}`;
 
-export function Meta({ children }: { children: ReactNode }) {
+function Meta({ children }: { children: ReactNode }) {
   return (
     <div className="mb-3 flex flex-wrap items-center gap-1.5 text-2xs text-muted-foreground">
       {children}
@@ -22,7 +22,7 @@ export function Meta({ children }: { children: ReactNode }) {
   );
 }
 
-export function Label({ children }: { children: ReactNode }) {
+function Label({ children }: { children: ReactNode }) {
   return (
     <span className="inline-flex shrink-0 items-center rounded-full border border-border px-1.5 py-px text-3xs">
       {children}
@@ -63,17 +63,9 @@ export function Description({ body }: { body: string }) {
 }
 
 /** A titled part of a view. */
-export function Section({
-  title,
-  children,
-  className,
-}: {
-  title: string;
-  children: ReactNode;
-  className?: string;
-}) {
+export function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className={cn("mt-5", className)}>
+    <section className="mt-5">
       <h4 className="mb-2 text-3xs font-medium tracking-wide text-muted-foreground uppercase">
         {title}
       </h4>
@@ -85,6 +77,26 @@ export function Section({
 /** A quiet line under a list: what GitHub has beyond it, or why it is empty. */
 export function Note({ children }: { children: ReactNode }) {
   return <p className="mt-2 text-2xs text-muted-foreground">{children}</p>;
+}
+
+/** `+ 3 more files on GitHub`, when GitHub has more than the view shows. */
+export function MoreOnGitHub({ count, noun }: { count: number; noun: string }) {
+  return count > 0 ? <Note>+ {counted(count, noun)} on GitHub</Note> : null;
+}
+
+/** A bordered box: a comment, a review, the merge state. */
+export function Card({
+  as: Tag = "div",
+  className,
+  children,
+}: {
+  as?: "div" | "li";
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <Tag className={cn("rounded-md border border-border/70 px-2.5 py-2", className)}>{children}</Tag>
+  );
 }
 
 /** Who wrote something, and when. */
@@ -107,13 +119,13 @@ export function Comments({ detail }: { detail: GithubIssueDetail }) {
     <Section title={counted(commentCount, "comment")}>
       <ul className="flex flex-col gap-2">
         {comments.map((comment) => (
-          <li key={comment.id} className="rounded-md border border-border/70 px-2.5 py-2">
+          <Card as="li" key={comment.id}>
             <Byline author={comment.author} at={comment.createdAt} />
             <Markdown text={comment.body || "_No text._"} className="text-xs" />
-          </li>
+          </Card>
         ))}
       </ul>
-      {more > 0 && <Note>+ {more} more on GitHub</Note>}
+      <MoreOnGitHub count={more} noun="more comment" />
     </Section>
   );
 }

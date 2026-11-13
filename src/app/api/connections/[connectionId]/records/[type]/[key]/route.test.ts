@@ -161,6 +161,7 @@ describe("GET /api/connections/[connectionId]/records/[type]/[key]", () => {
       expect(body.detail.merge).toMatchObject({
         mergeableState: "unknown",
         merged: true,
+        draft: false,
         closed: true,
         base: "main",
         head: "fixtures/status-page",
@@ -231,7 +232,7 @@ describe("GET /api/connections/[connectionId]/records/[type]/[key]", () => {
       expect(body.detail.files).toHaveLength(4);
     });
 
-    it("reads a draft one, mergeable, with no reviews or CI yet", async () => {
+    it("reads a draft one as a draft, with its file and Actions runs and no reviews yet", async () => {
       const DRAFT_HEAD = "fb96c63f0a07fec0962c22e8afd3072b9a58c114";
       const none = { status: 200, body: [] };
       useRecordedGithub({
@@ -239,18 +240,9 @@ describe("GET /api/connections/[connectionId]/records/[type]/[key]", () => {
         [`${REPO}/issues/9/comments?per_page=100`]: none,
         [`${REPO}/pulls/9/reviews?per_page=100`]: none,
         [`${REPO}/pulls/9/comments?per_page=100`]: none,
-        [`${REPO}/pulls/9/files?per_page=100`]: {
-          status: 200,
-          body: [{ filename: "status/history.md", status: "added", additions: 5, deletions: 0, patch: "@@ -0,0 +1,5 @@" }],
-        },
-        [`${REPO}/commits/${DRAFT_HEAD}/status`]: {
-          status: 200,
-          body: { state: "pending", sha: DRAFT_HEAD, total_count: 0, statuses: [] },
-        },
-        [`${REPO}/actions/runs?head_sha=${DRAFT_HEAD}`]: {
-          status: 200,
-          body: { total_count: 0, workflow_runs: [] },
-        },
+        [`${REPO}/pulls/9/files?per_page=100`]: "pull-request-draft-files.json",
+        [`${REPO}/commits/${DRAFT_HEAD}/status`]: "pull-request-draft-status.json",
+        [`${REPO}/actions/runs?head_sha=${DRAFT_HEAD}`]: "pull-request-draft-workflow-runs.json",
       });
       const { response, body } = await read("pull-request", "laserjm/workspace-fixtures#9");
       expect(response.status).toBe(200);
@@ -258,21 +250,21 @@ describe("GET /api/connections/[connectionId]/records/[type]/[key]", () => {
         title: "Sample: keep older incidents on a history page",
         state: "draft",
       });
+      // GitHub calls the draft `clean`; the view must not read that as ready to merge.
       expect(body.detail.merge).toMatchObject({
         mergeableState: "clean",
+        draft: true,
         merged: false,
         closed: false,
       });
       expect(body.detail.merge.mergedAt).toBeUndefined();
       expect(body.detail.reviews).toEqual([]);
       expect(body.detail.files).toEqual([
-        { path: "status/history.md", status: "added", additions: 5, deletions: 0 },
+        { path: "status/history.md", status: "added", additions: 3, deletions: 0 },
       ]);
-      expect(body.detail.ci).toEqual({
-        headSha: DRAFT_HEAD,
-        actions: { readable: true, total: 0, runs: [] },
-        statuses: { readable: true, state: "pending", statuses: [] },
-      });
+      expect(body.detail.ci.headSha).toBe(DRAFT_HEAD);
+      expect(body.detail.ci.actions).toMatchObject({ readable: true, total: 2 });
+      expect(body.detail.ci.statuses).toEqual({ readable: true, state: "pending", statuses: [] });
     });
 
     it("keeps the first 100 changed files and counts the rest", async () => {
@@ -291,7 +283,6 @@ describe("GET /api/connections/[connectionId]/records/[type]/[key]", () => {
       const { body } = await read("pull-request", "laserjm/workspace-fixtures#8");
       expect(body.detail.files).toHaveLength(100);
       expect(body.detail.fileCount).toBe(130);
-      expect(body.detail.fileCount - body.detail.files.length).toBe(30);
     });
 
     it("answers 404 for an issue read as a pull request", async () => {

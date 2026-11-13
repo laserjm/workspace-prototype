@@ -20,13 +20,25 @@ import { Markdown } from "@/components/ui/markdown";
 import { cn } from "@/lib/utils";
 import type { RecordViewProps } from "../../../record-views";
 import { githubPullRequestDetailSchema, type GithubPullRequestDetail } from "../records";
-import { Byline, Comments, counted, dayOf, Description, Note, Opened, Section } from "./parts";
+import {
+  Byline,
+  Card,
+  Comments,
+  counted,
+  dayOf,
+  Description,
+  MoreOnGitHub,
+  Note,
+  Opened,
+  Section,
+} from "./parts";
 
-// States only identify, so they take Tailwind's palette, as the record marks do.
+// Success, failure and waiting carry meaning, so they take their tokens; `done` (merged) only
+// identifies, so it takes the palette, as the record marks do (ARCHITECTURE.md, "Styling").
 const TONE = {
-  good: "text-emerald-600 dark:text-emerald-400",
-  bad: "text-red-600 dark:text-red-400",
-  waiting: "text-amber-600 dark:text-amber-400",
+  good: "text-success-foreground",
+  bad: "text-destructive-foreground",
+  waiting: "text-warning-foreground",
   done: "text-violet-600 dark:text-violet-400",
   quiet: "text-muted-foreground",
 } as const;
@@ -83,6 +95,13 @@ function MergeState({ merge }: { merge: GithubPullRequestDetail["merge"] }) {
         Closed without merging
       </Status>
     );
+  // GitHub may call a draft `clean`; it still cannot be merged.
+  else if (merge.draft)
+    line = (
+      <Status icon={GitPullRequestDraft} tone="quiet">
+        Draft: not ready to merge yet
+      </Status>
+    );
   else {
     const known = MERGEABLE[merge.mergeableState];
     line = known ? (
@@ -96,14 +115,22 @@ function MergeState({ merge }: { merge: GithubPullRequestDetail["merge"] }) {
     );
   }
   return (
-    <div className="mt-1 mb-4 flex flex-col gap-1 rounded-md border border-border/70 px-2.5 py-2 text-xs">
+    <Card className="mt-1 mb-4 flex flex-col gap-1 text-xs">
       {line}
       <span className="pl-5 text-2xs text-muted-foreground">
-        {counted(merge.commits, "commit")} ·{" "}
-        <span className={TONE.good}>+{merge.additions}</span>{" "}
-        <span className={TONE.bad}>−{merge.deletions}</span>
+        {counted(merge.commits, "commit")} · <Diffstat {...merge} />
       </span>
-    </div>
+    </Card>
+  );
+}
+
+/** Lines added and deleted. */
+function Diffstat({ additions, deletions }: { additions: number; deletions: number }) {
+  return (
+    <span className="tabular-nums">
+      <span className={TONE.good}>+{additions}</span>{" "}
+      <span className={TONE.bad}>−{deletions}</span>
+    </span>
   );
 }
 
@@ -149,16 +176,15 @@ function ChangedFiles({ detail }: { detail: GithubPullRequestDetail }) {
                 <span title={name} className="min-w-0 flex-1 truncate font-mono text-secondary-foreground">
                   {name}
                 </span>
-                <span className="shrink-0 font-mono text-3xs tabular-nums">
-                  <span className={TONE.good}>+{file.additions}</span>{" "}
-                  <span className={TONE.bad}>−{file.deletions}</span>
+                <span className="shrink-0 font-mono text-3xs">
+                  <Diffstat {...file} />
                 </span>
               </li>
             );
           })}
         </ul>
       )}
-      {more > 0 && <Note>+ {counted(more, "more file")} on GitHub</Note>}
+      <MoreOnGitHub count={more} noun="more file" />
     </Section>
   );
 }
@@ -219,7 +245,7 @@ function ActionsRuns({ actions }: { actions: GithubPullRequestDetail["ci"]["acti
           </li>
         ))}
       </ul>
-      {more > 0 && <Note>+ {counted(more, "more run")} on GitHub</Note>}
+      <MoreOnGitHub count={more} noun="more run" />
     </>
   );
 }
@@ -280,7 +306,7 @@ function Reviews({ detail }: { detail: GithubPullRequestDetail }) {
           {reviews.map((review) => {
             const state = REVIEW_STATE[review.state] ?? { label: review.state.toLowerCase(), tone: "quiet" };
             return (
-              <li key={review.id} className="rounded-md border border-border/70 px-2.5 py-2">
+              <Card as="li" key={review.id}>
                 <Byline author={review.author} at={review.submittedAt}>
                   <span className={TONE[state.tone]}>{state.label}</span>
                 </Byline>
@@ -298,12 +324,12 @@ function Reviews({ detail }: { detail: GithubPullRequestDetail }) {
                     ))}
                   </ul>
                 )}
-              </li>
+              </Card>
             );
           })}
         </ul>
       )}
-      {more > 0 && <Note>+ {counted(more, "more review comment")} on GitHub</Note>}
+      <MoreOnGitHub count={more} noun="more review comment" />
     </Section>
   );
 }

@@ -11,7 +11,7 @@ and labelled `fixture` plus one `case/<name>`:
 | [#6](https://github.com/laserjm/workspace-fixtures/issues/6) | `case/open-issue` | open issue, 3 comments | `issue.json`, `issue-comments.json` |
 | [#7](https://github.com/laserjm/workspace-fixtures/issues/7) | `case/not-planned` | closed as not planned | `issue-not-planned.json` |
 | [#8](https://github.com/laserjm/workspace-fixtures/pull/8) | `case/merged-pr` | merged; a review, an inline comment, 4 files; on its head two Actions runs and two commit statuses (one failing) | `pull-request*.json` |
-| [#9](https://github.com/laserjm/workspace-fixtures/pull/9) | `case/draft-pr` | open draft | `pull-request-draft.json` |
+| [#9](https://github.com/laserjm/workspace-fixtures/pull/9) | `case/draft-pr` | open draft, no reviews or comments, 1 file; on its head two Actions runs and no commit status | `pull-request-draft*.json` |
 
 `fixtures.test.ts` beside this folder checks that each file has its line below, finds each case by
 its label (not its number) and checks its state.
@@ -24,6 +24,7 @@ fails when a line and a file don't match.
 ```bash
 get() { gh api -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28' "$@"; }
 head=$(get repos/laserjm/workspace-fixtures/pulls/8 --jq .head.sha)
+draft_head=$(get repos/laserjm/workspace-fixtures/pulls/9 --jq .head.sha)
 get user --jq 'del(.email, .notification_email, .private_gists, .total_private_repos, .owned_private_repos, .disk_usage, .collaborators, .two_factor_authentication, .plan)' > user.json
 get 'user/repos?visibility=public&affiliation=owner&per_page=100' --jq '[.[] | select(.full_name == "laserjm/workspace-fixtures")]' > repositories.json
 get -X GET search/issues -f q='repo:laserjm/workspace-fixtures' -f sort=updated -f order=desc -F per_page=20 > search.json
@@ -40,6 +41,9 @@ get 'repos/laserjm/workspace-fixtures/pulls/8/files?per_page=100' > pull-request
 get repos/laserjm/workspace-fixtures/commits/$head/status > pull-request-status.json
 get "repos/laserjm/workspace-fixtures/actions/runs?head_sha=$head" > pull-request-workflow-runs.json
 get repos/laserjm/workspace-fixtures/pulls/9 > pull-request-draft.json
+get 'repos/laserjm/workspace-fixtures/pulls/9/files?per_page=100' > pull-request-draft-files.json
+get repos/laserjm/workspace-fixtures/commits/$draft_head/status > pull-request-draft-status.json
+get "repos/laserjm/workspace-fixtures/actions/runs?head_sha=$draft_head" > pull-request-draft-workflow-runs.json
 ```
 
 The three searches are the ones #43 describes, with "Include closed" on: the two that run

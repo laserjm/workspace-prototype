@@ -91,8 +91,8 @@ const itemSchema = z.object({
   updated_at: z.string(),
 });
 type GithubItem = z.infer<typeof itemSchema>;
-/** What a summary needs of an item, wherever it was read. */
-type ItemFields = Omit<GithubItem, "repository_url">;
+/** An item without where it lives: what a summary needs, wherever the item was read. */
+type ItemWithoutRepository = Omit<GithubItem, "repository_url">;
 
 const searchSchema = z.object({ total_count: z.number(), items: z.array(itemSchema) });
 
@@ -237,7 +237,7 @@ function cursorFrom(encoded: string | undefined, asked: readonly GithubRecordTyp
 }
 
 /** The state GitHub's search item is in, as declared above. */
-function stateOf(item: ItemFields): string {
+function stateOf(item: ItemWithoutRepository): string {
   if (item.pull_request) {
     if (item.pull_request.merged_at) return "merged";
     if (item.state === "closed") return "closed";
@@ -247,13 +247,13 @@ function stateOf(item: ItemFields): string {
   return item.state_reason === "not_planned" ? "not_planned" : "closed";
 }
 
-const typeOf = (item: ItemFields): GithubRecordType => (item.pull_request ? "pull-request" : "issue");
+const typeOf = (item: ItemWithoutRepository): GithubRecordType => (item.pull_request ? "pull-request" : "issue");
 
 const summaryOf = (connectionId: string, item: GithubItem): RecordSummary =>
-  summaryIn(connectionId, item.repository_url.split("/").slice(-2).join("/"), item);
+  summaryInRepository(connectionId, item.repository_url.split("/").slice(-2).join("/"), item);
 
 /** The summary of an item of `repository` (`acme/web`). */
-function summaryIn(connectionId: string, repository: string, item: ItemFields): RecordSummary {
+function summaryInRepository(connectionId: string, repository: string, item: ItemWithoutRepository): RecordSummary {
   const name = repository.split("/")[1];
   return {
     connectionId,
@@ -414,6 +414,8 @@ export const githubPullRequestDetailSchema = githubIssueDetailSchema.extend({
      * `draft` or `unknown` (while GitHub works it out, and after a merge).
      */
     mergeableState: z.string(),
+    /** Not ready for review: GitHub may still call it `clean`, but it cannot be merged. */
+    draft: z.boolean(),
     merged: z.boolean(),
     /** Closed, merged or not: the mergeable state no longer applies. */
     closed: z.boolean(),
@@ -539,6 +541,9 @@ const conversationFields = {
   created_at: z.string(),
 };
 
+/** An issue's or a pull request's conversation, as `detailOf` reads it. */
+type GithubConversation = z.infer<z.ZodObject<typeof conversationFields>> & { number: number };
+
 /** The parts of `GET /repos/{o}/{r}/issues/{n}` a view shows. */
 const issueSchema = itemSchema.extend(conversationFields);
 
@@ -599,7 +604,7 @@ const filesSchema = z.array(
 
 /** What a view shows of an issue (or a pull request's conversation) and its first comments. */
 function detailOf(
-  issue: z.infer<z.ZodObject<typeof conversationFields>> & { number: number },
+  issue: GithubConversation,
   comments: z.infer<typeof commentsSchema>,
 ): GithubIssueDetail {
   return {
@@ -653,6 +658,7 @@ function reviewsOf(
 function mergeOf(pull: GithubPull): GithubPullRequestDetail["merge"] {
   return {
     mergeableState: pull.mergeable_state ?? "unknown",
+    draft: pull.draft === true,
     merged: pull.merged ?? pull.merged_at !== null,
     closed: pull.state === "closed",
     ...(pull.merged_at ? { mergedAt: pull.merged_at } : {}),
@@ -803,7 +809,7 @@ const readPullRequest: Reader = async (access, key) => {
   const pullRead = getJson(path, access, pullSchema);
   // CI needs the head commit, so it starts as soon as the pull request is read.
   const ciRead = pullRead.then((read) =>
-    read.ok ? readCi(access, parsed.repository, read.value.head.sha) : undefined,
+    read.ok ? readCi(access, parsed.repository, read.value.head.sha) : read,
   );
   const [pull, comments, reviews, reviewComments, files, ci] = await Promise.all([
     pullRead,
@@ -818,7 +824,7 @@ const readPullRequest: Reader = async (access, key) => {
   if (!reviews.ok) return reviews;
   if (!reviewComments.ok) return reviewComments;
   if (!files.ok) return files;
-  if (!ci?.ok) return ci ?? err({ kind: "unreachable" });
+  if (!ci.ok) return ci;
   const item = { ...pull.value, pull_request: { merged_at: pull.value.merged_at } };
   const detail: GithubPullRequestDetail = {
     ...detailOf(pull.value, comments.value),
@@ -829,7 +835,7 @@ const readPullRequest: Reader = async (access, key) => {
     files: filesOf(files.value),
     ci: ci.value,
   };
-  return ok({ summary: summaryIn(access.connectionId, parsed.repository, item), detail });
+  return ok({ summary: summaryInRepository(access.connectionId, parsed.repository, item), detail });
 };
 
 /** The declared types, each with its reader. */
