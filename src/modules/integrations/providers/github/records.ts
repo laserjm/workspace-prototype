@@ -255,8 +255,11 @@ function stateOf(item: ItemWithoutRepository): string {
 
 const typeOf = (item: ItemWithoutRepository): GithubRecordType => (item.pull_request ? "pull-request" : "issue");
 
+/** `acme/web`: the repository an item lives in. */
+const repositoryOf = (item: GithubItem) => item.repository_url.split("/").slice(-2).join("/");
+
 const summaryOf = (connectionId: string, item: GithubItem): RecordSummary =>
-  summaryInRepository(connectionId, item.repository_url.split("/").slice(-2).join("/"), item);
+  summaryInRepository(connectionId, repositoryOf(item), item);
 
 /** The summary of an item of `repository` (`acme/web`). */
 function summaryInRepository(connectionId: string, repository: string, item: ItemWithoutRepository): RecordSummary {
@@ -282,8 +285,9 @@ export async function searchGithubRecords(
   access: ConnectionAccess,
   query: RecordSearchQuery,
 ): Promise<Result<RecordSearchPage, RecordError>> {
-  if (query.type !== undefined && !isRecordType(query.type))
-    return err({ kind: "invalid_query", message: `GitHub has no record type '${query.type}'.` });
+  const typeAsked = query.type;
+  if (typeAsked !== undefined && !isRecordType(typeAsked))
+    return err({ kind: "invalid_query", message: `GitHub has no record type '${typeAsked}'.` });
 
   const repositories = await getJson("/user/repos?per_page=100", access, repositoriesSchema);
   if (!repositories.ok) return repositories;
@@ -291,18 +295,19 @@ export async function searchGithubRecords(
   if (repositories.value.length === 0) return ok({ results: [], total: 0, reach });
 
   const reading = readText(query.text ?? "", query.qualifiers === true, repositories.value);
-  if (query.type !== undefined && reading.type !== undefined && reading.type !== query.type)
+  if (typeAsked !== undefined && reading.type !== undefined && reading.type !== typeAsked)
     return err({
       kind: "invalid_query",
-      message: `The query asks for ${reading.type}, but the type asked for is ${query.type}.`,
+      message: `The query asks for ${reading.type}, but the type asked for is ${typeAsked}.`,
     });
+  const type = typeAsked ?? reading.type;
   // A state the query names wins over leaving closed items out.
   const asked: RecordSearchQuery = {
     ...query,
-    type: query.type ?? reading.type,
+    type,
     includeClosed: query.includeClosed === true || reading.namesState,
   };
-  const cursor = cursorFrom(query.cursor, asked.type ? [asked.type as GithubRecordType] : RECORD_TYPES);
+  const cursor = cursorFrom(query.cursor, type ? [type] : RECORD_TYPES);
   if (cursor === undefined)
     return err({ kind: "invalid_query", message: "That page of results is no longer available." });
   const { page, types } = cursor;
@@ -325,7 +330,8 @@ export async function searchGithubRecords(
   };
   // With one repository in play, a typed number is also read directly and put on top: the search
   // has no number qualifier.
-  const number = page === 1 && inPlay.length === 1 ? reading.number : undefined;
+  const number =
+    page === 1 && inPlay.length === 1 && !reading.qualified ? reading.number : undefined;
   const [found, involving, numbered] = await Promise.all([
     searchTypes(access, terms, asked, types, page),
     suggesting ? searchTypes(access, { ...terms, involvesMe: true }, asked, types, 1) : undefined,
@@ -334,7 +340,15 @@ export async function searchGithubRecords(
   if (!found.ok) return found;
   if (involving && !involving.ok) return involving;
   const byUpdated = !byRelevance(terms);
-  const foundItems = mergedItems(found.value, byUpdated);
+  // Past 256 characters the scope names owners, which may reach their public repositories the
+  // token was not given (#43). The dialog shows what it finds; the agent's search never wanders
+  // past the token's repositories, and its count would hold the others too.
+  const byOwner = terms.scope.some((term) => term.startsWith("user:"));
+  const strict = query.qualifiers === true;
+  const readable = new Set(inPlay.map((name) => name.toLowerCase()));
+  const foundItems = mergedItems(found.value, byUpdated).filter(
+    (item) => !strict || readable.has(repositoryOf(item).toLowerCase()),
+  );
   // A number nothing has, or cannot be read, is only not on top.
   const exact = numbered?.ok && matchesToggles(numbered.value, asked) ? [numbered.value] : [];
   const items = uniqueItems([
@@ -343,16 +357,17 @@ export async function searchGithubRecords(
     ...foundItems,
   ]);
   const foundIds = new Set(foundItems.map(idOf));
-  const total =
-    found.value.reduce((sum, typePage) => sum + typePage.total, 0) +
-    exact.filter((item) => !foundIds.has(idOf(item))).length;
+  const total = strict && byOwner
+    ? undefined
+    : found.value.reduce((sum, typePage) => sum + typePage.total, 0) +
+      exact.filter((item) => !foundIds.has(idOf(item))).length;
   const nextTypes = found.value
     .filter((typePage) => page * PAGE_SIZE < Math.min(typePage.total, SEARCH_LIMIT))
     .map((typePage) => typePage.type);
   return ok({
     results: items.map((item) => summaryOf(access.connectionId, item)),
     ...(nextTypes.length ? { next: cursorOf({ page: page + 1, types: nextTypes }) } : {}),
-    total,
+    ...(total === undefined ? {} : { total }),
     reach,
     ...(narrowedTo.length ? { narrowedTo } : {}),
   });
@@ -379,13 +394,15 @@ type TextReading = {
   namesState: boolean;
   /** `482` or `#482`: the first number typed. */
   number?: string;
+  /** Whether a qualifier passes through, which the number read directly might not match. */
+  qualified: boolean;
 };
 
 /** The pieces of a query, split at spaces outside double quotes: `label:"good first issue"` is one. */
 const piecesOf = (text: string) => text.match(/(?:[^\s"]+|"[^"]*"?)+/g) ?? [];
 
 /** `repo:`, `user:` and `org:`, which would widen the search past the token's repositories. */
-const SCOPE_QUALIFIER = /^(-?)(repo|user|org):"?([^"\s]+)"?$/i;
+const REPOSITORY_QUALIFIER = /^(-?)(repo|user|org):"?([^"\s]+)"?$/i;
 const TYPE_QUALIFIER = /^(?:is|type):(issue|pr|pull-request)$/i;
 const STATE_QUALIFIER = /^-?(?:is|state):(?:open|closed|merged|unmerged)$/i;
 /** A qualifier with one plain or quoted value, negated or not; never an operator or parentheses. */
@@ -408,15 +425,16 @@ function readText(text: string, qualifiers: boolean, repositories: readonly Repo
     narrowedTo: [],
     excluded: [],
     namesState: false,
+    qualified: false,
   };
   const narrow = (named: readonly Repository[], into: string[]) => {
     for (const repo of named) if (!into.includes(repo.full_name)) into.push(repo.full_name);
   };
   for (const piece of pieces) {
     reading.number ??= numberIn(piece);
-    const scope = qualifiers ? SCOPE_QUALIFIER.exec(piece) : null;
-    if (scope) {
-      const [, negated, kind, value] = scope as unknown as [string, string, string, string];
+    const qualifier = qualifiers ? REPOSITORY_QUALIFIER.exec(piece) : null;
+    if (qualifier) {
+      const [, negated, kind = "", value = ""] = qualifier;
       const name = value.toLowerCase();
       const named = repositories.filter((repo) =>
         kind.toLowerCase() === "repo"
@@ -432,10 +450,15 @@ function readText(text: string, qualifiers: boolean, repositories: readonly Repo
       reading.type = type === "issue" ? "issue" : "pull-request";
       continue;
     }
-    if (qualifiers && (QUALIFIER_PIECE.test(piece) || PHRASE.test(piece))) {
-      if (STATE_QUALIFIER.test(piece)) reading.namesState = true;
+    if (qualifiers && PHRASE.test(piece)) {
       reading.words.push(piece);
-      if (PHRASE.test(piece)) reading.plainWords += 1;
+      reading.plainWords += 1;
+      continue;
+    }
+    if (qualifiers && QUALIFIER_PIECE.test(piece)) {
+      if (STATE_QUALIFIER.test(piece)) reading.namesState = true;
+      else reading.qualified = true;
+      reading.words.push(piece);
       continue;
     }
     const named = repositoriesNamed(repositories, piece);

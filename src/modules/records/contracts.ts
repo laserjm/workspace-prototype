@@ -31,6 +31,13 @@ export type AttachedConnection = {
 /** The connection an item or a whole-connection attachment comes from. */
 export type ConnectionRef = Omit<AttachedConnection, "items">;
 
+/** How an attachment names one of the user's connections. */
+export const connectionRefOf = (connection: Connection): ConnectionRef => ({
+  connectionId: connection.id,
+  provider: connection.providerId,
+  label: connection.accountLabel,
+});
+
 export function itemCount(attached: readonly AttachedConnection[]): number {
   return attached.reduce((sum, connection) => sum + connection.items.length, 0);
 }

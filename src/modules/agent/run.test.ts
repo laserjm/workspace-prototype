@@ -329,6 +329,47 @@ describe("runAgent", () => {
     });
   });
 
+  it("keeps results to the token's repositories when the query names their owner instead", async () => {
+    // 6 × "repo:acme/a-repository-with-a-long-name-N" make the query longer than 256 characters.
+    const repositories = Array.from({ length: 6 }, (_, index) => ({
+      full_name: `acme/a-repository-with-a-long-name-${index}`,
+      owner: { login: "acme", type: "Organization" },
+    }));
+    const inRepository = (name: string, number: number) => ({
+      ...openIssue,
+      number,
+      repository_url: `https://api.github.com/repos/acme/${name}`,
+    });
+    useRecordedGithub({
+      [REPOS]: { status: 200, body: repositories },
+      "GET /search/issues?q=user:acme launch is:issue is:open&per_page=20": {
+        status: 200,
+        body: {
+          total_count: 2,
+          items: [inRepository("a-repository-with-a-long-name-0", 1), inRepository("not-given", 2)],
+        },
+      },
+    });
+    model.current = searching({ connectionId: githubConnection.id, query: "launch", type: "issue" });
+    const conversation = await run({ modelId: "mock" }, [attaching([{ ...laserjm, items: [] }])]);
+    const output = searchOutput(conversation);
+    const found = output?.type === "tool-search_records" && output.output;
+    expect(found && "results" in found && found.results.map((result) => result.key)).toEqual([
+      "acme/a-repository-with-a-long-name-0#1",
+    ]);
+  });
+
+  it("does not put a number on top that the query's qualifiers might not match", async () => {
+    const { requests } = useRecordedGithub({
+      [REPOS]: "repositories.json",
+      "GET /search/issues?q=repo:laserjm/workspace-fixtures label:bug 6 is:issue is:open&per_page=20":
+        { status: 200, body: { total_count: 0, items: [] } },
+    });
+    model.current = searching({ connectionId: githubConnection.id, query: "label:bug #6", type: "issue" });
+    await run({ modelId: "mock" }, [attaching([{ ...laserjm, items: [] }])]);
+    expect(requests).toHaveLength(2);
+  });
+
   it("answers no_access for a connection the thread did not attach, without asking GitHub", async () => {
     const { requests } = useRecordedGithub({});
     model.current = searching({ connectionId: "00000000-0000-4000-8000-000000000009", query: "launch" });

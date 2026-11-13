@@ -12,11 +12,8 @@ export {
   itemCount,
   MAX_ATTACHED_CONNECTIONS,
   MAX_ATTACHED_ITEMS,
-  MAX_SEARCH_RESULTS,
   removeConnection,
   removeItem,
-  searchRecordsInputSchema,
-  searchRecordsOutputSchema,
 } from "./contracts";
 export {
   ATTACHED_ITEMS_PART,

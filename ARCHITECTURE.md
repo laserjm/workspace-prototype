@@ -385,13 +385,15 @@ thread attached, through the provider's own search, the same code the attach dia
   records through tools.
 - **Names.** A stored conversation holds tool names, so a removed tool keeps a stub under its
   name. One exception was made: the thread scope's `search_records` (#62) kept no stub, and its
-  name was reused with the new schema, because the database was reset with that change
-  (`pnpm stack:reset`) and no stored conversation holds the old parts.
+  name was reused with the new schema, because the database is reset with that change
+  (`pnpm stack:reset`), so no stored conversation holds the old parts.
 **Enforced by.** `agent/tools.test.ts` (the tool names, the new `search_records` schema, what
 `toolsFor` offers); `agent/run.test.ts` (on a mock model over recorded GitHub answers:
 `search_records` offered for a connection attached whole and not without one or for one needing
 reconnecting, the call reaching GitHub with the token's scope and an outside `repo:` or `user:`
-dropped, a foreign `connectionId` answering `no_access`, a 422 answering `invalid_query`); `tsc`
+dropped, results kept to the token's repositories when the scope names their owners, no number
+read directly when a qualifier passes through, a foreign `connectionId` answering `no_access`, a
+422 answering `invalid_query`); `tsc`
 (`WorkspaceUITools`, `toolsContext`).
 **Recorded in.** This entry; `docs/adr/0003-attached-items-and-record-views.md`.
 
@@ -502,9 +504,11 @@ value (`label:"good first issue"`, `-label:bug`, `created:>2026-01-01`) and a qu
 through, without `in:title,body`; `repo:`, `user:` and `org:` narrow to the readable repositories
 they name (negated, they leave them out) and are dropped when they name none; `is:issue`,
 `is:pr` or `type:` set the type (a different `type` asked for is `invalid_query`); a named state
-(`is:closed`, `state:open`, `is:merged`) lets closed items through. Operators (`AND`, `OR`, `NOT`)
-and parentheses are searched as words, so nothing can widen the search past the token's
-repositories. `482` or `#482` is searched as `482`; with one repository in play
+(`is:closed`, `state:open`, `is:merged`) lets closed items through; a typed number is read
+directly only when no other qualifier passes through, since it might not match them. Operators
+(`AND`, `OR`, `NOT`) and parentheses are searched as words, and when the scope names owners
+(`user:`), results outside the token's repositories are dropped and `total` is left out, so
+nothing widens the agent's search past the token's repositories. `482` or `#482` is searched as `482`; with one repository in play
 (narrowed, or the only one the token reads) the issue or pull request of that number is also read
 (`GET /repos/{o}/{r}/issues/{n}`) and put on top when the toggles let it through. Before typing,
 two searches sorted by `updated` run in parallel (each per type for "All"), one with

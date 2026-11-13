@@ -2,7 +2,7 @@
 
 import { Search } from "lucide-react";
 import { useIntegrations, waitLabel, type RecordError } from "@/modules/integrations";
-import type { SearchRecordsInput, SearchRecordsOutput } from "../contracts";
+import { connectionRefOf, type SearchRecordsInput, type SearchRecordsOutput } from "../contracts";
 import { AttachedItemChip } from "./attached-item-chip";
 import { useRecordPanel } from "./record-panel-provider";
 
@@ -60,19 +60,17 @@ export function RecordSearchCall({
         Could not search {what}. {errorText}
       </p>
     );
-  const results = output && "results" in output ? output.results : [];
+  const found = output && "results" in output ? output : undefined;
+  const results = found?.results ?? [];
+  const count = found ? (found.total ?? results.length) : 0;
   const line =
     state === "searching" || !output
       ? `Searching ${what}…`
       : "error" in output
         ? `Could not search ${what}: ${errorWords(output.error, providerName)}`
-        : `Searched ${what}: ${resultCount(output.total ?? results.length)}`;
-  const ref = connection && {
-    connectionId: connection.id,
-    provider: connection.providerId,
-    label: connection.accountLabel,
-  };
-  const more = (output && "results" in output ? (output.total ?? results.length) : 0) - CHIPS_SHOWN;
+        : `Searched ${what}: ${resultCount(count)}`;
+  const ref = connection && connectionRefOf(connection);
+  const more = count - CHIPS_SHOWN;
   return (
     <div className="mt-1 mb-3 text-xs text-secondary-label [&+&]:-mt-2">
       <p
