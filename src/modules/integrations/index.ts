@@ -25,6 +25,7 @@ export type {
 export {
   defineProvider,
   expiryLabel,
+  invitedProvider,
   pluralLabels,
   RECORD_TONES,
   toneOf,

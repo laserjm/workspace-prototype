@@ -218,8 +218,8 @@ through `queries.ts` and `server.ts`, and reach the browser through `Integration
 `GET /api/connections/[connectionId]/records/[type]/[key]` the first time it is shown, into the
 browser's `RecordViewStore` (see "The record panel"). Skill activation, the record panel's width
 and each thread's record panel persist in `localStorage`; the stored skill ids are parsed with
-`storedSkillIdsSchema`, a stored panel with `restorePanel`. There are no cache tags: every read is per request, and an action returns what it
-stored, which the browser adds to its state.
+`storedSkillIdsSchema`, a stored panel with `restorePanel`. There are no cache tags: every read is
+per request, and an action returns what it stored, which the browser adds to its state.
 **Enforced by.** The `server-only` import in every `queries.ts`, `server.ts` and
 `threads/answer.ts` (a client component that imports one fails the build); the
 `thread_messages_thread_id_user_id_fkey` and `threads_one_placement` constraints; the
@@ -405,26 +405,27 @@ read directly when a qualifier passes through, a foreign `connectionId` answerin
 provider: a system the workspace connects to (`providers/github/` today; Atlassian, codebeamer,
 PostHog, Stripe and Supabase are planned). There is no sample provider: the workspace shows only
 what the user connects (ADR 0003 §5). A provider is
-`defineProvider({ id, name, description, auth, baseUrl?, verify?, records?, guide? })` (`contracts.ts`),
-registered by one line in `providers.ts`, and written in its folder: `index.ts` (the
-manifest), `api.ts` (its HTTP calls, every response parsed with zod), `records.ts` (its record
+`defineProvider({ id, name, description, auth, baseUrl, verify, records?, guide? })`
+(`contracts.ts`), registered by one line in `providers.ts`, and written in its folder: `index.ts`
+(the manifest), `api.ts` (its HTTP calls, every response parsed with zod), `records.ts` (its record
 types, states, search and one reader per type, only with records), `views/` (in the browser: its
 mark and each type's record view and kind mark; ADR 0003 §3), an optional `guide.md`: what the agent should know to use
 its connections (what its records and states mean, how its search reads), imported as text,
 declared as the manifest's `guide`, kept server-side (never on `ProviderChoice`) and in the system
 prompt while one of its connections is allowed (`providerForPrompt`, `integrations/server.ts`;
 `providers.test.ts` caps its length), and an optional `tools.ts` for agent tools of its own (none
-has any yet; the record tools are `records`'). A provider's code is handed a `ProviderAccess` (the API
-address and the `Authorization` header value) and never reads a secret, an env var or the
+has any yet; the record tools are `records`'). A provider's code is handed a `ProviderAccess` (the
+API address and the `Authorization` header value) and never reads a secret, an env var or the
 database. `auth` lists how a user connects: `token` (sent as `Bearer`) or `basic` (username and
-password, or an email and API token, sent as HTTP Basic); every provider declares `baseUrl` and
-`verify`, which checks a credential and names the account.
+password, or an email and API token, sent as HTTP Basic); `verify` checks a credential and names
+the account.
 
 A connection is one user's link to one account of a provider at one address (`connections`,
 unique per user, provider, `base_url` and `account_ref`). `listConnections(user)` answers with
-the stored ones, in the order they were made; a new user has none. `connectAction` verifies the credential with the provider before anything is stored, then
-writes the connection and its credential in one transaction; connecting the same account again
-updates both. `testConnectionAction` asks the provider again (a refused credential is
+the stored ones, in the order they were made; a new user has none. `connectAction` verifies the
+credential with the provider before anything is stored, then writes the connection and its
+credential in one transaction; connecting the same account again updates both.
+`testConnectionAction` asks the provider again (a refused credential is
 `needs_reconnect`; an unreachable provider changes nothing), and `disconnectAction` deletes the
 connection and, by cascade, its credential. The base URL must be HTTPS, and `connectAction`
 (so connecting and reconnecting) refuses one that points the server at itself or at an internal
@@ -438,9 +439,9 @@ sources (code name `sources`: `SourcesSettingsPanel`, the connect form built fro
 sources" button opens it. `IntegrationsProvider` holds them, and an action's answer goes into its
 state. With no connection, the new-thread page offers the first provider with records in one
 quiet line ("Connect GitHub to ask about your issues and pull requests", from its name and
-`pluralLabels`), and the attach dialog says "No data sources connected yet" with "Connect GitHub";
-both open Settings → Data sources, and the composer keeps its draft. With a connection, the
-new-thread page shows no line.
+`pluralLabels`; `invitedProvider`), and the attach dialog says "No data sources connected yet" with
+"Connect GitHub"; both open Settings → Data sources, and the composer keeps its draft. With a
+connection, the new-thread page shows no line.
 
 A provider with records (ADR 0003 §3) declares them in its manifest's `records`: its types, each
 with a singular and a plural label and its states, each state with a label and a tone from
@@ -593,9 +594,9 @@ render prop, `RecordPanel`, beside the conversation once that is here.
   tone, the short label, close on hover or middle-click. Only the active view renders and reads.
   Its frame (kind mark, where, live state badge, title, refresh, "Open on <provider>", close) is
   `records`'; the body is the provider's `RecordViewBody`. Errors: not found or no access offer
-  Retry and the record's page; needs reconnecting offers Reconnect (Settings → Data sources) and Retry;
-  a removed connection says so, with no link, and reads nothing. On a wide screen the panel is
-  resizable (`ResizablePanel`, its width in `localStorage`).
+  Retry and the record's page; needs reconnecting offers Reconnect (Settings → Data sources) and
+  Retry; a removed connection says so, with no link, and reads nothing. On a wide screen the panel
+  is resizable (`ResizablePanel`, its width in `localStorage`).
 - **View data.** `RecordViewStore` (`records/components/record-view-store.ts`) holds each view's
   record by view id for the page's lifetime: read the first time the view is shown, shared while
   in flight, kept when the view is shown again; refresh (and Retry) reads again, showing the record

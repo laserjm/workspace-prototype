@@ -11,7 +11,8 @@ _Avoid_: Integration, data source, vendor
 
 **Connection**:
 One user's authenticated link to one account or site of a provider. It is what the user picks
-when they choose where to bring items in from.
+when they choose where to bring items in from. The interface labels the user's connections
+"Data sources" (Settings → Data sources, "Choose a data source"); code and docs say connection.
 _Avoid_: Data source, source, account, integration
 
 **Record**:

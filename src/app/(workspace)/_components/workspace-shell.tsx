@@ -12,7 +12,11 @@ import {
 import { IconButton } from "@/components/ui/icon-button";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { pluralLabels, useIntegrations } from "@/modules/integrations";
+import {
+  invitedProvider,
+  pluralLabels,
+  useIntegrations,
+} from "@/modules/integrations";
 import { ProjectForm, ProjectIcon, type Project } from "@/modules/projects";
 import { useSkillPreferences } from "@/modules/skills";
 import {
@@ -112,13 +116,12 @@ export function WorkspaceShell({
     (thread) => thread.id === history[historyIndex],
   );
   const currentProjectId = activeThread ? activeThread.projectId : projectId;
-  // With nothing connected, the new-thread page says what connecting the first provider offers.
+  // With nothing connected, the new-thread page says what connecting a provider offers.
   const { providers, connections } = useIntegrations();
-  const firstProvider = providers.find((provider) => provider.records);
+  const invited = connections.length ? undefined : invitedProvider(providers);
   const invitation =
-    !connections.length && firstProvider?.records
-      ? `Connect ${firstProvider.name} to ask about your ${pluralLabels(firstProvider.records)}`
-      : undefined;
+    invited &&
+    `Connect ${invited.name} to ask about your ${pluralLabels(invited.records)}`;
   const currentProject = currentProjectId
     ? projectName(currentProjectId)
     : null;

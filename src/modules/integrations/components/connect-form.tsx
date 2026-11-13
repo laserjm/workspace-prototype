@@ -12,7 +12,7 @@ const fieldLabel = "text-xs font-medium text-secondary-foreground";
 const fieldHelp = "text-2xs leading-relaxed text-muted-foreground";
 
 /**
- * Connects to a provider: its sign-in methods' fields and, when it has one, its API address.
+ * Connects to a provider: its sign-in methods' fields and its API address.
  * The provider checks the credential before anything is stored.
  */
 export function ConnectForm({
@@ -24,10 +24,9 @@ export function ConnectForm({
   onConnected: (connection: Connection) => void;
   onCancel: () => void;
 }) {
-  const methods = provider.auth;
   const [methodIndex, setMethodIndex] = useState(0);
-  const method = methods[methodIndex]!;
-  const [baseUrl, setBaseUrl] = useState(provider.baseUrl?.default ?? "");
+  const method = provider.auth[methodIndex]!;
+  const [baseUrl, setBaseUrl] = useState(provider.baseUrl.default ?? "");
   const [token, setToken] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -39,12 +38,12 @@ export function ConnectForm({
       : { kind: "basic", username, password };
   const complete =
     (method.kind === "token" ? token.trim() : username.trim() && password) &&
-    (!provider.baseUrl || baseUrl.trim());
+    baseUrl.trim();
   const id = (field: string) => `connect-${provider.id}-${field}`;
   // Any issue with the address (not HTTPS, internal, not found) is the URL field's error; every
   // other error is the form's.
   const urlError =
-    provider.baseUrl && connect.error?._tag === "ValidationFailed"
+    connect.error?._tag === "ValidationFailed"
       ? connect.error.issues.find((issue) => issue.path === "baseUrl")?.message
       : undefined;
 
@@ -57,14 +56,14 @@ export function ConnectForm({
         if (!complete || connect.pending) return;
         void connect.run({
           providerId: provider.id,
-          ...(provider.baseUrl ? { baseUrl: baseUrl.trim() } : {}),
+          baseUrl: baseUrl.trim(),
           credential,
         });
       }}
     >
-      {methods.length > 1 && (
+      {provider.auth.length > 1 && (
         <div className="flex gap-1" role="group" aria-label="Sign-in method">
-          {methods.map((item, index) => (
+          {provider.auth.map((item, index) => (
             <Button
               key={item.label}
               type="button"
@@ -78,33 +77,31 @@ export function ConnectForm({
           ))}
         </div>
       )}
-      {provider.baseUrl && (
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor={id("url")} className={fieldLabel}>
-            {provider.baseUrl.label}
-          </label>
-          <Input
-            id={id("url")}
-            type="url"
-            inputMode="url"
-            placeholder={provider.baseUrl.placeholder}
-            value={baseUrl}
-            onChange={(event) => setBaseUrl(event.target.value)}
-            required
-            aria-invalid={urlError ? true : undefined}
-            aria-describedby={urlError ? id("url-error") : undefined}
-          />
-          {urlError && (
-            <p
-              id={id("url-error")}
-              className="text-xs text-destructive-foreground"
-              role="alert"
-            >
-              {urlError}
-            </p>
-          )}
-        </div>
-      )}
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor={id("url")} className={fieldLabel}>
+          {provider.baseUrl.label}
+        </label>
+        <Input
+          id={id("url")}
+          type="url"
+          inputMode="url"
+          placeholder={provider.baseUrl.placeholder}
+          value={baseUrl}
+          onChange={(event) => setBaseUrl(event.target.value)}
+          required
+          aria-invalid={urlError ? true : undefined}
+          aria-describedby={urlError ? id("url-error") : undefined}
+        />
+        {urlError && (
+          <p
+            id={id("url-error")}
+            className="text-xs text-destructive-foreground"
+            role="alert"
+          >
+            {urlError}
+          </p>
+        )}
+      </div>
       {method.kind === "token" ? (
         <div className="flex flex-col gap-1.5">
           <label htmlFor={id("token")} className={fieldLabel}>

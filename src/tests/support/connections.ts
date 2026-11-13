@@ -6,7 +6,8 @@
 //   vi.mock("@/modules/integrations/vault", () => import("@/tests/support/connections"));
 //
 // `connectedUser` has one GitHub connection, `githubConnection`, whose credential is a fake token;
-// answer its requests with `useRecordedGithub`. Every other user has none. Connecting is tested against Postgres (integrations/actions.integration.test.ts).
+// answer its requests with `useRecordedGithub`. Every other user has none. Connecting is tested
+// against Postgres (integrations/actions.integration.test.ts).
 import type { User } from "@/lib/auth/user";
 import type { Connection, Credential } from "@/modules/integrations";
 import { aUser } from "@/tests/factories/user";

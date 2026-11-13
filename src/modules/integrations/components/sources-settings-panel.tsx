@@ -121,7 +121,7 @@ function ConnectionRow({
         <span className="text-2xs text-muted-foreground">
           {healthy
             ? [
-                connection.baseUrl === provider.baseUrl?.default
+                connection.baseUrl === provider.baseUrl.default
                   ? null
                   : connection.baseUrl,
                 connection.expiresAt

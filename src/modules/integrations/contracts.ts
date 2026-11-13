@@ -116,10 +116,10 @@ export type Provider = {
   name: string;
   description: string;
   auth: readonly AuthMethod[];
-  /** Where its API lives; asked for when connecting. Every provider declares it (`providers.test.ts`). */
-  baseUrl?: BaseUrlSetting;
-  /** Checks a credential and says whose it is. Every provider declares it (`providers.test.ts`). */
-  verify?: (
+  /** Where its API lives; asked for when connecting. */
+  baseUrl: BaseUrlSetting;
+  /** Checks a credential and says whose it is. */
+  verify: (
     access: ProviderAccess,
   ) => Promise<
     Result<VerifiedAccount, CredentialRejected | ProviderUnreachable | RateLimited>
@@ -290,6 +290,19 @@ export type ProviderChoice = Pick<
   Provider,
   "id" | "name" | "description" | "auth" | "baseUrl"
 > & { records?: RecordDeclarations };
+
+/**
+ * The provider a user with nothing connected is invited to connect: the first that holds records.
+ * The new-thread page and the attach dialog name it.
+ */
+export function invitedProvider(
+  providers: readonly ProviderChoice[],
+): (ProviderChoice & { records: RecordDeclarations }) | undefined {
+  return providers.find(
+    (provider): provider is ProviderChoice & { records: RecordDeclarations } =>
+      provider.records !== undefined,
+  );
+}
 
 export type ConnectionStatus = "active" | "needs_reconnect";
 

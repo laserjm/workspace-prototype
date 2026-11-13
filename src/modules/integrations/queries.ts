@@ -75,7 +75,7 @@ export async function listProviderChoices(): Promise<ProviderChoice[]> {
     name,
     description,
     auth,
-    ...(baseUrl ? { baseUrl } : {}),
+    baseUrl,
     ...(records ? { records: declarationsOf(records) } : {}),
   }));
 }

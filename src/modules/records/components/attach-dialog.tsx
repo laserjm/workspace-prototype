@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import {
+  invitedProvider,
   pluralLabels,
   ProviderMark,
   RecordKindMark,
@@ -111,8 +112,8 @@ export function AttachDialog({
   const cache = useSearchCache();
   const shown = searchable.find(({ connection }) => connection.id === connectionId);
   const [picks, setPicks] = useState(attached);
-  // With nothing to search, the dialog offers the first provider that holds records.
-  const invited = providers.find((provider) => provider.records);
+  // With nothing to search, the dialog offers to connect a provider.
+  const invited = invitedProvider(providers);
 
   return (
     <Dialog
