@@ -7,6 +7,7 @@ import {
   MessageParts,
   messageMarkdown,
 } from "./message-parts";
+import { awaitsNextStep } from "./reply-progress";
 import { ResponseTurn } from "./response-turn";
 
 /** A model response, or the placeholder while the request is in flight. */
@@ -49,8 +50,8 @@ export function LiveResponse({
       continuation={continuation}
       details={details}
       note="Answered through the Vercel AI Gateway."
-      preparingLabel={model ? `${model.label} is thinking…` : "Thinking…"}
       streaming={hasVisibleParts(message)}
+      waiting={awaitsNextStep(message)}
       copyText={message ? messageMarkdown(message) : ""}
       onFork={onFork}
     >
