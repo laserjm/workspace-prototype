@@ -74,9 +74,10 @@ the user first and names their id in its query.
 and the agent loop; see "Answers come from the Vercel AI Gateway"), `threads` (rich:
 conversations, settle, snooze, wake, fork, the live chat), `integrations` (the providers the
 workspace connects to, the user's connections and what they read; a leaf that imports no other
-module), `records` (attaching records to a question, provider-neutral: the attachment rules, the
-attach dialog and its chips; ADR 0003 §2), `sources` (the sources and records of the user's
-connections, the thread scope and the explorer; a read-only domain, which ADR 0003 retires),
+module), `records` (attaching records to a question and reading them, provider-neutral: the
+attachment rules, the attach dialog and its chips, the record panel and the frame its views share;
+ADR 0003 §2), `sources` (the sources and records of the user's
+connections and the thread scope; a read-only domain, which ADR 0003 retires),
 `skills` (the skill catalogue and its activation in this browser) and `projects` (the project
 list, the add-project rule and the sidebar filter). `app/(workspace)/` composes them; its
 `_components/` hold the shell, sidebar, settings and new-thread heading, which only that route
@@ -203,10 +204,12 @@ does. A user's sources
 are read from their connections (see "Integrations are provider folders"); the skill catalogue
 is one `skills/catalog/<id>/SKILL.md` per skill (see "Skills are SKILL.md files"). Both are read
 through `queries.ts` and `server.ts`, and reach the browser through `SourcesProvider` and
-`SkillsProvider`. A source's records are not part of the page: the browser loads them from
-`GET /api/sources/[sourceId]/records` the first time a view needs them (`SourceRecordsStore`,
-`useSourceRecords`), and a new thread starts with all of them. Skill activation and the source panel
-width persist in `localStorage`; the stored skill ids are parsed with `storedSkillIdsSchema`. There are no cache tags: every read is per request, and an action returns what it
+`SkillsProvider`. A record is not part of the page: a record view reads it from
+`GET /api/connections/[connectionId]/records/[type]/[key]` the first time it is shown, into the
+browser's `RecordViewStore` (see "The record panel"). Skill activation, the record panel's width
+and each thread's record panel persist in `localStorage`; the stored skill ids are parsed with
+`storedSkillIdsSchema`, a stored panel with `restorePanel`. (Until the scope goes, the scope dialog
+still loads a source's records from `GET /api/sources/[sourceId]/records`.) There are no cache tags: every read is per request, and an action returns what it
 stored, which the browser adds to its state.
 **Enforced by.** The `server-only` import in every `queries.ts`, `server.ts` and
 `threads/answer.ts` (a client component that imports one fails the build); the
@@ -378,8 +381,8 @@ Atlassian, codebeamer, PostHog, Stripe and Supabase are planned). A provider is
 `defineProvider({ id, name, description, auth, baseUrl?, verify?, records?, guide? })` (`contracts.ts`),
 registered by one line in `providers.ts`, and written in its folder: `index.ts` (the
 manifest), `api.ts` (its HTTP calls, every response parsed with zod), `records.ts` (its record
-types, states and search, only with records), `views/` (its marks in the browser, and with
-#60 its record views; ADR 0003 §3) and an optional `guide.md`: what the agent should know to use
+types, states, search and one reader per type, only with records), `views/` (in the browser: its
+mark and each type's record view and kind mark; ADR 0003 §3) and an optional `guide.md`: what the agent should know to use
 its connections (what its records and states mean, how its search reads), imported as text,
 declared as the manifest's `guide`, kept server-side (never on `ProviderChoice`) and in the system
 prompt while one of its connections is allowed (`providerForPrompt`, `integrations/server.ts`;
@@ -420,17 +423,38 @@ the hint the dialog shows under its search field (`hint.idle` before typing, `hi
 typing; a provider's own terms, such as GitHub's numbers and repository names, stay in its
 declaration); and its search, which answers a `RecordSearchPage` (`RecordSummary`s, an opaque
 `next` cursor, `total`, the connection's `reach`, and `narrowedTo` when the text narrowed it,
-which the dialog shows) or a `RecordError` and never throws. The sample's older reader
-is its manifest's `sources`. The declarations, without code, reach the browser on
-`ProviderChoice.records`; each provider's marks (its own and one per type) are in its `views/`,
-gathered by provider id in `record-views.ts`. `searchRecords(user, connectionId, query)`
+which the dialog shows) or a `RecordError` and never throws. Each declared type also has a
+`read(access, key)`, which answers the record's live `RecordSummary` and the provider's own detail
+(`GithubIssueDetail`, a zod schema beside the reader; there is no generic detail type), and the
+manifest's `url(baseUrl, type, key)` builds the record's page from the connection's base URL and
+the key, without asking the provider. The sample's older reader is its manifest's `sources`. The
+declarations, without code (`listProviderChoices` drops the readers), reach the browser on
+`ProviderChoice.records`. The browser's registry is `record-views.ts`, one line per provider: its
+`views/` maps each declared type to `{ view, icon }`, a `React.lazy` body-only view
+(`({ detail }) => …`, drawn with the shared Markdown renderer, which checks the detail against its
+schema) and the type's kind mark, beside the provider's mark, keyed on the provider id. The view
+kind is derived, `viewKindOf(provider, type)` = `github.issue-view`, never declared;
+`RecordViewBody({ kind, detail })` draws a kind's body, loading its chunk with the first view of
+that kind, and says so for a kind nobody registered. `ProviderMark`, `RecordKindMark` and
+`RecordStateBadge` draw the marks and a state's declared label in its tone. `searchRecords(user, connectionId, query)`
 (`integrations/records.ts`) finds the connection among the user's (another user's is
 `not_found`) and runs the provider's search; a `needs_reconnect` answer marks an active connection
 `needs_reconnect` (`markNeedsReconnect`, the one write in `queries.ts`). `GET
 /api/connections/[connectionId]/records?q=&type=&closed=&cursor=` serves it to the attach dialog,
 `private, no-store`; `record-error.ts` beside it answers a `RecordError` as a status and `{ error:
-{ kind, message, retryAt? } }` (404, 403, 409 for `needs_reconnect` because 401 means the
-session ended, 429 with `Retry-After`, 502, 422). GitHub's search (#43) names the token's
+{ kind, message, retryAt?, url? } }` (404, 403, 409 for `needs_reconnect` because 401 means the
+session ended, 429 with `Retry-After`, 502, 422). `readRecord(user, connectionId, type, key)`
+(`integrations/records.ts`) does the same for one record: another user's connection, an undeclared
+type or a key the provider cannot parse is `not_found`, a `needs_reconnect` answer marks the
+connection, and a refusal carries the record's `url`. `GET
+/api/connections/[connectionId]/records/[type]/[key]` serves it to the record views (the key
+URL-encoded, parsed only by the provider), `private, no-store`, answering `{ summary:
+RecordSummary & { url }, detail }` or the same `{ error }`. GitHub's issue reader (#60) reads
+`/repos/{o}/{r}/issues/{n}` and its first 100 comments in parallel; a pull request is read the same
+way plus `/pulls/{n}` for its draft and merge state until #61 gives it its own detail. Both strip
+invisible and bidirectional Unicode (zero-width characters, the bidi embeddings, overrides and
+isolates, the byte order mark, tag characters; the zero-width joiner stays for emoji) from titles,
+bodies, labels and comments. GitHub's search (#43) names the token's
 repositories (`GET /user/repos`) as `repo:a repo:b …`, or `user:<owner>` for each distinct owner
 when that would make the query longer than 256 characters; adds the typed words with
 `in:title,body` (a word GitHub would read as a qualifier is quoted), `is:issue` or `is:pr` and
@@ -470,19 +494,68 @@ fails the test and names it), and swaps the connection query and the vault for
 seeded case found by its label, CI on the merged pull request's head, no token or `Authorization`);
 `integrations/providers.test.ts` (every provider in the registry: unique ids, a
 way to connect, a base URL and `verify` when it takes a credential, declared record types whose
-states' tones are in the set, sources in a declared product, records read back by id in order, nothing for an unknown key);
+states' tones are in the set, every declared type with a reader, a view and an icon and every
+view of a declared type, a provider mark, sources in a declared product, records read back by id
+in order, nothing for an unknown key);
 `integrations/actions.integration.test.ts` (connect, reconnect, refusals including each internal
 address kind with name resolution stubbed, test, disconnect, a search marking only its user's
-connection `needs_reconnect`, a visitor, `assertIsolation()`); the marks registry in
-`providers.test.ts` (a mark for each declared type, none for another); `providers/github/api.test.ts`;
+connection `needs_reconnect`, a visitor, `assertIsolation()`); `providers/github/api.test.ts`;
 `app/api/connections/[connectionId]/records/route.test.ts` (the scoped query, the toggles and
 the cursor, one search per type for "All", the before-typing pair, narrowing by a repository
 name, the number on top, the
 `user:` fallback, the computed states, another user's connection, each classifier case and a 401
-marking the connection); `records/contracts.test.ts` (the dialog's default connection);
+marking the connection); `app/api/connections/[connectionId]/records/[type]/[key]/route.test.ts`
+(an issue's fields and comment count, a pull request's merged state and page, the summary's live
+state and URL, Unicode stripped, a pull request read as an issue, an unparsable key, another
+user's connection, 403, 429 with `retryAt`, 502 and a 409 marking the connection);
+`records/contracts.test.ts` (the dialog's default connection);
 `sources/queries.test.ts`; `tsc`.
 **Recorded in.** This entry; `docs/adr/0002-integrations.md`;
 `docs/adr/0003-attached-items-and-record-views.md`.
+
+### The record panel
+
+**Decision.** An open thread's right-hand panel shows its attached items as record views (ADR 0003
+§2, #40, #51). `records` owns it; the shell puts `RecordPanelProvider` (keyed by nothing, told the
+open thread) around the header and the conversation, `RecordPanelToggle` in the header of an open
+thread (no panel and no button on the new-thread page), and `ThreadConversation` draws its `panel`
+render prop, `RecordPanel`, beside the conversation once that is here.
+- **State.** `records/record-panel.ts` is pure: per thread, the open views (in the order they
+  opened, each with the snapshot it was opened from, so a tab draws without fetching), the active
+  one (none shows the fixed **Attached** tab), whether the panel is shown and whether the user
+  rearranged it since their last question. A view's id is `<viewKind>:<connectionId>:<key>`.
+  `openView` (a chip or an Attached row) opens or focuses and shows the panel; `openSent` opens a
+  question's items and focuses the first, showing a hidden panel on a wide screen, unless the user
+  rearranged the panel since their last question, when they open without taking focus; closing a
+  view focuses its neighbour, the last one Attached. Nothing opens twice. The provider keeps each
+  thread's state in `localStorage` (`workspace:record-panel:<threadId>`, versioned, read by
+  `restorePanel`: another version or an unreadable value starts afresh, a view that does not read
+  is dropped). A thread with nothing stored starts open on a wide screen when it has attached
+  items, hidden otherwise; below 1200px the panel is a sheet over the conversation and always
+  starts hidden.
+- **Sending.** `RecordPanel` calls `openSent` for each user message that appears in the
+  conversation after it mounted, so a stored question, or one asked again by Try again, opens
+  nothing. Chips on a sent question call `open`.
+- **The panel.** The Attached tab lists `attachedByQuestion(conversation)` (built on
+  `threadAttachedItems`), grouped by the question that attached them, each marked when its view is
+  open; empty, it offers "Choose a data source", whose picks land in the composer's draft (the
+  shell holds the open thread's draft for both). A tab per view: the kind mark in its live state's
+  tone, the short label, close on hover or middle-click. Only the active view renders and reads.
+  Its frame (kind mark, where, live state badge, title, refresh, "Open on <provider>", close) is
+  `records`'; the body is the provider's `RecordViewBody`. Errors: not found or no access offer
+  Retry and the record's page; needs reconnecting offers Reconnect (Settings → Sources) and Retry;
+  a removed connection says so, with no link, and reads nothing. On a wide screen the panel is
+  resizable (`ResizablePanel`, its width in `localStorage`).
+- **View data.** `RecordViewStore` (`records/components/record-view-store.ts`) holds each view's
+  record by view id for the page's lifetime: read the first time the view is shown, shared while
+  in flight, kept when the view is shown again; refresh (and Retry) reads again, showing the record
+  it has meanwhile. Nothing is cached on the server.
+**Enforced by.** `records/record-panel.test.ts` (open and focus, nothing twice, `openSent` with
+and without "rearranged", the neighbour on close and Attached after the last, starting open or
+hidden, a stored state of an older version or a corrupt one);
+`records/components/record-view-store.test.ts` (one read per view, refresh, a refusal kept until a
+retry); `records/attached-items.test.ts` (the grouping by question).
+**Recorded in.** This entry; `docs/adr/0003-attached-items-and-record-views.md`.
 
 ### Connection credentials live in the vault
 
@@ -542,7 +615,7 @@ files beside `globals.css`. Colours that only identify something (project letter
 marks, record status, priority, issue type) use Tailwind's palette with a `dark:` variant; a
 colour with meaning (errors, warnings, success) uses its token. Layout state that descendants
 react to is a data attribute on a named group: `data-sidebar` and `data-mobile-sidebar` on
-`group/app`, `data-session` and `data-source-panel` on `group/main` (read as
+`group/app`, `data-session` on `group/main` (read as
 `group-data-[sidebar=collapsed]/app:…`). Class names are literal strings, never assembled at
 runtime, because Tailwind finds them by scanning the source. The custom breakpoints keep the
 workspace's widths: `max-desktop:` (below 1200px), `3xl:` (1600px), `4xl:` (1800px), plus

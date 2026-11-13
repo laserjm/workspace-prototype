@@ -12,9 +12,10 @@ import {
 } from "@/components/ui/dialog";
 import { allRecordIds, recordCountLabel } from "../contracts";
 import { RecordStatusBadge } from "./record-status-badge";
-import { noResultsClassName } from "./source-explorer";
 import { SourceIcon } from "./source-icon";
 import { useSourceRecords, useSources } from "./use-sources";
+
+const noResultsClassName = "px-3 py-6 text-center text-xs text-muted-foreground";
 
 /** Chooses which of a source's records a thread may use; at least one. */
 export function SourceScopeDialog({

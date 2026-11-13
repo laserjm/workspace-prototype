@@ -15,6 +15,7 @@ export {
 } from "./contracts";
 export {
   ATTACHED_ITEMS_PART,
+  attachedByQuestion,
   attachedConnectionsOf,
   attachedItemsText,
   recordsDataSchemas,
@@ -26,3 +27,6 @@ export {
 } from "./attached-items";
 export { AttachDialog } from "./components/attach-dialog";
 export { AttachedItemChip } from "./components/attached-item-chip";
+export type { OpenView, PanelState, ViewTarget } from "./record-panel";
+export { RecordPanel, RecordPanelToggle } from "./components/record-panel";
+export { RecordPanelProvider, useRecordPanel } from "./components/record-panel-provider";

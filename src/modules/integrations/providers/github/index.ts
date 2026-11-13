@@ -1,7 +1,7 @@
 import { defineProvider } from "../../contracts";
 import { verifyGithubToken } from "./api";
 import guide from "./guide.md";
-import { githubRecordTypes, searchGithubRecords } from "./records";
+import { githubRecordTypes, githubRecordUrl, searchGithubRecords } from "./records";
 
 /**
  * GitHub: connected with a fine-grained personal access token for now (ADR 0002, phase 2).
@@ -34,6 +34,7 @@ export const github = defineProvider({
         "Matches words in titles and descriptions. Type a repository name to search only there.",
     },
     search: searchGithubRecords,
+    url: githubRecordUrl,
   },
   guide,
 });

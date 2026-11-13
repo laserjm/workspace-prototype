@@ -62,10 +62,6 @@ export type Source = {
   collectionPath: string;
   /** Heading of an overview built from this source's records. */
   overviewTitle: string;
-  /** Label of the explorer's list view, e.g. "Pages". */
-  listLabel: string;
-  /** Whether the explorer offers a board grouped by status. */
-  hasBoard: boolean;
   singular: string;
   plural: string;
 };

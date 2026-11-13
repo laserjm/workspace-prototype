@@ -30,7 +30,6 @@ export {
 export { RecordSearchCall } from "./components/record-search-call";
 export { RecordStatusBadge } from "./components/record-status-badge";
 export { SourceChoiceList } from "./components/source-choice-list";
-export { SourceExplorer } from "./components/source-explorer";
 export { SourceIcon } from "./components/source-icon";
 export { SourcePicker } from "./components/source-picker";
 export { SourceScopeDialog } from "./components/source-scope-dialog";

@@ -12,10 +12,6 @@ export type ProductPresentation = {
   /** "ticket", "tickets". */
   singular: string;
   plural: string;
-  /** Label of the explorer's list view, e.g. "Pages". */
-  listLabel: string;
-  /** Whether the explorer offers a board grouped by status. */
-  hasBoard: boolean;
 };
 
 /** A collection of records in a connection, as its provider lists it. */
@@ -237,6 +233,21 @@ export type RecordTypeDeclaration = {
   states: Readonly<Record<string, RecordStateDeclaration>>;
 };
 
+/**
+ * One record as its view shows it: the live summary, and the provider's own detail (such as
+ * `GithubIssueDetail`), which only that provider's view reads. There is no generic detail type.
+ */
+export type RecordDetail = { summary: RecordSummary; detail: unknown };
+
+/** What the detail route answers: the detail, and where the record is on its provider's site. */
+export type RecordRead = { summary: RecordSummary & { url: string }; detail: unknown };
+
+/** A declared record type with its reader: server-side, never on `ProviderChoice`. */
+export type RecordType = RecordTypeDeclaration & {
+  /** Reads one record by its key, which only this provider parses; never throws. */
+  read: (access: ConnectionAccess, key: string) => Promise<Result<RecordDetail, RecordError>>;
+};
+
 /** The generic filters the attach dialog offers; a provider says which its search supports. */
 export type RecordFilter = "type" | "includeClosed";
 
@@ -272,17 +283,30 @@ export type RecordSearchHint = {
 
 /** The records part of a provider's manifest. */
 export type ProviderRecords = {
-  types: Readonly<Record<string, RecordTypeDeclaration>>;
+  types: Readonly<Record<string, RecordType>>;
   filters: readonly RecordFilter[];
   hint: RecordSearchHint;
   search: (
     access: ConnectionAccess,
     query: RecordSearchQuery,
   ) => Promise<Result<RecordSearchPage, RecordError>>;
+  /**
+   * Where a record is on the provider's site, built from the connection's base URL and the key
+   * without asking the provider; nothing for a key it cannot parse.
+   */
+  url: (baseUrl: string, type: string, key: string) => string | undefined;
 };
 
 /** The records declaration as the browser gets it: no code. */
-export type RecordDeclarations = Pick<ProviderRecords, "types" | "filters" | "hint">;
+export type RecordDeclarations = Pick<ProviderRecords, "filters" | "hint"> & {
+  types: Readonly<Record<string, RecordTypeDeclaration>>;
+};
+
+/**
+ * The view kind a record of `type` opens in, derived and never declared (ADR 0003 §3):
+ * `github.pull-request-view`.
+ */
+export const viewKindOf = (providerId: string, type: string) => `${providerId}.${type}-view`;
 
 /** The tone a record in `state` is drawn in; `neutral` for anything undeclared. */
 export function toneOf(

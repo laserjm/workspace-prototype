@@ -1,9 +1,8 @@
 "use client";
 
 import { useLayoutEffect, useRef, type ReactNode } from "react";
-import { ChevronDown, GitFork } from "lucide-react";
+import { GitFork } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { recordCountLabel, SourceIcon, useSources } from "@/modules/sources";
 import type { ModelChoice, WorkspaceUIMessage } from "@/modules/agent";
 import { type Thread } from "../contracts";
 import { shelfOf } from "../placement";
@@ -43,12 +42,14 @@ type ThreadConversationProps = {
   onWorkingChange: (working: boolean) => void;
   onRestore: () => void;
   onOpenThread: (id: string) => void;
-  onViewSource: () => void;
   onFork: (target: ForkTarget) => void;
+  /** What sits beside the conversation once it is here: the record panel. */
+  panel: (messages: WorkspaceUIMessage[]) => ReactNode;
 };
 
 /**
- * An open thread: its placement, origin, source, messages and responses, then the composer.
+ * An open thread: its placement, origin, messages and responses, then the composer, and once
+ * its conversation is here, the record panel beside it.
  * It opens with the conversation the database holds; key it by the thread's id.
  */
 export function ThreadConversation(props: ThreadConversationProps) {
@@ -88,24 +89,27 @@ function LiveConversation({
 }: ThreadConversationProps & { initialMessages: WorkspaceUIMessage[] }) {
   const chat = useThreadChat({ ...props, initialMessages });
   return (
-    <ConversationLayout
-      {...props}
-      composer={props.composer(chat.controls)}
-      list={(lane) => (
-        <ThreadMessages
-          {...lane}
-          thread={props.thread}
-          messages={chat.messages}
-          inFlight={chat.busy}
-          error={chat.error}
-          load="ready"
-          onReload={() => undefined}
-          onRetry={chat.retry}
-          models={props.models}
-          onFork={props.onFork}
-        />
-      )}
-    />
+    <>
+      <ConversationLayout
+        {...props}
+        composer={props.composer(chat.controls)}
+        list={(lane) => (
+          <ThreadMessages
+            {...lane}
+            thread={props.thread}
+            messages={chat.messages}
+            inFlight={chat.busy}
+            error={chat.error}
+            load="ready"
+            onReload={() => undefined}
+            onRetry={chat.retry}
+            models={props.models}
+            onFork={props.onFork}
+          />
+        )}
+      />
+      {props.panel(chat.messages)}
+    </>
   );
 }
 
@@ -122,17 +126,13 @@ function ConversationLayout({
   list,
   onRestore,
   onOpenThread,
-  onViewSource,
 }: {
   thread: Thread;
   composer: ReactNode;
   list: (lane: ListLane) => ReactNode;
   onRestore: () => void;
   onOpenThread: (id: string) => void;
-  onViewSource: () => void;
 }) {
-  const { sourceById } = useSources();
-  const source = thread.scope ? sourceById(thread.scope.sourceId) : undefined;
   const lane = conversationLane(!!thread.scope);
   const conversationRef = useRef<HTMLDivElement>(null);
   const composerLayerRef = useRef<HTMLDivElement>(null);
@@ -173,7 +173,7 @@ function ConversationLayout({
   const placed = shelfOf(thread) !== "active";
   // Rows that stay put under the header. Without any, the list starts right
   // under the header and fades out beneath it.
-  const hasTopRows = placed || Boolean(source && thread.scope);
+  const hasTopRows = placed;
   // The rows above and below the message list reserve the same scrollbar
   // gutters as the list, so all three lanes resolve to one width even where
   // the browser draws classic (space-taking) scrollbars.
@@ -202,27 +202,6 @@ function ConversationLayout({
                   className="font-medium text-secondary-foreground"
                 >
                   {thread.snoozedUntil ? "Wake now" : "Return to active"}
-                </button>
-              </div>
-            )}
-            {source && thread.scope && (
-              <div className="flex shrink-0 items-center gap-2.5 border-b border-border/60 py-4 max-md:py-3">
-                <SourceIcon icon={source.icon} size="md" iconClassName="size-4" />
-                <div className="min-w-0">
-                  <strong className="block truncate text-xs font-medium text-accent-foreground max-md:max-w-47.5 max-md:text-2xs">
-                    {source.collection}
-                  </strong>
-                  <span className="mt-0.5 block text-3xs text-secondary-label">
-                    {recordCountLabel(source, thread.scope.recordIds.length)} ·
-                    Read-only sample snapshot
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={onViewSource}
-                  className="ml-auto flex shrink-0 items-center gap-1 rounded-sm p-1 text-3xs text-secondary-label hover:text-foreground"
-                >
-                  View source <ChevronDown size={12} />
                 </button>
               </div>
             )}

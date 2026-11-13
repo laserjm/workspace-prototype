@@ -6,7 +6,6 @@ import {
   ChevronDown,
   PanelBottom,
   PanelLeftOpen,
-  PanelRight,
   SquareMenu,
   X,
 } from "lucide-react";
@@ -26,10 +25,15 @@ import {
   allRecordIds,
   recordCountLabel,
   SourceChoiceList,
-  SourceExplorer,
   SourceScopeDialog,
   useSources,
 } from "@/modules/sources";
+import {
+  RecordPanel,
+  RecordPanelProvider,
+  RecordPanelToggle,
+  type AttachedConnection,
+} from "@/modules/records";
 import {
   createScope,
   placementOf,
@@ -119,8 +123,10 @@ export function WorkspaceShell({
   const [newProjectName, setNewProjectName] = useState("");
   const [draftScope, setDraftScope] = useState<ThreadScope>();
   const [editingScope, setEditingScope] = useState(false);
-  const [sourceOpen, setSourceOpen] = useState(true);
-  const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);
+  // The open thread's composer draft of attached items, which the record panel adds to too.
+  const [draftAttached, setDraftAttached] = useState<
+    readonly AttachedConnection[]
+  >([]);
   const activeThread = threads.find(
     (thread) => thread.id === history[historyIndex],
   );
@@ -142,8 +148,7 @@ export function WorkspaceShell({
   }
 
   function navigate(threadId: string | null) {
-    setSelectedRecordId(null);
-    setSourceOpen(!window.matchMedia("(max-width: 1100px)").matches);
+    setDraftAttached([]);
     setHistory((previous) => [
       ...previous.slice(0, historyIndex + 1),
       threadId,
@@ -253,11 +258,6 @@ export function WorkspaceShell({
       setProjectId(currentProjectId);
       navigate(null);
     }
-  }
-
-  function showSource() {
-    setSelectedRecordId(null);
-    setSourceOpen(true);
   }
 
   async function handleFork(target: ForkTarget) {
@@ -422,6 +422,7 @@ export function WorkspaceShell({
             }
           />
 
+          <RecordPanelProvider threadId={activeThread?.id ?? null}>
           <div
             className="relative flex min-w-0 flex-1 flex-col"
             inert={mobileSidebarOpen}
@@ -468,39 +469,21 @@ export function WorkspaceShell({
                 >
                   <PanelBottom />
                 </IconButton>
-                <IconButton
-                  label={
-                    activeThread?.scope
-                      ? sourceOpen
-                        ? "Hide source explorer"
-                        : "Show source explorer"
-                      : "Choose data source"
-                  }
-                  aria-pressed={activeThread?.scope ? sourceOpen : undefined}
-                  onClick={() =>
-                    activeThread?.scope
-                      ? setSourceOpen((open) => !open)
-                      : setDialog("sources")
-                  }
-                >
-                  <PanelRight />
-                </IconButton>
+                {/* No panel, and so no button, on the new-thread page. */}
+                {activeThread && <RecordPanelToggle />}
               </div>
             </header>
 
             <main
               id="workspace-main"
-              // A source session sets the conversation beside the source panel.
+              // An open thread sets the conversation beside the record panel.
               className={cn(
                 "group/main relative min-h-0 flex-1 outline-none",
-                activeThread?.scope && "flex",
+                activeThread && "flex",
                 // A short window lets the new-thread draft scroll.
                 !activeThread && "short:overflow-y-auto",
               )}
               data-session={activeThread?.scope ? "source" : "plain"}
-              data-source-panel={
-                activeThread?.scope && sourceOpen ? "open" : "closed"
-              }
               tabIndex={-1}
             >
               {!activeThread ? (
@@ -530,7 +513,6 @@ export function WorkspaceShell({
                 </div>
               ) : (
                 <ThreadConversation
-                  // The source explorer beside it is keyed by the bare id.
                   key={`conversation:${activeThread.id}`}
                   thread={activeThread}
                   models={models}
@@ -550,8 +532,15 @@ export function WorkspaceShell({
                   }
                   onRestore={() => handleRestore(activeThread.id)}
                   onOpenThread={navigate}
-                  onViewSource={showSource}
                   onFork={(target) => void handleFork(target)}
+                  panel={(messages) => (
+                    <RecordPanel
+                      messages={messages}
+                      draft={draftAttached}
+                      onDraftChange={setDraftAttached}
+                      onConnect={() => openSettings("sources")}
+                    />
+                  )}
                   composer={(controls) => (
                     <PromptForm
                       compact
@@ -568,19 +557,10 @@ export function WorkspaceShell({
                       onManageSkills={() => openSettings("skills")}
                       onChooseSource={chooseSource}
                       onClearSource={clearSource}
-                      onScope={showSource}
+                      attached={draftAttached}
+                      onAttachedChange={setDraftAttached}
                     />
                   )}
-                />
-              )}
-              {activeThread?.scope && sourceOpen && (
-                <SourceExplorer
-                  key={activeThread.id}
-                  sourceId={activeThread.scope.sourceId}
-                  recordIds={activeThread.scope.recordIds}
-                  selectedId={selectedRecordId}
-                  onSelect={setSelectedRecordId}
-                  onClose={() => setSourceOpen(false)}
                 />
               )}
             </main>
@@ -619,6 +599,7 @@ export function WorkspaceShell({
               </section>
             )}
           </div>
+          </RecordPanelProvider>
         </div>
 
         <Dialog

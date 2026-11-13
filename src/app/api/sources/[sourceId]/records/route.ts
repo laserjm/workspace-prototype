@@ -4,7 +4,7 @@ import { searchSourceRecords } from "@/modules/sources/server";
 
 /**
  * A page of one of the user's sources' records, read with their connection: what the source
- * explorer and the scope dialog show. `?text=` searches, `?cursor=` asks for the next page.
+ * scope dialog shows. `?text=` searches, `?cursor=` asks for the next page.
  */
 export async function GET(
   req: Request,

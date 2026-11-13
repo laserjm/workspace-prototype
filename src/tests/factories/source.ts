@@ -30,8 +30,6 @@ export function aSource(overrides: Partial<Source> = {}): Source {
     collection: "Sprint 1",
     collectionPath: "PROJECT / SAMPLE",
     overviewTitle: "Sprint 1 at a glance",
-    listLabel: "List",
-    hasBoard: false,
     singular: "ticket",
     plural: "tickets",
     ...overrides,

@@ -1,7 +1,8 @@
-// GitHub's marks: the provider's and one per record type. Its record views join them here.
+// GitHub in the browser: its mark, and each record type's view and kind mark (ADR 0003 §3).
+import { lazy } from "react";
 import { CircleDot, GitPullRequest } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { RecordMarks } from "../../../record-views";
+import type { ProviderViews } from "../../../record-views";
 
 /** GitHub's mark, in the text colour. */
 function GithubMark({ className }: { className?: string }) {
@@ -12,7 +13,13 @@ function GithubMark({ className }: { className?: string }) {
   );
 }
 
-export const githubMarks: RecordMarks = {
-  provider: GithubMark,
-  types: { issue: CircleDot, "pull-request": GitPullRequest },
+// One chunk for both until #61 gives the pull request its own view, laid out for review.
+const IssueView = lazy(() => import("./issue-view"));
+
+export const githubViews: ProviderViews = {
+  icon: GithubMark,
+  types: {
+    issue: { view: IssueView, icon: CircleDot },
+    "pull-request": { view: IssueView, icon: GitPullRequest },
+  },
 };

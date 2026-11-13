@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, type Dispatch, type SetStateAction } from "react";
 import {
   ArrowUp,
   Check,
@@ -66,6 +66,8 @@ export function PromptForm({
   initialSkill,
   busy = false,
   onStop,
+  attached: shownAttached,
+  onAttachedChange,
 }: {
   models: ModelChoice[];
   /** Resolves false when the message was not taken; the form then keeps it. */
@@ -82,6 +84,12 @@ export function PromptForm({
   busy?: boolean;
   /** Shown in place of send while busy. */
   onStop?: () => void;
+  /**
+   * The draft's attached items, when the page holds them (the record panel's Attached tab adds
+   * to them too); otherwise the form keeps its own.
+   */
+  attached?: readonly AttachedConnection[];
+  onAttachedChange?: Dispatch<SetStateAction<readonly AttachedConnection[]>>;
 }) {
   const { skillById } = useSkills();
   const [prompt, setPrompt] = useState("");
@@ -89,7 +97,9 @@ export function PromptForm({
   const [permission, setPermission] = useState("Full access");
   const [attachments, setAttachments] = useState<File[]>([]);
   // The records the question is about, sent as its data part. Each question starts with none.
-  const [attached, setAttached] = useState<readonly AttachedConnection[]>([]);
+  const [ownAttached, setOwnAttached] = useState<readonly AttachedConnection[]>([]);
+  const attached = shownAttached ?? ownAttached;
+  const setAttached = onAttachedChange ?? setOwnAttached;
   const [attaching, setAttaching] = useState(false);
   const [error, setError] = useState("");
   const [chosenSkill, setChosenSkill] = useState<string | undefined>(
