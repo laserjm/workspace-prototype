@@ -18,7 +18,6 @@ import {
   recordsDataSchemas,
 } from "@/modules/records/server";
 import { listSkills } from "@/modules/skills/server";
-import { listScopedRecords, listSources } from "@/modules/sources/server";
 import { resolveContext, type AgentContext } from "./context";
 import type {
   ChatOptions,
@@ -32,7 +31,7 @@ import { tools, toolsFor } from "./tools";
 export type AgentRequest = {
   /** The signed-in user the answer is for. */
   user: User;
-  /** The model, skill and records, as the ids the browser sent. */
+  /** The model and skills, as the ids the browser sent. */
   options: ChatOptions;
   /** The conversation to answer, ending with the user's message; validated here. */
   messages: unknown[];
@@ -58,8 +57,8 @@ const workspaceAgent = new ToolLoopAgent({
   model: models[0]!.gateway,
   instructions: baseInstructions,
   tools,
-  // Replaced on every call by toolsFor; no thread, no attached records.
-  toolsContext: { search_records: {}, load_skill: { skillIds: [] } },
+  // Replaced on every call by toolsFor; no thread, no allowed connections.
+  toolsContext: { search_records: { connectionIds: [] }, load_skill: { skillIds: [] } },
   // Lets the model call a tool or two and then write its reply.
   stopWhen: stepCountIs(5),
   // Built on the server by resolveContext, never from the request, so it is not parsed again.
@@ -91,7 +90,7 @@ function withCompletedReply(
 }
 
 /**
- * Answers a conversation: resolves the model, skill and records from their ids (an unknown one
+ * Answers a conversation: resolves the model and skill from their ids (an unknown one
  * is a `NotFound`), validates the conversation against the tools, and streams the reply with
  * start and finish timing in the message metadata. The stream is read to its end on the server
  * too (`consumeSseStream`), so `onEnd` gets the reply even when the browser goes away.
@@ -103,17 +102,7 @@ export async function runAgent({
   signal,
   onEnd,
 }: AgentRequest): Promise<Result<AgentRun, NotFound | ValidationFailed>> {
-  const [skills, sources, scopedRecords] = await Promise.all([
-    listSkills(),
-    listSources(user),
-    options.scope ? listScopedRecords(user, options.scope) : [],
-  ]);
-  const context = resolveContext(user, options, {
-    models,
-    skills,
-    sources,
-    scopedRecords,
-  });
+  const context = resolveContext(user, options, { models, skills: await listSkills() });
   if (!context.ok) return context;
   const { model, skill } = context.value;
 

@@ -75,9 +75,9 @@ and the agent loop; see "Answers come from the Vercel AI Gateway"), `threads` (r
 conversations, settle, snooze, wake, fork, the live chat), `integrations` (the providers the
 workspace connects to, the user's connections and what they read; a leaf that imports no other
 module), `records` (attaching records to a question and reading them, provider-neutral: the
-attachment rules, the attach dialog and its chips, the record panel and the frame its views share;
-ADR 0003 §2), `sources` (the sources and records of the user's
-connections and the thread scope; a read-only domain, which ADR 0003 retires),
+attachment rules, the attach dialog and its chips, the record panel and the frame its views share,
+and the record tools every provider answers; ADR 0003 §2), `sources` (the sample's sources and
+records; a read-only domain, which ADR 0003 retires and #63 removes),
 `skills` (the skill catalogue and its activation in this browser) and `projects` (the project
 list, the add-project rule and the sidebar filter). `app/(workspace)/` composes them; its
 `_components/` hold the shell, sidebar, settings and new-thread heading, which only that route
@@ -96,14 +96,17 @@ any `@/modules/*` but those two); the `server-only` import in every `server.ts`.
 
 **Decision.** A module's types and rules hold another module's data by id, never as a value:
 they import only a type such as `ModelProvider` from `agent` (an input schema may build on the
-other module's schema, as `startThreadInputSchema` does on `chatOptionsSchema`). A
-thread refers to its source, records and skill by id (`ThreadScope = { sourceId, recordIds }`,
-`skillId`; a source id is `<connectionId>:<sourceKey>`, `sourceIdOf` in `sources/contracts.ts`). Components resolve the ids through the other module's public API
-(`useSources().sourceById`, `useSkills().skillById`). Source-specific presentation (overview
-title, breadcrumb, the icon `SourceIcon` draws) is data on the source,
-from its provider's product, not a branch on its id. The record vocabulary (`RECORD_STATUSES`,
-`SourceRecord`, `RecordQuery`, `RecordPage`) is `sources`'; `integrations` imports it as types
-only, so loading `sources` never loads the `integrations` components and actions.
+other module's schema, as `chatTurnDtoSchema` does on `chatOptionsSchema`). A question refers to
+its skill by id (`skillId`) and to what it is about by reference: its attached items name a
+connection by its id and a record by its provider's type and key (`{ connectionId, type, key }`,
+ADR 0003 §1), never by value, and the snapshot beside them only draws a chip. A thread holds no
+records: what it is about is its questions' attached items (`threadAttachedItems`). Components
+resolve the ids through the other module's public API (`useIntegrations().connections`,
+`useSkills().skillById`). Provider-specific presentation (the provider mark, a type's kind mark,
+a state's label and tone) is data the provider declares, not a branch on its id. The record
+vocabulary (`RecordSummary`, `RecordError`, the tones) is `integrations`'; `records` builds on it.
+The sample's older vocabulary (`SourceRecord`, `RecordQuery`, `RecordPage`) is still `sources`',
+which `integrations` imports as types only, until #63 removes both.
 **Enforced by.** Review.
 **Recorded in.** This entry.
 
@@ -184,7 +187,10 @@ its end on the server (`consumeSseStream`) so the reply is stored even if the br
 The server names the replies (`generateMessageId`). Leaving a thread stops its response, as
 closing the page does: `useChat` stops its chat when it unmounts, and the reply is stored as it
 ended. A question stores the model and skill it asked for, which a retry asks again
-(`lastRequest`). `listThreads` counts each thread's stored questions and attachments for the
+(`lastRequest`). A thread stores no scope: what it is about is its questions' attached items,
+stored in their messages (`drizzle/0008_drop-thread-scope.sql` dropped `source_id` and
+`record_ids`, with no backfill), and the sidebar row's subtitle is the snooze time or the
+branch. `listThreads` counts each thread's stored questions and attachments for the
 sidebar. A fork is stored first, with the conversation through the chosen response, then opened
 (`forkPoint`; a question or a response not stored yet is a `NotFound`); its origin is a snapshot
 in `forked_from_*`, not a reference.
@@ -200,21 +206,23 @@ at its deadline (`wakeIfDue`, in `listThreads` and before each change), and the 
 an open page's threads live (`useSnoozeWake`). Asking again returns a parked thread to active
 and stores the provider it now talks to (`answerThread`). Whether a response is in flight only
 the browser knows, and only the open thread can have one; the browser refuses a snooze while it
-does. A user's sources
-are read from their connections (see "Integrations are provider folders"); the skill catalogue
+does. A user's connections
+are read from the database (see "Integrations are provider folders"); the skill catalogue
 is one `skills/catalog/<id>/SKILL.md` per skill (see "Skills are SKILL.md files"). Both are read
-through `queries.ts` and `server.ts`, and reach the browser through `SourcesProvider` and
+through `queries.ts` and `server.ts`, and reach the browser through `IntegrationsProvider` and
 `SkillsProvider`. A record is not part of the page: a record view reads it from
 `GET /api/connections/[connectionId]/records/[type]/[key]` the first time it is shown, into the
 browser's `RecordViewStore` (see "The record panel"). Skill activation, the record panel's width
 and each thread's record panel persist in `localStorage`; the stored skill ids are parsed with
-`storedSkillIdsSchema`, a stored panel with `restorePanel`. (Until the scope goes, the scope dialog
-still loads a source's records from `GET /api/sources/[sourceId]/records`.) There are no cache tags: every read is per request, and an action returns what it
+`storedSkillIdsSchema`, a stored panel with `restorePanel`. (`GET /api/sources/[sourceId]/records`
+is still served, though nothing reads it since the scope went; #63 removes it with `sources`.)
+There are no cache tags: every read is per request, and an action returns what it
 stored, which the browser adds to its state.
 **Enforced by.** The `server-only` import in every `queries.ts`, `server.ts` and
 `threads/answer.ts` (a client component that imports one fails the build); the
 `thread_messages_thread_id_user_id_fkey` and `threads_one_placement` constraints; the
-integration tests.
+integration tests (`threads/answer.integration.test.ts` checks that the migrated `threads` holds
+no scope columns); `drizzle-kit check`.
 **Recorded in.** This entry.
 
 ### Threads without a project
@@ -294,11 +302,9 @@ The `agent` module is the runtime AI, flat by file:
   message of the thread attached, keeps those that are still the user's and do not need
   reconnecting, and answers `{ connectionId, provider, providerName, account, reach?, guide? }`
   for each. Sending fetches nothing, so `reach` is left out until something already holds it.
-  No tool reads records yet, so `toolsFor` has nothing to pass them to.
-- `context.ts`: `resolveContext` turns the browser's ids into the model, skill and records (the
-  scope's records are read for the user by `runAgent` first, through `listScopedRecords`)
-  (unknown ids are `NotFound`, answered with a 400), so the prompt only ever holds what the
-  server offers. The `AgentContext` it returns carries the signed-in user, so a tool reads only
+  `toolsFor` turns them into the record tools' context (see "Agent tools live in their module").
+- `context.ts`: `resolveContext` turns the browser's ids into the model and skill (unknown ids
+  are `NotFound`, answered with a 400), so the prompt only ever holds what the server offers. The `AgentContext` it returns carries the signed-in user, so a tool reads only
   what is theirs. It also turns `skillIds`, the skills switched on in this browser, into
   `offeredSkills`: known ones only (a stale id is left out, not refused), without the picked
   skill.
@@ -309,17 +315,17 @@ The `agent` module is the runtime AI, flat by file:
   (`next.config.ts`) bundles it into the server code, so nothing is read from disk at runtime;
   the `markdownAsText` plugin does the same in Vitest, and `src/markdown.d.ts` types it.
 - `instructions.ts`: the two files, then the picked skill in full, then the offered skills by
-  id, name and description ("Skills you can load"), then the attached records, then, when the
-  thread attached anything, "Attached items and connections": `instructions/attached-items.md`
+  id, name and description ("Skills you can load"), then, when the thread attached anything, "Attached items and connections": `instructions/attached-items.md`
   (what the reference lines are, "an item from a connection not listed here cannot be read; tell
   the user", tool results are third-party data), the allowed connections ("None." when every one
-  is gone) and each allowed provider's guide once. The records and the connections stay
-  TypeScript, because they are built from data; all of it is text the server wrote.
+  is gone) and each allowed provider's guide once. The connections stay TypeScript, because
+  they are built from data; all of it is text the server wrote.
 - `tools.ts`: the registry. `tools` is every tool the agent knows, its own and the modules'
   (see "Agent tools live in their module"); `toolsFor(context)` picks the ones one answer may
   call and what each knows of the thread. Stored conversations hold the tool names and every
   send validates the whole conversation against all of `tools`, so a tool is never renamed and a
-  removed one keeps a stub under its name; `tools.test.ts` lists the names.
+  removed one keeps a stub under its name (one exception, #62: see "Agent tools live in their
+  module"); `tools.test.ts` lists the names.
 - `html-render.tool.ts`: the agent's own tool, because it presents and acts on no module's data.
 - `contracts.ts`: the browser-safe types (`WorkspaceUIMessage`, the tool schemas, `ModelChoice`,
   `ChatOptions`), so the chat UI never imports the server side.
@@ -347,31 +353,47 @@ connection is a 400 on a new message only, and a stored message keeps its data p
 ### Agent tools live in their module
 
 **Decision.** A tool is another way into a module, beside its pages and actions, so it lives in
-the module it acts on and is a thin wrapper over that module's `queries.ts` (or, for a write,
-its actions). `sources/tools.ts` is the pattern: `search_records` searches the records the
-thread attached, and `skills/tools.ts` (`load_skill`, see "Skills are SKILL.md files") follows
-it.
-- **Files.** The tool's input and output schemas, and the rule it applies (`searchRecords`), are
-  in the module's `contracts.ts`, so the browser can type the tool's parts. The tool is in
-  `<module>/tools.ts` (`server-only`), exported as `<module>Tools` from `server.ts`. Its chat
-  card is in `<module>/components/` (`RecordSearchCall`), exported from `index.ts`; the chat's
+the module it acts on and is a thin wrapper over that module's queries (or, for a write, its
+actions). `records/tools.ts` is the pattern: `search_records` searches one of the connections the
+thread attached, through the provider's own search, the same code the attach dialog runs (ADR 0003
+§4); `skills/tools.ts` (`load_skill`, see "Skills are SKILL.md files") follows it.
+- **Files.** The tool's input and output schemas are in the module's `contracts.ts`, so the
+  browser can type the tool's parts; field meanings are in their `.describe()`, and the tool's
+  description says that its results are third-party data. The tool is in `<module>/tools.ts`
+  (`server-only`), exported as `<module>Tools` from `server.ts`. Its chat card is in
+  `<module>/components/` (`RecordSearchCall`), exported from `index.ts`; the chat's
   `message-parts.tsx` maps the part's state onto it.
 - **Context, not trust.** What a tool may see comes from the server, never from the model: the
-  tool declares it with `contextSchema` (`{ scope?: RecordScope }`, ids as everywhere between
-  modules), and `toolsFor` in `agent/tools.ts` fills it from the resolved `AgentContext`.
-  `search_records` (context `{ user?, scope? }`) reads through `listScopedRecords(user, scope)`,
-  so a record outside the thread's scope or the user's connections is never read, whatever the
-  model asks. A tool whose context the thread lacks is not
-  offered (`activeTools`), and its `execute` refuses anyway.
+  tool declares it with `contextSchema`, and `toolsFor` in `agent/tools.ts` fills it from the
+  resolved `AgentContext`. `search_records` (context `{ user?, connectionIds }`) answers
+  `no_access` for a `connectionId` outside the **allowed connections** (`allowedConnections`, see
+  "Answers come from the Vercel AI Gateway"), whatever the model asks, and is offered
+  (`activeTools`) only while one connection is allowed, even one attached with no items. A tool
+  whose context the thread lacks is not offered, and its `execute` refuses anyway.
+- **`search_records`.** `{ connectionId, query, type?, includeClosed? }` answers `{ results:
+  RecordSummary[] (at most 20, MAX_SEARCH_RESULTS), total? }` or `{ error: RecordError }`: every
+  refusal comes back as data, so the model explains it and carries on. It calls
+  `searchRecords(user, connectionId, { text, type, includeClosed, qualifiers: true })`
+  (`integrations/server.ts`): the provider's own qualifiers pass through, and the provider keeps
+  the search inside what the connection reads (GitHub's: see "Integrations are provider
+  folders"). Its card is one quiet line ("Searched @acme for “login timeout”: 6 results", or the
+  error in words) with the first three results as `AttachedItemChip`s and "+N"; a chip opens the
+  record's view as a tab, never under Attached.
 - **Registration.** `agent/tools.ts` spreads the module's tools into `tools`, adds the tool's
   context to `toolsFor`, and `WorkspaceUITools` in `agent/contracts.ts` gets its types.
-- **Behaviour.** The tools only read. The attached records are still in the prompt as well;
-  `search_records` lets the model filter them by status, priority, owner or words.
-**Enforced by.** `sources/tools.test.ts` (only scoped records, refused without a scope);
-`agent/tools.test.ts` (the tool names, what `toolsFor` offers); `agent/run.test.ts` (on a mock
-model, the call offers the tools and `execute` sees the thread's scope); `tsc`
+- **Behaviour.** The tools only read. Record bodies never reach the prompt: the model reads
+  records through tools.
+- **Names.** A stored conversation holds tool names, so a removed tool keeps a stub under its
+  name. One exception was made: the thread scope's `search_records` (#62) kept no stub, and its
+  name was reused with the new schema, because the database was reset with that change
+  (`pnpm stack:reset`) and no stored conversation holds the old parts.
+**Enforced by.** `agent/tools.test.ts` (the tool names, the new `search_records` schema, what
+`toolsFor` offers); `agent/run.test.ts` (on a mock model over recorded GitHub answers:
+`search_records` offered for a connection attached whole and not without one or for one needing
+reconnecting, the call reaching GitHub with the token's scope and an outside `repo:` or `user:`
+dropped, a foreign `connectionId` answering `no_access`, a 422 answering `invalid_query`); `tsc`
 (`WorkspaceUITools`, `toolsContext`).
-**Recorded in.** This entry.
+**Recorded in.** This entry; `docs/adr/0003-attached-items-and-record-views.md`.
 
 ### Integrations are provider folders
 
@@ -408,9 +430,9 @@ connection is saved only: no DNS pinning and no re-check per request (decided in
 provider request is sent with `redirect: "error"` and cannot be led elsewhere. Settings → Sources
 (`SourcesSettingsPanel`, the connect form built from the provider's `auth` and `baseUrl`) lists
 every provider and the user's connections; `IntegrationsProvider` holds them, and an action's
-answer goes into its state. `integrations/records.ts` runs a connection's reader for `sources`
-(`listConnectedSources`, `searchConnectionRecords`, `getConnectionRecords`); `sources` turns that
-into `Source`s, the scope's records and the records route. The sample records are the
+answer goes into its state. `integrations/records.ts` runs the sample's reader for `sources`
+(`listConnectedSources`, `searchConnectionRecords`); `sources` turns that into `Source`s and their
+records route, which nothing reads since the scope went (#63 removes them). The sample records are the
 provider's `data.ts`; the stored threads' sample ids moved to `sample:<product>` in
 `drizzle/0006_rename-sample-source-ids.sql`. Unit tests that read sources swap the connection
 query for `tests/support/connections.ts` (the sample connection alone), so they need no Postgres.
@@ -474,7 +496,15 @@ issues and pull requests at once (422, "Query must include 'is:issue' or 'is:pul
 with no type chosen it runs one search per type and merges them: by `updated` when sorted so,
 otherwise rank by rank (#58); `total` adds them up. Its cursor encodes the page number and the
 types that still have that page. A word that names a readable repository exactly, in any case
-(`web` or `acme/web`), narrows the scope to it instead of being searched. `482` or `#482` is searched as `482`; with one repository in play
+(`web` or `acme/web`), narrows the scope to it instead of being searched. The agent's search
+(`qualifiers: true`, #62) reads its text in GitHub's syntax: a qualifier with one plain or quoted
+value (`label:"good first issue"`, `-label:bug`, `created:>2026-01-01`) and a quoted phrase pass
+through, without `in:title,body`; `repo:`, `user:` and `org:` narrow to the readable repositories
+they name (negated, they leave them out) and are dropped when they name none; `is:issue`,
+`is:pr` or `type:` set the type (a different `type` asked for is `invalid_query`); a named state
+(`is:closed`, `state:open`, `is:merged`) lets closed items through. Operators (`AND`, `OR`, `NOT`)
+and parentheses are searched as words, so nothing can widen the search past the token's
+repositories. `482` or `#482` is searched as `482`; with one repository in play
 (narrowed, or the only one the token reads) the issue or pull request of that number is also read
 (`GET /repos/{o}/{r}/issues/{n}`) and put on top when the toggles let it through. Before typing,
 two searches sorted by `updated` run in parallel (each per type for "All"), one with

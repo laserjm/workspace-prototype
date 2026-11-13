@@ -12,9 +12,6 @@ import {
 /** When a response started and, once it has, when it finished. */
 export type ResponseTiming = { startedAt: string; completedAt: string | null };
 
-/** The source records a thread may use, by id. The sources module owns what they are. */
-export type ThreadScope = { sourceId: string; recordIds: string[] };
-
 /** Where a thread sits in the sidebar. No field set: active. */
 export type ThreadPlacement = {
   settledAt?: string;
@@ -37,7 +34,6 @@ export type Thread = ThreadPlacement & {
   createdAt: string;
   provider: ModelProvider;
   forkedFrom?: { threadId: string; title: string; responseIndex: number };
-  scope?: ThreadScope;
 } & ConversationCounts;
 
 /** How much the thread's stored conversation holds: its questions and their attachments. */
@@ -64,24 +60,12 @@ export type SnoozeTimeInPast = { _tag: "SnoozeTimeInPast" };
 /** A custom snooze names no date or duration that can be read. */
 export type SnoozeTimeUnreadable = { _tag: "SnoozeTimeUnreadable" };
 
-/** A thread's scope names at least one record. */
-export type ScopeHasNoRecords = { _tag: "ScopeHasNoRecords" };
-
 export type ThreadError =
   | ThreadStillWorking
   | SnoozeTimeInPast
-  | SnoozeTimeUnreadable
-  | ScopeHasNoRecords;
+  | SnoozeTimeUnreadable;
 
 // Rules
-
-export function createScope(
-  sourceId: string,
-  recordIds: readonly string[],
-): Result<ThreadScope, ScopeHasNoRecords> {
-  if (recordIds.length === 0) return err({ _tag: "ScopeHasNoRecords" });
-  return ok({ sourceId, recordIds: [...recordIds] });
-}
 
 export type NewThread = {
   id: string;
@@ -89,7 +73,6 @@ export type NewThread = {
   /** The first message; it titles the thread. */
   prompt: string;
   provider: ModelProvider;
-  scope?: ThreadScope;
 };
 
 export function startThread(input: NewThread, now: Date): Thread {
@@ -100,9 +83,6 @@ export function startThread(input: NewThread, now: Date): Thread {
     branch: "main",
     createdAt: now.toISOString(),
     provider: input.provider,
-    scope: input.scope
-      ? { ...input.scope, recordIds: [...input.scope.recordIds] }
-      : undefined,
     // The first message is sent once the thread is stored.
     turnCount: 0,
     attachmentCount: 0,
@@ -132,8 +112,8 @@ export function countTurn(thread: Thread, attachmentCount: number): Thread {
 }
 
 /**
- * An independent copy of the thread through response `responseIndex`, with the same project and
- * scope. The conversation through that response is copied with it (`forkPoint`); `counts` are
+ * An independent copy of the thread through response `responseIndex`, in the same project. The
+ * conversation through that response is copied with it (`forkPoint`); `counts` are
  * that copy's.
  */
 export function forkThread(
@@ -150,9 +130,6 @@ export function forkThread(
     id,
     title: `Fork: ${thread.title.replace(/^Fork: /, "")}`,
     createdAt: now.toISOString(),
-    scope: thread.scope
-      ? { ...thread.scope, recordIds: [...thread.scope.recordIds] }
-      : undefined,
     forkedFrom: { threadId: thread.id, title: thread.title, responseIndex },
   };
 }
@@ -165,7 +142,6 @@ export const startThreadInputSchema = z.object({
   projectId: z.uuid().nullable(),
   prompt: z.string().trim().min(1).max(10_000),
   provider: z.enum(MODEL_PROVIDERS),
-  scope: chatOptionsSchema.shape.scope,
 });
 export type StartThreadInput = z.infer<typeof startThreadInputSchema>;
 

@@ -124,17 +124,23 @@ const QUERY_LIMIT = 256;
 type SearchTerms = {
   /** `repo:acme/web …`, or `user:acme …`. */
   scope: readonly string[];
+  /** The words, and the qualifiers that pass through, in the order given. */
   words: readonly string[];
+  /** Match the words in titles and descriptions only (`in:title,body`), as the dialog does. */
+  inTitleBody?: boolean;
   /** Only what involves the token's user (`involves:@me`). */
   involvesMe?: boolean;
 };
 
 /** The query after the scope: the words, the type and whether closed items count. */
-function qualifiersOf({ words, involvesMe }: Omit<SearchTerms, "scope">, query: RecordSearchQuery) {
+function qualifiersOf(
+  { words, inTitleBody, involvesMe }: Omit<SearchTerms, "scope">,
+  query: RecordSearchQuery,
+) {
   return [
     ...(involvesMe ? ["involves:@me"] : []),
     ...words,
-    ...(words.length ? ["in:title,body"] : []),
+    ...(inTitleBody ? ["in:title,body"] : []),
     ...(query.type ? [QUALIFIER[query.type as GithubRecordType]] : []),
     ...(query.includeClosed ? [] : ["is:open"]),
   ];
@@ -164,7 +170,7 @@ async function searchPage(
 ): Promise<Result<TypePage, RecordError>> {
   const params = new URLSearchParams({
     q: queryOf(terms, { ...query, type }),
-    ...(terms.words.length ? {} : { sort: "updated", order: "desc" }),
+    ...(byRelevance(terms) ? {} : { sort: "updated", order: "desc" }),
     per_page: String(PAGE_SIZE),
     ...(page > 1 ? { page: String(page) } : {}),
   });
@@ -278,47 +284,59 @@ export async function searchGithubRecords(
 ): Promise<Result<RecordSearchPage, RecordError>> {
   if (query.type !== undefined && !isRecordType(query.type))
     return err({ kind: "invalid_query", message: `GitHub has no record type '${query.type}'.` });
-  const cursor = cursorFrom(query.cursor, query.type ? [query.type] : RECORD_TYPES);
-  if (cursor === undefined)
-    return err({ kind: "invalid_query", message: "That page of results is no longer available." });
-  const { page, types } = cursor;
 
   const repositories = await getJson("/user/repos?per_page=100", access, repositoriesSchema);
   if (!repositories.ok) return repositories;
   const reach = reachOf(repositories.value);
   if (repositories.value.length === 0) return ok({ results: [], total: 0, reach });
 
-  const typed = (query.text ?? "").split(/\s+/).filter(Boolean);
-  const named = typed.map((word) => repositoriesNamed(repositories.value, word));
-  const narrowedTo = [...new Set(named.flat().map((repo) => repo.full_name))];
-  const inPlay = narrowedTo.length ? narrowedTo : repositories.value.map((repo) => repo.full_name);
-  const words = typed
-    .filter((_, index) => named[index].length === 0)
-    .map(searchWord)
-    .filter(Boolean);
-  const suggesting = typed.length === 0 && page === 1;
+  const reading = readText(query.text ?? "", query.qualifiers === true, repositories.value);
+  if (query.type !== undefined && reading.type !== undefined && reading.type !== query.type)
+    return err({
+      kind: "invalid_query",
+      message: `The query asks for ${reading.type}, but the type asked for is ${query.type}.`,
+    });
+  // A state the query names wins over leaving closed items out.
+  const asked: RecordSearchQuery = {
+    ...query,
+    type: query.type ?? reading.type,
+    includeClosed: query.includeClosed === true || reading.namesState,
+  };
+  const cursor = cursorFrom(query.cursor, asked.type ? [asked.type as GithubRecordType] : RECORD_TYPES);
+  if (cursor === undefined)
+    return err({ kind: "invalid_query", message: "That page of results is no longer available." });
+  const { page, types } = cursor;
+
+  const narrowedTo = reading.narrowedTo;
+  const inPlay = (narrowedTo.length ? narrowedTo : repositories.value.map((repo) => repo.full_name)).filter(
+    (name) => !reading.excluded.includes(name),
+  );
+  if (inPlay.length === 0) return ok({ results: [], total: 0, reach, narrowedTo });
+  const { words } = reading;
+  const suggesting = reading.empty && page === 1;
   // Every search shares one scope, decided on the longest of them.
+  const shared = { words, inTitleBody: reading.plainWords > 0 && !query.qualifiers };
   const terms: SearchTerms = {
+    ...shared,
     scope: scopeOf(
       inPlay,
-      qualifiersOf({ words, involvesMe: suggesting }, { ...query, type: query.type ?? "issue" }),
+      qualifiersOf({ ...shared, involvesMe: suggesting }, { ...asked, type: asked.type ?? "issue" }),
     ),
-    words,
   };
   // With one repository in play, a typed number is also read directly and put on top: the search
   // has no number qualifier.
-  const number = page === 1 && inPlay.length === 1 ? typed.map(numberIn).find(Boolean) : undefined;
+  const number = page === 1 && inPlay.length === 1 ? reading.number : undefined;
   const [found, involving, numbered] = await Promise.all([
-    searchTypes(access, terms, query, types, page),
-    suggesting ? searchTypes(access, { ...terms, involvesMe: true }, query, types, 1) : undefined,
+    searchTypes(access, terms, asked, types, page),
+    suggesting ? searchTypes(access, { ...terms, involvesMe: true }, asked, types, 1) : undefined,
     number ? getJson(`/repos/${inPlay[0]}/issues/${number}`, access, itemSchema) : undefined,
   ]);
   if (!found.ok) return found;
   if (involving && !involving.ok) return involving;
-  const byUpdated = words.length === 0;
+  const byUpdated = !byRelevance(terms);
   const foundItems = mergedItems(found.value, byUpdated);
   // A number nothing has, or cannot be read, is only not on top.
-  const exact = numbered?.ok && matchesToggles(numbered.value, query) ? [numbered.value] : [];
+  const exact = numbered?.ok && matchesToggles(numbered.value, asked) ? [numbered.value] : [];
   const items = uniqueItems([
     ...exact,
     ...(involving ? mergedItems(involving.value, byUpdated) : []),
@@ -338,6 +356,100 @@ export async function searchGithubRecords(
     reach,
     ...(narrowedTo.length ? { narrowedTo } : {}),
   });
+}
+
+/** GitHub's best matches first while there are words to match; otherwise the most recently updated. */
+const byRelevance = (terms: SearchTerms) => terms.words.length > 0;
+
+/** What a search's text asks for. */
+type TextReading = {
+  /** Nothing typed. */
+  empty: boolean;
+  /** The words and passed-through qualifiers to send, in the order given. */
+  words: string[];
+  /** How many of `words` are plain words, not qualifiers. */
+  plainWords: number;
+  /** The readable repositories it names, by `repo:`, `user:` or `org:` or by a repository's name. */
+  narrowedTo: string[];
+  /** The readable repositories it leaves out (`-repo:`, `-user:`, `-org:`). */
+  excluded: string[];
+  /** The type a qualifier names (`is:pr`, `type:issue`). */
+  type?: GithubRecordType;
+  /** Whether a qualifier names a state (`is:closed`, `state:open`, `is:merged`). */
+  namesState: boolean;
+  /** `482` or `#482`: the first number typed. */
+  number?: string;
+};
+
+/** The pieces of a query, split at spaces outside double quotes: `label:"good first issue"` is one. */
+const piecesOf = (text: string) => text.match(/(?:[^\s"]+|"[^"]*"?)+/g) ?? [];
+
+/** `repo:`, `user:` and `org:`, which would widen the search past the token's repositories. */
+const SCOPE_QUALIFIER = /^(-?)(repo|user|org):"?([^"\s]+)"?$/i;
+const TYPE_QUALIFIER = /^(?:is|type):(issue|pr|pull-request)$/i;
+const STATE_QUALIFIER = /^-?(?:is|state):(?:open|closed|merged|unmerged)$/i;
+/** A qualifier with one plain or quoted value, negated or not; never an operator or parentheses. */
+const QUALIFIER_PIECE = /^-?[a-z][\w-]*:(?:"[^"()]*"|[^\s"()]+)$/i;
+const PHRASE = /^"[^"]+"$/;
+
+/**
+ * Reads the text of a search. Every word is searched as text in the dialog's search; the agent's
+ * (`qualifiers`) passes GitHub's qualifiers through and quoted phrases as phrases. Either way a
+ * word that names a readable repository narrows the search to it, and the scope stays the token's:
+ * a `repo:`, `user:` or `org:` outside the readable repositories is dropped, and operators and
+ * parentheses are searched as text, so nothing can widen the search past them.
+ */
+function readText(text: string, qualifiers: boolean, repositories: readonly Repository[]): TextReading {
+  const pieces = qualifiers ? piecesOf(text) : text.split(/\s+/).filter(Boolean);
+  const reading: TextReading = {
+    empty: pieces.length === 0,
+    words: [],
+    plainWords: 0,
+    narrowedTo: [],
+    excluded: [],
+    namesState: false,
+  };
+  const narrow = (named: readonly Repository[], into: string[]) => {
+    for (const repo of named) if (!into.includes(repo.full_name)) into.push(repo.full_name);
+  };
+  for (const piece of pieces) {
+    reading.number ??= numberIn(piece);
+    const scope = qualifiers ? SCOPE_QUALIFIER.exec(piece) : null;
+    if (scope) {
+      const [, negated, kind, value] = scope as unknown as [string, string, string, string];
+      const name = value.toLowerCase();
+      const named = repositories.filter((repo) =>
+        kind.toLowerCase() === "repo"
+          ? repo.full_name.toLowerCase() === name
+          : repo.owner.login.toLowerCase() === name,
+      );
+      // Outside the token's repositories: dropped.
+      narrow(named, negated ? reading.excluded : reading.narrowedTo);
+      continue;
+    }
+    const type = qualifiers ? TYPE_QUALIFIER.exec(piece)?.[1]?.toLowerCase() : undefined;
+    if (type) {
+      reading.type = type === "issue" ? "issue" : "pull-request";
+      continue;
+    }
+    if (qualifiers && (QUALIFIER_PIECE.test(piece) || PHRASE.test(piece))) {
+      if (STATE_QUALIFIER.test(piece)) reading.namesState = true;
+      reading.words.push(piece);
+      if (PHRASE.test(piece)) reading.plainWords += 1;
+      continue;
+    }
+    const named = repositoriesNamed(repositories, piece);
+    if (named.length) {
+      narrow(named, reading.narrowedTo);
+      continue;
+    }
+    const word = searchWord(piece);
+    if (word) {
+      reading.words.push(word);
+      reading.plainWords += 1;
+    }
+  }
+  return reading;
 }
 
 /** The repositories a typed word names exactly, in any case: `web` (of any owner) or `acme/web`. */

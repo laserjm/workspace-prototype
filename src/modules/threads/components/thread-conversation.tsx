@@ -21,12 +21,8 @@ import {
  * spans the canvas, so the message list scrolls with its bar at the canvas
  * edge while the messages keep this width (as T3 Code's chat content lane).
  */
-function conversationLane(inSourceSession: boolean) {
-  // A source session shares the canvas with the source panel.
-  return inSourceSession
-    ? "mx-auto w-full max-w-230 px-8 max-desktop:px-5.5 max-md:px-4 3xl:px-12"
-    : "mx-auto w-[min(var(--workspace-composer-width),calc(100%-4rem))] max-desktop:w-[calc(100%-3rem)] max-md:w-[calc(100%-1.75rem)]";
-}
+const conversationLane =
+  "mx-auto w-[min(var(--workspace-composer-width),calc(100%-4rem))] max-desktop:w-[calc(100%-3rem)] max-md:w-[calc(100%-1.75rem)]";
 
 type ThreadConversationProps = {
   thread: Thread;
@@ -68,7 +64,6 @@ export function ThreadConversation(props: ThreadConversationProps) {
       list={(lane) => (
         <ThreadMessages
           {...lane}
-          thread={props.thread}
           messages={[]}
           inFlight={false}
           load={conversation.state}
@@ -96,7 +91,6 @@ function LiveConversation({
         list={(lane) => (
           <ThreadMessages
             {...lane}
-            thread={props.thread}
             messages={chat.messages}
             inFlight={chat.busy}
             error={chat.error}
@@ -133,7 +127,7 @@ function ConversationLayout({
   onRestore: () => void;
   onOpenThread: (id: string) => void;
 }) {
-  const lane = conversationLane(!!thread.scope);
+  const lane = conversationLane;
   const conversationRef = useRef<HTMLDivElement>(null);
   const composerLayerRef = useRef<HTMLDivElement>(null);
 
@@ -176,10 +170,7 @@ function ConversationLayout({
   // The rows above and below the message list reserve the same scrollbar
   // gutters as the list, so all three lanes resolve to one width even where
   // the browser draws classic (space-taking) scrollbars.
-  const gutters = cn(
-    "shrink-0 overflow-hidden [scrollbar-gutter:stable_both-edges]",
-    thread.scope && "[scrollbar-width:thin]",
-  );
+  const gutters = "shrink-0 overflow-hidden [scrollbar-gutter:stable_both-edges]";
   return (
     <div
       ref={conversationRef}

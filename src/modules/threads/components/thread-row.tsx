@@ -20,7 +20,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ProjectIcon } from "@/modules/projects";
-import { recordCountLabel, SourceIcon, useSources } from "@/modules/sources";
 import type { Thread } from "../contracts";
 import { shelfOf, snoozePresets } from "../placement";
 import { ProviderIcon } from "./provider-icon";
@@ -65,8 +64,6 @@ export function ThreadRow({
 }) {
   const [snoozeOpen, setSnoozeOpen] = useState(false);
   const [presets, setPresets] = useState<ReturnType<typeof snoozePresets>>([]);
-  const { sourceById } = useSources();
-  const source = thread.scope ? sourceById(thread.scope.sourceId) : undefined;
   const shelf = shelfOf(thread);
   const restoreLabel = shelf === "snoozed" ? "Wake thread" : "Un-settle thread";
   return (
@@ -95,11 +92,7 @@ export function ThreadRow({
               roomForActions,
             )}
           >
-            {source ? (
-              <SourceIcon icon={source.icon} size="xs" />
-            ) : (
-              <ProjectIcon />
-            )}
+            <ProjectIcon />
             <span className="min-w-0 flex-1 truncate">{projectName}</span>
             <span
               className={cn(
@@ -132,11 +125,7 @@ export function ThreadRow({
           </span>
           <span className="mt-0.5 flex items-center gap-1.5 text-xs text-secondary-label">
             <span className="min-w-0 flex-1 truncate">
-              {thread.snoozedUntil
-                ? formatWakeTime(thread.snoozedUntil)
-                : source && thread.scope
-                  ? `${source.name} · ${recordCountLabel(source, thread.scope.recordIds.length)}`
-                  : thread.branch}
+              {thread.snoozedUntil ? formatWakeTime(thread.snoozedUntil) : thread.branch}
             </span>
             <ProviderIcon provider={thread.provider} />
           </span>
@@ -163,8 +152,8 @@ export function ThreadRow({
         <button
           type="button"
           className={cn(rowAction, "w-6")}
-          aria-label={`View context: ${thread.title}`}
-          title="View session context"
+          aria-label={`About this thread: ${thread.title}`}
+          title="About this thread"
           onClick={onContext}
         >
           <Info />

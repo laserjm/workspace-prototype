@@ -4,14 +4,19 @@ export type {
   AttachedItem,
   ConnectionRef,
   ItemSnapshot,
+  SearchRecordsInput,
+  SearchRecordsOutput,
 } from "./contracts";
 export {
   attachedPhrase,
   itemCount,
   MAX_ATTACHED_CONNECTIONS,
   MAX_ATTACHED_ITEMS,
+  MAX_SEARCH_RESULTS,
   removeConnection,
   removeItem,
+  searchRecordsInputSchema,
+  searchRecordsOutputSchema,
 } from "./contracts";
 export {
   ATTACHED_ITEMS_PART,
@@ -27,4 +32,5 @@ export {
 export { AttachDialog } from "./components/attach-dialog";
 export { AttachedItemChip } from "./components/attached-item-chip";
 export { RecordPanel, RecordPanelToggle } from "./components/record-panel";
+export { RecordSearchCall } from "./components/record-search-call";
 export { RecordPanelProvider, useRecordPanel } from "./components/record-panel-provider";

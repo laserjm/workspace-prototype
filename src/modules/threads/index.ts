@@ -3,18 +3,16 @@ export type {
   ChatTurnDto,
   NewThread,
   ResponseTiming,
-  ScopeHasNoRecords,
   SnoozeTimeInPast,
   SnoozeTimeUnreadable,
   StartThreadInput,
   Thread,
   ThreadError,
   ThreadPlacement,
-  ThreadScope,
   ThreadShelf,
   ThreadStillWorking,
 } from "./contracts";
-export { chatTurnDtoSchema, createScope } from "./contracts";
+export { chatTurnDtoSchema } from "./contracts";
 export type { SnoozePreset } from "./placement";
 export { placementOf, shelfOf } from "./placement";
 export { CustomSnoozeDialog } from "./components/custom-snooze-dialog";

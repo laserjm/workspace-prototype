@@ -154,7 +154,6 @@ export function useThreadChat({
           modelId,
           skillId: last.skillId,
           skillIds: enabledSkills,
-          scope: thread.scope,
         } satisfies ChatOptions,
       });
     },

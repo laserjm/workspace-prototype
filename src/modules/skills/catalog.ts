@@ -11,7 +11,7 @@ const frontmatterSchema = z
     name: z.string().min(1),
     description: z.string().min(1),
     output: z.string().min(1),
-    /** Opening of the example prompt, completed with the scope: "… these 5 tickets." */
+    /** Opening of the example prompt, completed with what is attached: "… these 3 items." */
     prompt: z.string().min(1),
     enabledByDefault: z.enum(["true", "false"]).transform((v) => v === "true"),
     order: z.coerce.number().int(),

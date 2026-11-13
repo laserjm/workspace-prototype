@@ -19,13 +19,11 @@ import {
 import { err, ok, type Result } from "@/lib/result";
 import { findProject } from "@/modules/projects/server";
 import {
-  createScope,
   forkThread,
   forkThreadInputSchema,
   placeThreadInputSchema,
   startThread,
   startThreadInputSchema,
-  type ScopeHasNoRecords,
   type SnoozeTimeInPast,
   type Thread,
   type ThreadChange,
@@ -51,16 +49,11 @@ export const startThreadAction = action(
   async (
     input,
     { user },
-  ): Promise<Result<Thread, NotFound | ScopeHasNoRecords | Conflict>> => {
+  ): Promise<Result<Thread, NotFound | Conflict>> => {
     // Another user's project is answered like a missing one: its id reveals nothing.
     if (input.projectId && !(await findProject(user, input.projectId)))
       return err(notFound("Project", input.projectId));
-    const scope = input.scope
-      ? createScope(input.scope.sourceId, input.scope.recordIds)
-      : undefined;
-    if (scope && !scope.ok) return scope;
-
-    const thread = startThread({ ...input, scope: scope?.value }, new Date());
+    const thread = startThread(input, new Date());
     try {
       await db().insert(threadsTable).values(toThreadRow(user.id, thread));
     } catch (error) {

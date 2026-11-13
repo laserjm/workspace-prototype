@@ -11,7 +11,6 @@ import {
   useRecordPanel,
   type AttachedConnection,
 } from "@/modules/records";
-import type { Thread } from "../contracts";
 import { attachmentChipClassName } from "./attachment-chip";
 import { LiveResponse } from "./live-response";
 import type { StoredConversation } from "./use-stored-conversation";
@@ -26,7 +25,6 @@ const PINNED_DISTANCE = 80;
 
 /** The thread's messages, as its chat holds them. */
 export function ThreadMessages({
-  thread,
   messages,
   inFlight,
   error,
@@ -39,7 +37,6 @@ export function ThreadMessages({
   fadeTop,
   leading,
 }: {
-  thread: Thread;
   messages: WorkspaceUIMessage[];
   /** A response is in flight. */
   inFlight: boolean;
@@ -100,7 +97,6 @@ export function ThreadMessages({
       // both edges keeps the messages centred when the bar appears.
       className={cn(
         "min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable_both-edges]",
-        thread.scope && "overscroll-contain [scrollbar-width:thin]",
         fadeTop && "scroll-fade-top",
       )}
       ref={scrollRef}
@@ -120,7 +116,6 @@ export function ThreadMessages({
           // under a fixed row, a short gap is enough.
           "flex flex-col gap-6 pb-(--composer-height)",
           fadeTop ? "pt-6" : "pt-4 max-md:pt-3",
-          thread.scope && "gap-5.5",
           laneClassName,
         )}
       >
@@ -132,7 +127,6 @@ export function ThreadMessages({
             return (
               <Fragment key={message.id}>
                 <UserMessage
-                  inSession={!!thread.scope}
                   text={textOf(message)}
                   attachments={message.metadata?.attachments}
                   attached={attachedConnectionsOf(message)}
@@ -142,7 +136,6 @@ export function ThreadMessages({
                     requestedAt={requestedAt(message)}
                     working
                     continuation={responseIndex > 0}
-                    scope={thread.scope}
                     models={models}
                     onFork={() => undefined}
                   />
@@ -162,7 +155,6 @@ export function ThreadMessages({
               }
               working={inFlight && message === last}
               continuation={currentIndex > 0}
-              scope={thread.scope}
               models={models}
               onFork={() =>
                 onFork({
@@ -203,22 +195,15 @@ function UserMessage({
   text,
   attachments,
   attached,
-  inSession,
 }: {
   text: string;
   attachments?: string[];
   /** The records and connections the question attached, drawn from their snapshots. */
   attached: readonly AttachedConnection[];
-  inSession: boolean;
 }) {
   const panel = useRecordPanel();
   return (
-    <div
-      className={cn(
-        "max-w-4/5 self-end rounded-2xl rounded-br-sm bg-accent px-4.5 py-3 text-sm",
-        inSession && "max-w-[88%] px-4 text-secondary-foreground",
-      )}
-    >
+    <div className="max-w-4/5 self-end rounded-2xl rounded-br-sm bg-accent px-4.5 py-3 text-sm">
       <Markdown text={text} lineBreaks />
       {attachments?.map((name, index) => (
         <span

@@ -1,9 +1,11 @@
 import { randomUUID } from "node:crypto";
+import { sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   assertIsolation,
   describeIntegration,
 } from "@/tests/support/integration";
+import { db } from "@/lib/db/client";
 import { err, ok } from "@/lib/result";
 import type { WorkspaceUIMessage } from "@/modules/agent";
 import {
@@ -94,17 +96,15 @@ describeIntegration(
 
     it("asks the agent for the user, with the browser's options and the stored conversation", async () => {
       const thread = await aThreadOf(ana);
-      const scope = { sourceId: "jira", recordIds: ["PLAT-124"] };
       const response = await answerThread(ana, thread.id, {
         ...aChatTurn(),
         skillId: "risk-review",
-        scope,
       });
       expect(response.status).toBe(200);
       expect(requests).toEqual([
         {
           user: ana,
-          options: { modelId: "opus", skillId: "risk-review", scope },
+          options: { modelId: "opus", skillId: "risk-review" },
           messages: [...aConversation, ask("u3")],
           signal: undefined,
           onEnd: expect.any(Function),
@@ -248,6 +248,17 @@ describeIntegration(
           reply,
         ]);
       });
+    });
+
+    // The thread scope is gone (#62): what a question is about travels on its message.
+    it("stores threads without a scope", async () => {
+      const columns = await db().execute<{ column_name: string }>(
+        sql`select column_name from information_schema.columns where table_name = 'threads'`,
+      );
+      const names = [...columns].map((column) => column.column_name);
+      expect(names).toContain("title");
+      expect(names).not.toContain("source_id");
+      expect(names).not.toContain("record_ids");
     });
 
     // Ben cannot read Ana's conversation, and a chat turn on her thread is a 404 that asks the

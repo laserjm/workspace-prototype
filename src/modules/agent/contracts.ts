@@ -6,9 +6,12 @@ import {
   HTML_RENDER_MAX_TITLE_LENGTH,
   HTML_RENDER_MIN_HEIGHT,
 } from "@/lib/html-render/html-render";
-import type { RecordsDataTypes } from "@/modules/records";
+import type {
+  RecordsDataTypes,
+  SearchRecordsInput,
+  SearchRecordsOutput,
+} from "@/modules/records";
 import type { LoadSkillInput, LoadSkillOutput } from "@/modules/skills";
-import type { SearchRecordsInput, SearchRecordsOutput } from "@/modules/sources";
 
 export const MODEL_PROVIDERS = ["claude", "openai"] as const;
 export type ModelProvider = (typeof MODEL_PROVIDERS)[number];
@@ -23,20 +26,14 @@ export type ModelChoice = {
 
 /**
  * What the workspace sends alongside each message, as ids only. The agent resolves them
- * against the server's catalogues, so a browser cannot pick a model, skill or record it was not
- * offered.
+ * against the server's catalogues, so a browser cannot pick a model or skill it was not offered.
+ * What a question is about travels on the message itself (`data-attached-items`).
  */
 export const chatOptionsSchema = z.object({
   modelId: z.string().min(1).max(100),
   skillId: z.string().min(1).max(100).optional(),
   /** The skills switched on in this browser: the agent may load one when a question fits it. */
   skillIds: z.array(z.string().min(1).max(100)).max(50).optional(),
-  scope: z
-    .object({
-      sourceId: z.string().min(1).max(100),
-      recordIds: z.array(z.string().min(1).max(100)).max(100),
-    })
-    .optional(),
 });
 export type ChatOptions = z.infer<typeof chatOptionsSchema>;
 

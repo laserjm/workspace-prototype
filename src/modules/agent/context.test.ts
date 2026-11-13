@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { aSkill } from "@/tests/factories/skill";
-import { aSource, aSourceRecord } from "@/tests/factories/source";
 import { aUser } from "@/tests/factories/user";
 import type { ChatOptions } from "./contracts";
 import { resolveContext } from "./context";
@@ -15,64 +14,26 @@ const opus: AgentModel = {
 };
 const riskReview = aSkill({ id: "risk-review", name: "Risk review" });
 const summary = aSkill({ id: "summary", name: "Summary" });
-const jira = aSource({ id: "sample:jira" });
-const catalogs = {
-  models: [opus],
-  skills: [summary, riskReview],
-  sources: [jira],
-  // As listScopedRecords reads them: the named ones that exist, in the source's order.
-  scopedRecords: [
-    aSourceRecord({ id: "PLAT-124" }),
-    aSourceRecord({ id: "PLAT-126" }),
-  ],
-};
+const catalogs = { models: [opus], skills: [summary, riskReview] };
 const options: ChatOptions = { modelId: "opus" };
 const ana = aUser("ana");
 
 describe("resolveContext", () => {
-  it("resolves the user and the model, with no skill or records when none are named", () => {
+  it("resolves the user and the model, with no skill when none is named", () => {
     expect(resolveContext(ana, options, catalogs)).toEqual({
       ok: true,
       value: { user: ana, model: opus, skill: undefined, offeredSkills: [] },
     });
   });
 
-  it("resolves the skill and the records the thread named", () => {
-    const result = resolveContext(
-      ana,
-      {
-        ...options,
-        skillId: "risk-review",
-        scope: { sourceId: "sample:jira", recordIds: ["PLAT-126", "PLAT-124"] },
-      },
-      catalogs,
-    );
-    if (!result.ok) throw new Error("expected a context");
-    expect(result.value.skill).toBe(riskReview);
-    expect(result.value.attached?.records.map((record) => record.id)).toEqual(
-      ["PLAT-124", "PLAT-126"],
-    );
-    expect(result.value.attached?.recordCount).toBe(2);
-  });
-
-  it("attaches nothing when none of the named records exist", () => {
-    const result = resolveContext(
-      ana,
-      { ...options, scope: { sourceId: "sample:jira", recordIds: ["GONE-1"] } },
-      { ...catalogs, scopedRecords: [] },
-    );
-    expect(result.ok && result.value.attached).toBeUndefined();
+  it("resolves the skill the question named", () => {
+    const result = resolveContext(ana, { ...options, skillId: "risk-review" }, catalogs);
+    expect(result.ok && result.value.skill).toBe(riskReview);
   });
 
   it.each([
     { name: "model", change: { modelId: "gpt-0" }, entity: "Model", id: "gpt-0" },
     { name: "skill", change: { skillId: "poetry" }, entity: "Skill", id: "poetry" },
-    {
-      name: "source",
-      change: { scope: { sourceId: "sharepoint", recordIds: ["X-1"] } },
-      entity: "Source",
-      id: "sharepoint",
-    },
   ])("refuses an unknown $name", ({ change, entity, id }) => {
     expect(resolveContext(ana, { ...options, ...change }, catalogs)).toEqual({
       ok: false,

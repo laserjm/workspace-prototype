@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { aSkill } from "@/tests/factories/skill";
-import { aSource, aSourceRecord } from "@/tests/factories/source";
 import { aUser } from "@/tests/factories/user";
 import { baseInstructions, instructionsFor } from "./instructions";
 import type { AgentModel } from "./models";
@@ -25,29 +24,17 @@ describe("baseInstructions", () => {
 });
 
 describe("instructionsFor", () => {
-  it("is the base instructions alone without a skill or records", () => {
+  it("is the base instructions alone without a skill or connections", () => {
     expect(instructionsFor({ user, model: opus, offeredSkills: [] })).toBe(
       baseInstructions,
     );
   });
 
-  it("adds the skill, then the attached records", () => {
+  it("adds the skill after the base instructions", () => {
     const skill = aSkill({ name: "Risk review", instructions: "List risks." });
-    const record = aSourceRecord({ id: "PLAT-124" });
-    const source = aSource();
-    const prompt = instructionsFor({
-      user,
-      model: opus,
-      skill,
-      offeredSkills: [],
-      attached: { source, records: [record], recordCount: 1 },
-    });
+    const prompt = instructionsFor({ user, model: opus, skill, offeredSkills: [] });
     expect(prompt.startsWith(baseInstructions)).toBe(true);
     expect(prompt).toContain("# Skill: Risk review\n\nList risks.");
-    expect(prompt.indexOf("# Skill:")).toBeLessThan(
-      prompt.indexOf("# Source records"),
-    );
-    expect(prompt).toContain("### PLAT-124:");
   });
 
   it("lists the skills to load by id, name and description, after the picked one", () => {

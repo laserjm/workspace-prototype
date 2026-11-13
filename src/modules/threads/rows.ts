@@ -22,10 +22,6 @@ export function toThread(row: ThreadRow & ConversationCounts): Thread {
     branch: "main",
     createdAt: row.createdAt.toISOString(),
     provider: row.provider as ModelProvider,
-    scope:
-      row.sourceId && row.recordIds
-        ? { sourceId: row.sourceId, recordIds: row.recordIds }
-        : undefined,
     forkedFrom:
       row.forkedFromThreadId &&
       row.forkedFromTitle !== null &&
@@ -65,8 +61,6 @@ export function toThreadRow(userId: UserId, thread: Thread): NewThreadRow {
     userId,
     projectId: thread.projectId,
     title: thread.title,
-    sourceId: thread.scope?.sourceId ?? null,
-    recordIds: thread.scope?.recordIds ?? null,
     forkedFromThreadId: thread.forkedFrom?.threadId ?? null,
     forkedFromTitle: thread.forkedFrom?.title ?? null,
     forkedFromResponseIndex: thread.forkedFrom?.responseIndex ?? null,
