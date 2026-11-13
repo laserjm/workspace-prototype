@@ -17,3 +17,17 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - Before you finish, run `pnpm lint`, `pnpm typecheck` and `pnpm test`. The integration tests
   need the local stack (`pnpm stack:up`) and skip loudly without it.
 - Fix a lint finding rather than disabling it. A disable needs a comment that says why.
+
+## Agent skills
+
+### Issue tracker
+
+Issues are tracked in GitHub Issues for laserjm/workspace-prototype (via `gh`). See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five default triage labels: needs-triage, needs-info, ready-for-agent, ready-for-human, wontfix. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.

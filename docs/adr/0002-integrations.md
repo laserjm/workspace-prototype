@@ -1,9 +1,13 @@
 # 0002. Integrations: connected systems, credentials and their agent tools
 
-- **Status:** Accepted (design and decisions, 2026-11-06); no phase implemented yet
+- **Status:** Accepted (design and decisions, 2026-11-06); phases 0 to 2 implemented. Partly
+  superseded by ADR 0003 (2026-11-13), which replaces its records, scope and panel parts and lists
+  them in its status. ADR 0003 also reverses two decisions: the Confluence provider is
+  `confluence`, not `atlassian`, and GitHub's first tools are native over REST, not MCP.
 - **Date:** 2026-11-05
 - **Deciders:** Michael Laser
-- **Related:** `ARCHITECTURE.md` (Modules, Data ownership, Cross-module references are ids, Agent
+- **Related:** `docs/adr/0003-attached-items-and-record-views.md` (supersedes part of this ADR);
+  `ARCHITECTURE.md` (Modules, Data ownership, Cross-module references are ids, Agent
   tools live in their module, Answers come from the Vercel AI Gateway, Sign-in); the user-context
   branch (the user reaches `runAgent`). Supersedes the untracked draft
   `docs/architecture/integrations.md` on `t3/research-integration-architecture`, which was written
