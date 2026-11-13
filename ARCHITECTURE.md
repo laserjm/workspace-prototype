@@ -111,7 +111,9 @@ resolve the ids through the other module's public API (`useIntegrations().connec
 `useSkills().skillById`). Provider-specific presentation (the provider mark, a type's kind mark,
 a state's label and tone) is data the provider declares, not a branch on its id. The record
 vocabulary (`RecordSummary`, `RecordError`, the tones, their tool schemas and `recordErrorWords`)
-is `integrations`'; `records` builds on it.
+is `integrations`'; `records` builds on it. `records/contracts.ts` imports only types from
+`integrations`, because its index also loads its components and so the server's env: it keeps its
+own copy of the two tool schemas.
 **Enforced by.** Review.
 **Recorded in.** This entry.
 

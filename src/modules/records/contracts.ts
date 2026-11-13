@@ -2,13 +2,9 @@
 // and the schemas of the tools every provider answers (ADR 0003 §4).
 // Browser-safe: types, the composer's attachment rules and the tool schemas, pure.
 import { z } from "zod";
-import {
-  recordErrorSchema,
-  recordReadRefusalSchema,
-  recordSummarySchema,
-  type Connection,
-  type RecordSummary,
-} from "@/modules/integrations";
+// Types only from `integrations`: its index also loads its components, so a value import here
+// would load them (and the server's env) wherever these pure rules run.
+import type { Connection, RecordError, RecordSummary } from "@/modules/integrations";
 
 /** At most this many items, and this many connections, go on one question. */
 export const MAX_ATTACHED_ITEMS = 10;
@@ -167,6 +163,30 @@ export function defaultConnectionId(
 /** At most this many results of one search reach the model. */
 export const MAX_SEARCH_RESULTS = 20;
 
+// These copy integrations' (`recordSummarySchema`, `recordErrorSchema`), which its provider tools
+// answer in, because this file takes only types from that module (see the import above).
+const recordSummarySchema = z.object({
+  connectionId: z.string(),
+  type: z.string().describe("The provider's record type, e.g. issue or pull-request."),
+  key: z
+    .string()
+    .describe("The record's reference within its connection, as the provider's guide writes keys."),
+  label: z.string().describe("A short name to cite it by."),
+  title: z.string(),
+  state: z.string().describe("Its state now, as the provider's guide names them."),
+  updatedAt: z.string().describe("When it last changed, ISO 8601."),
+  where: z.string().describe("Where it lives, such as its repository and number."),
+}) satisfies z.ZodType<RecordSummary>;
+
+const recordErrorSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("not_found") }),
+  z.object({ kind: z.literal("no_access") }),
+  z.object({ kind: z.literal("needs_reconnect") }),
+  z.object({ kind: z.literal("rate_limited"), retryAt: z.string() }),
+  z.object({ kind: z.literal("unreachable") }),
+  z.object({ kind: z.literal("invalid_query"), message: z.string() }),
+]) satisfies z.ZodType<RecordError>;
+
 /** What the model may ask `search_records` for. */
 export const searchRecordsInputSchema = z.object({
   connectionId: z
@@ -241,7 +261,9 @@ export const readRecordOutputSchema = z.union([
       ),
   }),
   z.object({
-    error: recordReadRefusalSchema,
+    error: recordErrorSchema.and(
+      z.object({ url: z.string().optional().describe("The record's page, to point the user to.") }),
+    ),
   }),
 ]);
 export type ReadRecordOutput = z.infer<typeof readRecordOutputSchema>;
