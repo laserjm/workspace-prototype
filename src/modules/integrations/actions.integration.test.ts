@@ -17,6 +17,7 @@ import {
   testConnectionAction,
 } from "./actions";
 import { listConnections } from "./queries";
+import { searchRecords } from "./records";
 
 vi.mock("@/lib/auth/session", () => import("@/tests/support/session"));
 
@@ -254,6 +255,24 @@ describeIntegration(
         ok: true,
         value: { status: "needs_reconnect" },
       });
+    });
+
+    it("marks a connection needs_reconnect when a search finds its token refused, and only the user's", async () => {
+      const connected = await connectGithub(ana, "tok-ana");
+      const connectionId = connected.ok ? connected.value.id : "";
+      github.accounts.delete("tok-ana");
+
+      expect(await searchRecords(ben, connectionId, {})).toEqual({
+        ok: false,
+        error: { kind: "not_found" },
+      });
+      expect((await stored(ana))[0]?.status).toBe("active");
+
+      expect(await searchRecords(ana, connectionId, {})).toEqual({
+        ok: false,
+        error: { kind: "needs_reconnect" },
+      });
+      expect((await stored(ana))[0]?.status).toBe("needs_reconnect");
     });
 
     it("disconnects: the connection and its credential are gone", async () => {

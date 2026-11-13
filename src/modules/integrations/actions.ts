@@ -16,6 +16,7 @@ import {
   type Connection,
   type CredentialRejected,
   type ProviderUnreachable,
+  type RateLimited,
 } from "./contracts";
 import { baseUrlRefusal } from "./address";
 import { findProvider } from "./providers";
@@ -45,7 +46,11 @@ export const connectAction = action(
   ): Promise<
     Result<
       Connection,
-      NotFound | ValidationFailed | CredentialRejected | ProviderUnreachable
+      | NotFound
+      | ValidationFailed
+      | CredentialRejected
+      | ProviderUnreachable
+      | RateLimited
     >
   > => {
     const provider = findProvider(providerId);
@@ -96,15 +101,15 @@ export const connectAction = action(
 
 /**
  * Asks the provider again whether the stored credential works, and records the answer: a
- * refused credential marks the connection `needs_reconnect`. An unreachable provider changes
- * nothing.
+ * refused credential marks the connection `needs_reconnect`. An unreachable provider, or one
+ * whose rate limit is reached, changes nothing.
  */
 export const testConnectionAction = action(
   connectionInputSchema,
   async (
     { connectionId },
     { user },
-  ): Promise<Result<Connection, NotFound | ProviderUnreachable>> => {
+  ): Promise<Result<Connection, NotFound | ProviderUnreachable | RateLimited>> => {
     const connection = await findStoredConnection(user, connectionId);
     const provider = connection && findProvider(connection.providerId);
     const credential =
@@ -116,7 +121,7 @@ export const testConnectionAction = action(
       baseUrl: connection.baseUrl,
       authorization: authorizationOf(credential),
     });
-    if (!verified.ok && verified.error._tag === "ProviderUnreachable")
+    if (!verified.ok && verified.error._tag !== "CredentialRejected")
       return err(verified.error);
     const now = new Date();
     const [row] = await db()

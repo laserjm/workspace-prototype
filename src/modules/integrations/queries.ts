@@ -51,13 +51,32 @@ export async function findStoredConnection(
   return row && toConnection(row);
 }
 
-/** Every provider, as the connect form sees it: no code. Shared data, no user. */
+/**
+ * Marks a connection whose credential the provider refused while reading, once: an active one
+ * becomes `needs_reconnect`, and the user connects again. The one write outside the actions,
+ * because a read is what finds out.
+ */
+export async function markNeedsReconnect(user: User, connectionId: string) {
+  await db()
+    .update(connectionsTable)
+    .set({ status: "needs_reconnect", updatedAt: new Date() })
+    .where(
+      and(
+        eq(connectionsTable.userId, user.id),
+        eq(connectionsTable.id, connectionId),
+        eq(connectionsTable.status, "active"),
+      ),
+    );
+}
+
+/** Every provider, as the browser sees it: no code. Shared data, no user. */
 export async function listProviderChoices(): Promise<ProviderChoice[]> {
-  return providers.map(({ id, name, description, auth, baseUrl }) => ({
+  return providers.map(({ id, name, description, auth, baseUrl, records }) => ({
     id,
     name,
     description,
     auth,
     ...(baseUrl ? { baseUrl } : {}),
+    ...(records ? { records: { types: records.types, filters: records.filters } } : {}),
   }));
 }

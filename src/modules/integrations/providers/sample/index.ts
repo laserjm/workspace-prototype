@@ -39,7 +39,7 @@ export const sample = defineProvider({
   name: "Sample data",
   description: "Fictional enterprise records to try the workspace with",
   auth: [{ kind: "none" }],
-  records: {
+  sources: {
     products: Object.fromEntries(
       sampleSources.map((source) => [
         source.id,

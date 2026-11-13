@@ -75,6 +75,17 @@ describe("verifyGithubToken", () => {
     });
   });
 
+  it.each<{ status: number; headers: Record<string, string> }>([
+    { status: 403, headers: { "x-ratelimit-remaining": "0", "x-ratelimit-reset": "1794830440" } },
+    { status: 429, headers: { "retry-after": "40" } },
+  ])("reports a rate limit ($status) as rate_limited, not as a refused token", async ({ status, headers }) => {
+    answer(status, { message: "API rate limit exceeded" }, headers);
+    expect(await verifyGithubToken(access)).toMatchObject({
+      ok: false,
+      error: { _tag: "RateLimited", retryAt: expect.any(String) },
+    });
+  });
+
   it("says GitHub is unreachable on a server error, an odd answer or no answer", async () => {
     answer(502, {});
     expect(await verifyGithubToken(access)).toMatchObject({

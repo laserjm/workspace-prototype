@@ -70,21 +70,25 @@ the user first and names their id in its query.
 
 ### Modules
 
-**Decision.** Six modules. `agent` (the runtime AI: the model allowlist, instructions, tools
+**Decision.** Seven modules. `agent` (the runtime AI: the model allowlist, instructions, tools
 and the agent loop; see "Answers come from the Vercel AI Gateway"), `threads` (rich:
 conversations, settle, snooze, wake, fork, the live chat), `integrations` (the providers the
 workspace connects to, the user's connections and what they read; a leaf that imports no other
-module), `sources` (the sources and records of the user's connections, the thread scope and the
-explorer; a read-only domain),
+module), `records` (attaching records to a question, provider-neutral: the attachment rules, the
+attach dialog and its chips; ADR 0003 §2), `sources` (the sources and records of the user's
+connections, the thread scope and the explorer; a read-only domain, which ADR 0003 retires),
 `skills` (the skill catalogue and its activation in this browser) and `projects` (the project
 list, the add-project rule and the sidebar filter). `app/(workspace)/` composes them; its
 `_components/` hold the shell, sidebar, settings and new-thread heading, which only that route
 uses. Another module is reached only through its `index.ts`, which is safe to import in the
 browser, or its `server.ts`, which is `server-only`; inside a module, files import each other
 relatively.
+`records` builds on `integrations` alone: it imports only `@/modules/integrations` and
+`@/modules/integrations/server`.
 **Enforced by.** ESLint `no-restricted-imports` (`eslint.config.mjs`: `@/modules/<x>/` followed
-by anything but `index` or `server` is an error); the `server-only` import in every `server.ts`.
-**Recorded in.** This entry.
+by anything but `index` or `server` is an error; a block for `src/modules/records/**` refuses
+any `@/modules/*` but those two); the `server-only` import in every `server.ts`.
+**Recorded in.** This entry; `docs/adr/0003-attached-items-and-record-views.md`.
 
 ### Cross-module references are ids
 
@@ -332,9 +336,10 @@ model, the call offers the tools and `execute` sees the thread's scope); `tsc`
 provider: a system the workspace connects to (`providers/sample/` and `providers/github/` today;
 Atlassian, codebeamer, PostHog, Stripe and Supabase are planned). A provider is
 `defineProvider({ id, name, description, auth, baseUrl?, verify?, records? })` (`contracts.ts`),
-registered by one line in `providers.ts`, and written in at most three files: `index.ts` (the
-manifest), `api.ts` (its HTTP calls, every response parsed with zod) and `records.ts` (its
-`RecordReader`, only with records). A provider's code is handed a `ProviderAccess` (the API
+registered by one line in `providers.ts`, and written in its folder: `index.ts` (the
+manifest), `api.ts` (its HTTP calls, every response parsed with zod), `records.ts` (its record
+types, states and search, only with records) and `views/` (its marks in the browser, and with
+#60 its record views; ADR 0003 §3). A provider's code is handed a `ProviderAccess` (the API
 address and the `Authorization` header value) and never reads a secret, an env var or the
 database. `auth` lists how a user connects: `none` (the sample), `token` (sent as `Bearer`) or
 `basic` (username and password, or an email and API token, sent as HTTP Basic); `verify` checks a
@@ -363,20 +368,52 @@ provider's `data.ts`; the stored threads' sample ids moved to `sample:<product>`
 `drizzle/0006_rename-sample-source-ids.sql`. Unit tests that read sources swap the connection
 query for `tests/support/connections.ts` (the sample connection alone), so they need no Postgres.
 
-The GitHub provider's tests will replay recorded answers (ADR 0003 §5): `providers/github/fixtures/`
+A provider with records (ADR 0003 §3) declares them in its manifest's `records`: its types, each
+with a singular and a plural label and its states, each state with a label and a tone from
+`RECORD_TONES` (`open`, `draft`, `done`, `closed`, `neutral`; an undeclared state draws
+`neutral`); which of the dialog's generic filters (`type`, `includeClosed`) its search supports;
+and its search, which answers a `RecordSearchPage` (`RecordSummary`s, an opaque `next` cursor,
+`total`, the connection's `reach`) or a `RecordError` and never throws. The sample's older reader
+is its manifest's `sources`. The declarations, without code, reach the browser on
+`ProviderChoice.records`; each provider's marks (its own and one per type) are in its `views/`,
+gathered by provider id in `record-views.ts`. `searchRecords(user, connectionId, query)`
+(`integrations/records.ts`) finds the connection among the user's (another user's is
+`not_found`) and runs the provider's search; a `needs_reconnect` answer marks an active connection
+`needs_reconnect` (`markNeedsReconnect`, the one write in `queries.ts`). `GET
+/api/connections/[connectionId]/records?q=&type=&closed=&cursor=` serves it to the attach dialog,
+`private, no-store`; `record-error.ts` beside it answers a `RecordError` as a status and `{ error:
+{ kind, message, retryAt? } }` (404, 403, 409 for `needs_reconnect` because 401 means the
+session ended, 429 with `Retry-After`, 502, 422). GitHub's search names the token's repositories
+(`GET /user/repos`) as `repo:a repo:b …`, adds the typed words with `in:title,body` (a word GitHub
+would read as a qualifier is quoted), `is:issue` or `is:pr` and `is:open` unless closed items
+count, 20 a page; its cursor encodes the page number. GitHub's classifier (`classifyGithubAnswer`
+in `providers/github/api.ts`) is shared with `verifyGithubToken`, which reports a rate limit as
+`RateLimited` rather than a refused token: 401 is `needs_reconnect`; a 403 or 429 with
+`x-ratelimit-remaining: 0`, `retry-after` or a secondary rate limit is `rate_limited` with
+`retryAt`; another 403 `no_access`; 404 `not_found`; 422 `invalid_query`; anything else, or no
+answer, `unreachable`.
+
+The GitHub provider's tests replay recorded answers (ADR 0003 §5): `providers/github/fixtures/`
 holds plain GitHub JSON, one response body per file, captured from the public sandbox
 `laserjm/workspace-fixtures`. The sandbox's records are made by its `seed/seed.sh` and labelled
 `case/<name>`, so they can be rebuilt; the folder's README holds one `gh api` line per file. Only
 public data is saved: `/user` without its account-only fields, and `/user/repos` cut to the
-sandbox.
+sandbox. A test answers `fetch` with `useRecordedGithub({ "GET /path": "file.json" })`
+(`tests/support/recorded-github.ts`; an error answer is written inline, and an unlisted request
+fails the test and names it), and swaps the connection query and the vault for
+`tests/support/connections.ts`, whose `connectedUser` has one GitHub connection with a fake token.
 **Enforced by.** `providers/github/fixtures.test.ts` (README lines and files one to one, each
 seeded case found by its label, CI on the merged pull request's head, no token or `Authorization`);
 `integrations/providers.test.ts` (every provider in the registry: unique ids, a
-way to connect, a base URL and `verify` when it takes a credential, sources in a declared
-product, records read back by id in order, nothing for an unknown key);
+way to connect, a base URL and `verify` when it takes a credential, declared record types whose
+states' tones are in the set, sources in a declared product, records read back by id in order, nothing for an unknown key);
 `integrations/actions.integration.test.ts` (connect, reconnect, refusals including each internal
-address kind with name resolution stubbed, test, disconnect, a
-visitor, `assertIsolation()`); `providers/github/api.test.ts`; `sources/queries.test.ts`; `tsc`.
+address kind with name resolution stubbed, test, disconnect, a search marking only its user's
+connection `needs_reconnect`, a visitor, `assertIsolation()`); the marks registry in
+`providers.test.ts` (a mark for each declared type, none for another); `providers/github/api.test.ts`;
+`app/api/connections/[connectionId]/records/route.test.ts` (the scoped query, the toggles and
+the cursor, the computed states, another user's connection, each classifier case and a 401
+marking the connection); `sources/queries.test.ts`; `tsc`.
 **Recorded in.** This entry; `docs/adr/0002-integrations.md`;
 `docs/adr/0003-attached-items-and-record-views.md`.
 
@@ -486,8 +523,10 @@ in `modules/*/actions.ts`, ACTION-02 every export of it is `action(…)` or `pub
 ### Module shape
 
 **Decision.** A module is flat: `contracts.ts` (types, errors, rules, input schemas),
-`queries.ts` (reads, each taking the user first), `actions.ts` (writes: `action(…)` signs the
-caller in and validates, and the handler queries Drizzle), `components/`, `index.ts` and
+`queries.ts` (reads, each taking the user first; the one write there is
+`integrations`' `markNeedsReconnect`, because a read is what finds a refused credential),
+`actions.ts` (writes: `action(…)` signs the caller in and validates, and the handler queries
+Drizzle), `components/`, `index.ts` and
 `server.ts`. `server.ts` re-exports what pages, routes and other modules' tests need. Every
 query names `user.id`, and the integration test calls `assertIsolation()`. A handler reads a
 refused constraint with `violatedConstraint` (`lib/db/errors.ts`) and returns

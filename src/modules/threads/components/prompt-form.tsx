@@ -8,6 +8,7 @@ import {
   LoaderCircle,
   Paperclip,
   Plug,
+  Plus,
   Shield,
   ShieldOff,
   Square,
@@ -31,6 +32,13 @@ import {
   SourceScopeSummary,
   useSources,
 } from "@/modules/sources";
+import {
+  AttachDialog,
+  AttachedItemChip,
+  removeConnection,
+  removeItem,
+  type AttachedConnection,
+} from "@/modules/records";
 import type { ModelChoice } from "@/modules/agent";
 import type { ThreadScope } from "../contracts";
 import { attachmentChipClassName } from "./attachment-chip";
@@ -91,6 +99,9 @@ export function PromptForm({
   const [model, setModel] = useState(models[0]);
   const [permission, setPermission] = useState("Full access");
   const [attachments, setAttachments] = useState<File[]>([]);
+  // The records the question is about; sending them comes with the data part (#59).
+  const [attached, setAttached] = useState<readonly AttachedConnection[]>([]);
+  const [attaching, setAttaching] = useState(false);
   const [error, setError] = useState("");
   const [chosenSkill, setChosenSkill] = useState<string | undefined>(
     initialSkill,
@@ -106,9 +117,10 @@ export function PromptForm({
 
   async function submit() {
     if (!canSend) return;
-    const draft = { prompt, attachments };
+    const draft = { prompt, attachments, attached };
     setPrompt("");
     setAttachments([]);
+    setAttached([]);
     const sent = await onSend(
       draft.prompt.trim(),
       draft.attachments.map((file) => file.name),
@@ -118,6 +130,7 @@ export function PromptForm({
     if (sent) return;
     setPrompt(draft.prompt);
     setAttachments(draft.attachments);
+    setAttached(draft.attached);
   }
 
   return (
@@ -141,6 +154,16 @@ export function PromptForm({
         </button>
       )}
       <div className="mx-2 mb-2.5 flex min-w-0 items-center gap-3 max-md:mx-1 max-md:gap-2">
+        <button
+          type="button"
+          className={cn(inlineTriggerClassName, "shrink-0")}
+          onClick={() => setAttaching(true)}
+        >
+          <Plus />
+          <span>
+            {attached.length ? "Change data sources" : "Choose a data source"}
+          </span>
+        </button>
         {onChooseSource && onClearSource && (
           <SourcePicker
             selected={scope?.sourceId}
@@ -168,8 +191,34 @@ export function PromptForm({
           void submit();
         }}
       >
-        {attachments.length > 0 && (
+        {(attachments.length > 0 || attached.length > 0) && (
           <div className="flex flex-wrap gap-1.5 px-2 pb-3">
+            {attached.map((connection) =>
+              connection.items.length ? (
+                connection.items.map((item) => (
+                  <AttachedItemChip
+                    key={`${connection.connectionId}:${item.type}:${item.key}`}
+                    connection={connection}
+                    item={item}
+                    onRemove={() =>
+                      setAttached((current) =>
+                        removeItem(current, connection.connectionId, item.type, item.key),
+                      )
+                    }
+                  />
+                ))
+              ) : (
+                <AttachedItemChip
+                  key={connection.connectionId}
+                  connection={connection}
+                  onRemove={() =>
+                    setAttached((current) =>
+                      removeConnection(current, connection.connectionId),
+                    )
+                  }
+                />
+              ),
+            )}
             {attachments.map((file, index) => (
               <span
                 className={attachmentChipClassName}
@@ -242,9 +291,9 @@ export function PromptForm({
                 Attach files
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={onSources}>
+              <DropdownMenuItem onClick={() => setAttaching(true)}>
                 <Plug />
-                Connect a data source
+                Choose a data source
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -362,6 +411,14 @@ export function PromptForm({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+      {attaching && (
+        <AttachDialog
+          attached={attached}
+          onApply={setAttached}
+          onClose={() => setAttaching(false)}
+          onConnect={onSources}
+        />
+      )}
       {error && (
         <p role="alert" className="mx-1.5 mt-2 text-xs text-destructive">
           {error}

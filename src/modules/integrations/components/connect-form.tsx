@@ -160,7 +160,8 @@ export function ConnectForm({
       {connect.error && !urlError && (
         <p className="text-xs text-destructive-foreground" role="alert">
           {connect.error._tag === "CredentialRejected" ||
-          connect.error._tag === "ProviderUnreachable"
+          connect.error._tag === "ProviderUnreachable" ||
+          connect.error._tag === "RateLimited"
             ? connect.error.message
             : errorMessage(connect.error, {
                 NotFound: `${provider.name} cannot be connected this way.`,

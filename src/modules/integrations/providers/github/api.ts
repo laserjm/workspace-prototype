@@ -5,13 +5,18 @@ import { err, ok, type Result } from "@/lib/result";
 import {
   credentialRejected,
   providerUnreachable,
+  rateLimited,
   type CredentialRejected,
   type ProviderAccess,
   type ProviderUnreachable,
+  type RateLimited,
+  type RecordError,
   type VerifiedAccount,
 } from "../../contracts";
 
 const TIMEOUT_MS = 10_000;
+/** GitHub asks to wait at least a minute after a secondary rate limit without `retry-after`. */
+const SECONDARY_LIMIT_WAIT_MS = 60_000;
 
 /** GET from the API with the connection's credential. */
 export function githubGet(path: string, { baseUrl, authorization }: ProviderAccess) {
@@ -26,6 +31,60 @@ export function githubGet(path: string, { baseUrl, authorization }: ProviderAcce
     redirect: "error",
     signal: AbortSignal.timeout(TIMEOUT_MS),
   });
+}
+
+/**
+ * What a GitHub answer that is not OK means (ADR 0003 §3): 401 is a refused token, a 403 or 429
+ * that says so is a rate limit, any other 403 a missing permission, 404 nothing there, 422 a
+ * query GitHub could not run. Anything else is GitHub not answering properly.
+ */
+export async function classifyGithubAnswer(
+  response: Response,
+  now = Date.now(),
+): Promise<RecordError> {
+  const { status, headers } = response;
+  if (status === 401) return { kind: "needs_reconnect" };
+  if (status === 403 || status === 429) {
+    const message = await messageOf(response);
+    const retryAfter = Number(headers.get("retry-after"));
+    const reset = Number(headers.get("x-ratelimit-reset"));
+    if (headers.has("retry-after") && Number.isFinite(retryAfter))
+      return rateLimitedUntil(now + retryAfter * 1000);
+    if (headers.get("x-ratelimit-remaining") === "0")
+      return rateLimitedUntil(
+        Number.isFinite(reset) && reset > 0 ? reset * 1000 : now + SECONDARY_LIMIT_WAIT_MS,
+      );
+    if (status === 429 || /secondary rate limit/i.test(message))
+      return rateLimitedUntil(now + SECONDARY_LIMIT_WAIT_MS);
+    return { kind: "no_access" };
+  }
+  if (status === 404) return { kind: "not_found" };
+  if (status === 422)
+    return { kind: "invalid_query", message: (await messageOf(response)) || "GitHub could not run this search." };
+  return { kind: "unreachable" };
+}
+
+const rateLimitedUntil = (time: number): RecordError => ({
+  kind: "rate_limited",
+  retryAt: new Date(time).toISOString(),
+});
+
+/** GitHub's `message`, and the first error's, when it sends them. */
+async function messageOf(response: Response): Promise<string> {
+  const body = z
+    .object({
+      message: z.string().optional(),
+      errors: z.array(z.object({ message: z.string().optional() })).optional(),
+    })
+    .safeParse(await response.clone().json().catch(() => undefined));
+  if (!body.success) return "";
+  return [body.data.message, body.data.errors?.[0]?.message].filter(Boolean).join(": ");
+}
+
+/** "about 40 s", "about 3 min": how long until `retryAt`. */
+export function waitLabel(retryAt: string, now = Date.now()): string {
+  const seconds = Math.max(1, Math.ceil((Date.parse(retryAt) - now) / 1000));
+  return seconds < 90 ? `${seconds} s` : `${Math.ceil(seconds / 60)} min`;
 }
 
 const userSchema = z.object({ id: z.number(), login: z.string() });
@@ -53,21 +112,32 @@ function expiryOf(header: string | null): Date | undefined {
 /** Who the token belongs to (`GET /user`), its classic scopes and when it expires. */
 export async function verifyGithubToken(
   access: ProviderAccess,
-): Promise<Result<VerifiedAccount, CredentialRejected | ProviderUnreachable>> {
+): Promise<
+  Result<VerifiedAccount, CredentialRejected | ProviderUnreachable | RateLimited>
+> {
   let response: Response;
   try {
     response = await githubGet("/user", access);
   } catch {
     return err(providerUnreachable(`GitHub at ${access.baseUrl} could not be reached.`));
   }
-  if (response.status === 401 || response.status === 403)
-    return err(
-      credentialRejected(
-        "GitHub did not accept this token. Check that it is complete and has not expired.",
-      ),
-    );
-  if (!response.ok)
+  if (!response.ok) {
+    const error = await classifyGithubAnswer(response);
+    if (error.kind === "needs_reconnect" || error.kind === "no_access")
+      return err(
+        credentialRejected(
+          "GitHub did not accept this token. Check that it is complete and has not expired.",
+        ),
+      );
+    if (error.kind === "rate_limited")
+      return err(
+        rateLimited(
+          `GitHub's rate limit is reached. Try again in ${waitLabel(error.retryAt)}.`,
+          error.retryAt,
+        ),
+      );
     return err(providerUnreachable(`GitHub answered with HTTP ${response.status}.`));
+  }
   const user = userSchema.safeParse(await response.json().catch(() => undefined));
   if (!user.success)
     return err(providerUnreachable("GitHub answered with something unexpected."));
