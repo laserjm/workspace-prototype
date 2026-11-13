@@ -30,7 +30,7 @@ export const github = defineProvider({
     hint: {
       idle: "Involving you first, then recently updated. Type words, a number (482) or a repository name (web).",
       typing:
-        "Matches every word in titles and descriptions, best matches first. A repository name narrows it; a number in one repository comes first.",
+        "Matches words in titles and descriptions. Type a repository name to search only there.",
     },
     search: searchGithubRecords,
   },

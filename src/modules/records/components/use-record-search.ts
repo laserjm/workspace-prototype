@@ -135,9 +135,9 @@ export function useRecordSearch(
     setLoadingMore((loading) => (loading === from.key ? undefined : loading));
     if (!answer.ok) return fail(from.key, answer.error);
     const known = new Set(from.results.map((result) => `${result.type}:${result.key}`));
+    // The first page's total and reach stand; a later page may count only part of the search.
     put({
       ...from,
-      ...answer.page,
       // The last page answers without `next`, which must not keep the one before.
       next: answer.page.next,
       results: [
@@ -150,6 +150,8 @@ export function useRecordSearch(
   return {
     loading: enabled && !current && !error,
     results: shown?.results ?? [],
+    /** The results shown are kept from an earlier search, not this one's answer. */
+    stale: shown !== undefined && shown !== current,
     total: current?.total,
     reach: shown?.reach,
     // Only the answer to this text says what it narrowed to.

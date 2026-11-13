@@ -458,7 +458,7 @@ function ConnectionSearch({
           aria-busy={search.loading}
           className={cn(
             "mt-2 max-h-80 min-h-15 overflow-y-auto border-t border-border/60 transition-opacity",
-            search.loading && "opacity-50",
+            (search.loading || search.stale) && "opacity-50",
           )}
           onScroll={(event) => {
             const list = event.currentTarget;

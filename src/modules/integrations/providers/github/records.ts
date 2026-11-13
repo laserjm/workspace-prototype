@@ -41,6 +41,8 @@ export const githubRecordTypes = {
 
 type GithubRecordType = keyof typeof githubRecordTypes;
 
+const RECORD_TYPES = Object.keys(githubRecordTypes) as GithubRecordType[];
+
 const isRecordType = (type: string): type is GithubRecordType =>
   Object.hasOwn(githubRecordTypes, type);
 
@@ -147,32 +149,83 @@ function scopeOf(repositories: readonly string[], longest: readonly string[]): s
 const queryOf = (terms: SearchTerms, query: RecordSearchQuery) =>
   [...terms.scope, ...qualifiersOf(terms, query)].join(" ");
 
-/** One page of one search: GitHub's best matches with words, the most recently updated without. */
-function searchPage(
+/** One page of one type's search: GitHub's best matches with words, the most recently updated without. */
+async function searchPage(
   access: ConnectionAccess,
   terms: SearchTerms,
   query: RecordSearchQuery,
+  type: GithubRecordType,
   page: number,
-) {
+): Promise<Result<TypePage, RecordError>> {
   const params = new URLSearchParams({
-    q: queryOf(terms, query),
+    q: queryOf(terms, { ...query, type }),
     ...(terms.words.length ? {} : { sort: "updated", order: "desc" }),
     per_page: String(PAGE_SIZE),
     ...(page > 1 ? { page: String(page) } : {}),
   });
-  return getJson(`/search/issues?${params}`, access, searchSchema);
+  const found = await getJson(`/search/issues?${params}`, access, searchSchema);
+  return found.ok ? ok({ type, total: found.value.total_count, items: found.value.items }) : found;
 }
 
-const cursorSchema = z.object({ page: z.number().int().min(2) });
+/** One page of one type's search. */
+type TypePage = { type: GithubRecordType; total: number; items: GithubItem[] };
 
-/** GitHub's page number, encoded so nobody else reads anything into it. */
-const cursorOf = (page: number) => btoa(JSON.stringify({ page }));
+/**
+ * One page of the search for each of `types`, in parallel. GitHub refuses a fine-grained token's
+ * search for issues and pull requests at once ("Query must include 'is:issue' or
+ * 'is:pull-request'", #58), so "All" is one search per type.
+ */
+async function searchTypes(
+  access: ConnectionAccess,
+  terms: SearchTerms,
+  query: RecordSearchQuery,
+  types: readonly GithubRecordType[],
+  page: number,
+): Promise<Result<TypePage[], RecordError>> {
+  const pages = await Promise.all(
+    types.map((type) => searchPage(access, terms, query, type, page)),
+  );
+  const found: TypePage[] = [];
+  for (const typePage of pages) {
+    if (!typePage.ok) return typePage;
+    found.push(typePage.value);
+  }
+  return ok(found);
+}
 
-function pageOf(cursor: string | undefined): number | undefined {
-  if (cursor === undefined) return 1;
+/**
+ * The types' items as one list: by when they changed when the searches are sorted so, otherwise
+ * taking each search's next best match in turn.
+ */
+function mergedItems(pages: readonly TypePage[], byUpdated: boolean): GithubItem[] {
+  if (byUpdated)
+    return pages
+      .flatMap((typePage) => typePage.items)
+      .toSorted((a, b) => b.updated_at.localeCompare(a.updated_at));
+  const longest = Math.max(0, ...pages.map((typePage) => typePage.items.length));
+  return Array.from({ length: longest }, (_, rank) =>
+    pages.flatMap((typePage) => typePage.items[rank] ?? []),
+  ).flat();
+}
+
+const cursorSchema = z.object({
+  page: z.number().int().min(2),
+  /** The types whose searches have this page. */
+  types: z.array(z.enum(RECORD_TYPES)).min(1),
+});
+type Cursor = z.infer<typeof cursorSchema>;
+
+/** GitHub's page number and the types it is for, encoded so nobody else reads anything into it. */
+const cursorOf = (cursor: Cursor) => btoa(JSON.stringify(cursor));
+
+/** Where a search goes on: page 1 of every type asked for, or what the cursor names of them. */
+function cursorFrom(encoded: string | undefined, asked: readonly GithubRecordType[]) {
+  if (encoded === undefined) return { page: 1, types: asked };
   try {
-    const parsed = cursorSchema.safeParse(JSON.parse(atob(cursor)));
-    return parsed.success ? parsed.data.page : undefined;
+    const parsed = cursorSchema.safeParse(JSON.parse(atob(encoded)));
+    if (!parsed.success) return undefined;
+    const types = parsed.data.types.filter((type) => asked.includes(type));
+    return types.length ? { page: parsed.data.page, types } : undefined;
   } catch {
     return undefined;
   }
@@ -217,9 +270,10 @@ export async function searchGithubRecords(
 ): Promise<Result<RecordSearchPage, RecordError>> {
   if (query.type !== undefined && !isRecordType(query.type))
     return err({ kind: "invalid_query", message: `GitHub has no record type '${query.type}'.` });
-  const page = pageOf(query.cursor);
-  if (page === undefined)
+  const cursor = cursorFrom(query.cursor, query.type ? [query.type] : RECORD_TYPES);
+  if (cursor === undefined)
     return err({ kind: "invalid_query", message: "That page of results is no longer available." });
+  const { page, types } = cursor;
 
   const repositories = await getJson("/user/repos?per_page=100", access, repositoriesSchema);
   if (!repositories.ok) return repositories;
@@ -235,30 +289,43 @@ export async function searchGithubRecords(
     .map(searchWord)
     .filter(Boolean);
   const suggesting = typed.length === 0 && page === 1;
-  // Both searches before typing share one scope, decided on the longer of them.
+  // Every search shares one scope, decided on the longest of them.
   const terms: SearchTerms = {
-    scope: scopeOf(inPlay, qualifiersOf({ words, involvesMe: suggesting }, query)),
+    scope: scopeOf(
+      inPlay,
+      qualifiersOf({ words, involvesMe: suggesting }, { ...query, type: query.type ?? "issue" }),
+    ),
     words,
   };
   // With one repository in play, a typed number is also read directly and put on top: the search
   // has no number qualifier.
   const number = page === 1 && inPlay.length === 1 ? typed.map(numberIn).find(Boolean) : undefined;
   const [found, involving, numbered] = await Promise.all([
-    searchPage(access, terms, query, page),
-    suggesting ? searchPage(access, { ...terms, involvesMe: true }, query, 1) : undefined,
+    searchTypes(access, terms, query, types, page),
+    suggesting ? searchTypes(access, { ...terms, involvesMe: true }, query, types, 1) : undefined,
     number ? getJson(`/repos/${inPlay[0]}/issues/${number}`, access, itemSchema) : undefined,
   ]);
   if (!found.ok) return found;
   if (involving && !involving.ok) return involving;
+  const byUpdated = words.length === 0;
+  const foundItems = mergedItems(found.value, byUpdated);
   // A number nothing has, or cannot be read, is only not on top.
   const exact = numbered?.ok && matchesToggles(numbered.value, query) ? [numbered.value] : [];
-  const items = uniqueItems([...exact, ...(involving?.value.items ?? []), ...found.value.items]);
-  const foundIds = new Set(found.value.items.map(idOf));
-  const total = found.value.total_count + exact.filter((item) => !foundIds.has(idOf(item))).length;
-  const hasNext = page * PAGE_SIZE < Math.min(found.value.total_count, SEARCH_LIMIT);
+  const items = uniqueItems([
+    ...exact,
+    ...(involving ? mergedItems(involving.value, byUpdated) : []),
+    ...foundItems,
+  ]);
+  const foundIds = new Set(foundItems.map(idOf));
+  const total =
+    found.value.reduce((sum, typePage) => sum + typePage.total, 0) +
+    exact.filter((item) => !foundIds.has(idOf(item))).length;
+  const nextTypes = found.value
+    .filter((typePage) => page * PAGE_SIZE < Math.min(typePage.total, SEARCH_LIMIT))
+    .map((typePage) => typePage.type);
   return ok({
     results: items.map((item) => summaryOf(access.connectionId, item)),
-    ...(hasNext ? { next: cursorOf(page + 1) } : {}),
+    ...(nextTypes.length ? { next: cursorOf({ page: page + 1, types: nextTypes }) } : {}),
     total,
     reach,
     ...(narrowedTo.length ? { narrowedTo } : {}),

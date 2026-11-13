@@ -390,12 +390,16 @@ session ended, 429 with `Retry-After`, 502, 422). GitHub's search (#43) names th
 repositories (`GET /user/repos`) as `repo:a repo:b …`, or `user:<owner>` for each distinct owner
 when that would make the query longer than 256 characters; adds the typed words with
 `in:title,body` (a word GitHub would read as a qualifier is quoted), `is:issue` or `is:pr` and
-`is:open` unless closed items count, 20 a page; its cursor encodes the page number. A word that
-names a readable repository exactly, in any case (`web` or `acme/web`), narrows the scope to it
-instead of being searched. `482` or `#482` is searched as `482`; with one repository in play
+`is:open` unless closed items count, 20 a page. GitHub refuses a fine-grained token's search for
+issues and pull requests at once (422, "Query must include 'is:issue' or 'is:pull-request'"), so
+with no type chosen it runs one search per type and merges them: by `updated` when sorted so,
+otherwise rank by rank (#58); `total` adds them up. Its cursor encodes the page number and the
+types that still have that page. A word that names a readable repository exactly, in any case
+(`web` or `acme/web`), narrows the scope to it instead of being searched. `482` or `#482` is searched as `482`; with one repository in play
 (narrowed, or the only one the token reads) the issue or pull request of that number is also read
 (`GET /repos/{o}/{r}/issues/{n}`) and put on top when the toggles let it through. Before typing,
-two searches sorted by `updated` run in parallel, one with `involves:@me`, and their results are
+two searches sorted by `updated` run in parallel (each per type for "All"), one with
+`involves:@me`, and their results are
 listed once each, the first's first; later pages continue the second. The attach dialog searches
 250 ms after the last keystroke, aborts the search in flight when a newer one starts, and keeps
 the answers by `(connection, q, toggles)` while it is open (`useSearchCache`); nothing is cached
@@ -428,7 +432,8 @@ address kind with name resolution stubbed, test, disconnect, a search marking on
 connection `needs_reconnect`, a visitor, `assertIsolation()`); the marks registry in
 `providers.test.ts` (a mark for each declared type, none for another); `providers/github/api.test.ts`;
 `app/api/connections/[connectionId]/records/route.test.ts` (the scoped query, the toggles and
-the cursor, the before-typing pair, narrowing by a repository name, the number on top, the
+the cursor, one search per type for "All", the before-typing pair, narrowing by a repository
+name, the number on top, the
 `user:` fallback, the computed states, another user's connection, each classifier case and a 401
 marking the connection); `records/contracts.test.ts` (the dialog's default connection);
 `sources/queries.test.ts`; `tsc`.
