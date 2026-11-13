@@ -12,11 +12,11 @@ import type { User } from "@/lib/auth/user";
 import type { NotFound, ValidationFailed } from "@/lib/errors";
 import { err, ok, type Result } from "@/lib/result";
 import {
+  allowedConnections,
   attachedConnectionsOf,
   attachedItemsText,
   recordsDataSchemas,
-} from "@/modules/records";
-import { allowedConnections } from "@/modules/records/server";
+} from "@/modules/records/server";
 import { listSkills } from "@/modules/skills/server";
 import { listScopedRecords, listSources } from "@/modules/sources/server";
 import { resolveContext, type AgentContext } from "./context";
