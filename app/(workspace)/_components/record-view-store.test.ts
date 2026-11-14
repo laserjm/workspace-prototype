@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { err, ok } from "@/lib/result";
 import type { RecordRead } from "@/modules/integrations/contracts";
 import { RecordViewStore, type FetchRecord, type ViewRecordRef } from "./record-view-store";
+
+const ok = <T,>(value: T) => ({ ok: true as const, value });
+const err = <E,>(error: E) => ({ ok: false as const, error });
 
 const VIEW: ViewRecordRef = {
   id: "github.issue-view:acme:acme/web#1",

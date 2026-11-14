@@ -4,22 +4,30 @@ import { awaitsNextStep } from "./reply-progress";
 
 type Part = WorkspaceUIMessage["parts"][number];
 
-const reply = (...parts: unknown[]) =>
-  ({ id: "a1", role: "assistant", parts: parts as Part[] }) satisfies WorkspaceUIMessage;
-const text = (value: string, state: "streaming" | "done" = "streaming") => ({
+const reply = (...parts: Part[]): WorkspaceUIMessage => ({ id: "a1", role: "assistant", parts });
+const text = (value: string, state: "streaming" | "done" = "streaming"): Part => ({
   type: "text",
   text: value,
   state,
 });
-const read = (state: "input-streaming" | "input-available" | "output-available" | "output-error") => ({
-  type: "tool-read_record",
-  toolCallId: "call-1",
-  state,
-  input: { connectionId: "c1", type: "issue", key: "acme/web#42" },
-  ...(state === "output-available" ? { output: { error: { kind: "not_found" } } } : {}),
-  ...(state === "output-error" ? { errorText: "Failed" } : {}),
-});
-const stepStart = { type: "step-start" };
+const read = (
+  state: "input-streaming" | "input-available" | "output-available" | "output-error",
+): Part => {
+  const call = {
+    type: "tool-read_record",
+    toolCallId: "call-1",
+    input: { connectionId: "c1", type: "issue", key: "acme/web#42" },
+  } as const;
+  switch (state) {
+    case "output-available":
+      return { ...call, state, output: { error: { kind: "not_found" } } };
+    case "output-error":
+      return { ...call, state, errorText: "Failed" };
+    default:
+      return { ...call, state };
+  }
+};
+const stepStart: Part = { type: "step-start" };
 
 describe("awaitsNextStep", () => {
   it("waits before anything arrives", () => {

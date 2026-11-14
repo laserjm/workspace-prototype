@@ -1,14 +1,15 @@
+import { asSchema, type FlexibleSchema } from "ai";
 import { describe, expect, it } from "vitest";
-import { aSkill } from "@/test/factories";
-import { aUser } from "@/test/factories/user";
-import type { AgentModel } from "./models";
+import { aSkill, aUser } from "@/test/factories";
+import type { AgentModel } from "./contracts";
 import { tools, toolsFor } from "./tools";
 
 /** Whether `input` is a valid call of the tool, as the stored conversation is validated. */
 async function accepts(name: keyof typeof tools, input: unknown) {
-  const schema = tools[name].inputSchema as { "~standard": { validate(value: unknown): unknown } };
-  const result = (await schema["~standard"].validate(input)) as { issues?: unknown };
-  return !result.issues;
+  const schema: FlexibleSchema<unknown> = tools[name].inputSchema;
+  const result = await asSchema(schema).validate?.(input);
+  if (!result) throw new Error(`The ${name} tool has no input validation`);
+  return result.success;
 }
 
 const opus: AgentModel = {
