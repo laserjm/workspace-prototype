@@ -4,6 +4,8 @@
   superseded by ADR 0003 (2026-11-13), which replaces its records, scope and panel parts and lists
   them in its status. ADR 0003 also reverses two decisions: the Confluence provider is
   `confluence`, not `atlassian`, and GitHub's first tools are native over REST, not MCP.
+- **Note (2026-11-14):** the file paths and names below predate the adoption of the conventions
+  (`docs/CONVENTIONS.md`); see ARCHITECTURE.md for where things are now.
 - **Date:** 2026-11-05
 - **Deciders:** Michael Laser
 - **Related:** `docs/adr/0003-attached-items-and-record-views.md` (supersedes part of this ADR);

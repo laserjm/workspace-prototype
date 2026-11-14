@@ -8,15 +8,16 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 <!-- END:nextjs-agent-rules -->
 
-## Project conventions
+# Conventions
 
-- Read `ARCHITECTURE.md` before changing structure. Each entry records a decision and what
-  enforces it; change the entry together with the decision.
-- Another module is reached only through its `index.ts` (browser-safe) or `server.ts`
-  (server-only). ESLint enforces it; inside a module, import relatively.
-- Before you finish, run `pnpm lint`, `pnpm typecheck` and `pnpm test`. The integration tests
-  need the local stack (`pnpm stack:up`) and skip loudly without it.
-- Fix a lint finding rather than disabling it. A disable needs a comment that says why.
+Use `docs/CONVENTIONS.md`
+
+## Project
+
+- `ARCHITECTURE.md` records the decisions the conventions leave open (the stack, the
+  integrations, the agent, styling). `docs/adr/` records every departure from the conventions.
+- Before you finish, run `pnpm lint`, `pnpm typecheck` and `pnpm test`. The tests need the
+  local stack (`pnpm stack:up`).
 
 ## Agent skills
 

@@ -3,6 +3,21 @@ on: [push, pull_request]
 jobs:
   ci:
     runs-on: ubuntu-latest
+    # The tests run against real Postgres (docs/CONVENTIONS.md, Testing §2); test/global-setup.ts
+    # creates workspace_test on it.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: workspace
+          POSTGRES_PASSWORD: workspace
+          POSTGRES_DB: workspace
+        ports: ["5433:5432"]
+        options: >-
+          --health-cmd "pg_isready -U workspace"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 20
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -10,12 +25,12 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 24, cache: pnpm }
       - run: pnpm install --frozen-lockfile
-      - name: lint (ESLint, design tokens, server actions)
+      - name: lint (ESLint, design tokens)
         run: pnpm lint
       - name: schema drift — a schema.ts change needs its generated migration
         run: |
           pnpm db:check
           pnpm db:generate
-          test -z "$(git status --porcelain drizzle)" || { git status --porcelain drizzle; exit 1; }
+          test -z "$(git status --porcelain lib/db/migrations)" || { git status --porcelain lib/db/migrations; exit 1; }
       - run: pnpm typecheck
       - run: pnpm test

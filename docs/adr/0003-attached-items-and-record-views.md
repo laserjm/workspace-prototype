@@ -14,6 +14,8 @@
   - phase 5's Atlassian provider, which becomes `confluence` (and a separate Jira provider).
 
   It also reverses two decisions, below. The rest of ADR 0002 stands.
+- **Note (2026-11-14):** the file paths and names below predate the adoption of the conventions
+  (`docs/CONVENTIONS.md`); see ARCHITECTURE.md for where things are now.
 - **Date:** 2026-11-13
 - **Deciders:** Michael Laser
 - **Related:** `docs/adr/0002-integrations.md` (partly superseded by this ADR); `GLOSSARY.md`;
