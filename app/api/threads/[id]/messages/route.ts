@@ -3,7 +3,7 @@ import { gatewayModel } from "@/lib/ai";
 import { chatOptionsInput } from "@/modules/agent/contracts";
 import * as threads from "@/modules/threads";
 import { answerThreadInput } from "@/modules/threads/contracts";
-import { errorResponse, noStore, thrownResponse } from "./thread-error";
+import { errorResponse, noStore, thrownResponse } from "./refusals";
 
 // Tool loops (html_render, then the reply) can outlast the platform default.
 export const maxDuration = 300;

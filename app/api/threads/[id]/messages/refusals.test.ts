@@ -3,7 +3,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SignedOut } from "@/lib/auth";
 import * as threads from "@/modules/threads";
-import { thrownResponse } from "./thread-error";
+import { agentRefusal, threadRefusal, thrownResponse } from "./refusals";
 
 async function answer(error: unknown) {
   const response = thrownResponse(error);
@@ -45,5 +45,15 @@ describe("thrownResponse", () => {
     expect(thrownResponse(new threads.ThreadNotFound("t1")).headers.get("Cache-Control")).toBe(
       "private, no-store",
     );
+  });
+});
+
+describe("threadRefusal and agentRefusal", () => {
+  it("rethrow what is not their module's", () => {
+    const other = new Error("boom");
+    expect(() => threadRefusal(other)).toThrow(other);
+    expect(() => threadRefusal(new threads.ModelNotFound("m1"))).toThrow(threads.ModelNotFound);
+    expect(() => agentRefusal(other)).toThrow(other);
+    expect(() => agentRefusal(new threads.ThreadNotFound("t1"))).toThrow(threads.ThreadNotFound);
   });
 });
