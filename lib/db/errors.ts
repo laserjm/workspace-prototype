@@ -1,26 +1,41 @@
-// Reads a Postgres error for the actions: postgres.js puts the code and the constraint on the
-// error, and Drizzle wraps it in `cause`.
+// The one place that knows the driver's error codes. postgres.js puts the code and the
+// constraint's name on its error, and Drizzle wraps it in `cause`. A command asks here and throws
+// the fact that blocked the write; nothing else reads a driver error.
 import "server-only";
 
-const CONSTRAINT_CODES = new Set(["23505", "23503", "23514", "23502", "23P01"]); // unique, fk, check, not-null, exclusion
+const UNIQUE_VIOLATION = "23505";
+const FOREIGN_KEY_VIOLATION = "23503";
 
-type DriverError = { code: string; constraint?: unknown; constraint_name?: unknown };
+type DriverError = { code: string; constraint?: string };
 
-/** The violated constraint's name, or undefined when the error is not a constraint violation. */
-export function violatedConstraint(error: unknown): string | undefined {
+/** A unique index or key refused the write; `constraint` narrows it to that one. */
+export function isUniqueViolation(error: unknown, constraint?: string): boolean {
+  return violates(error, UNIQUE_VIOLATION, constraint);
+}
+
+/** A foreign key refused the write; `constraint` narrows it to that one. */
+export function isForeignKeyViolation(error: unknown, constraint?: string): boolean {
+  return violates(error, FOREIGN_KEY_VIOLATION, constraint);
+}
+
+function violates(error: unknown, code: string, constraint?: string) {
   const e = driverError(error);
-  if (!e || !CONSTRAINT_CODES.has(e.code)) return undefined;
-  const name = e.constraint ?? e.constraint_name;
-  return typeof name === "string" ? name : e.code;
+  return e?.code === code && (constraint === undefined || e.constraint === constraint);
 }
 
 function driverError(error: unknown, depth = 0): DriverError | undefined {
   if (!error || typeof error !== "object" || depth > 3) return undefined;
-  if (
-    "code" in error &&
-    typeof error.code === "string" &&
-    /^[0-9A-Z]{5}$/.test(error.code)
-  )
-    return error as DriverError;
+  if ("code" in error && typeof error.code === "string" && /^[0-9A-Z]{5}$/.test(error.code)) {
+    const name =
+      ("constraint_name" in error && error.constraint_name) ||
+      ("constraint" in error && error.constraint);
+    return { code: error.code, constraint: typeof name === "string" ? name : undefined };
+  }
   return "cause" in error ? driverError(error.cause, depth + 1) : undefined;
+}
+
+/** @deprecated Until the threads module throws its own facts. */
+export function violatedConstraint(error: unknown): string | undefined {
+  const e = driverError(error);
+  return e && /^23/.test(e.code) ? (e.constraint ?? e.code) : undefined;
 }

@@ -17,7 +17,7 @@ import {
   type NotFound,
 } from "@/lib/errors";
 import { err, ok, type Result } from "@/lib/result";
-import { findProject } from "@/modules/projects/server";
+import { getProject } from "@/modules/projects/queries";
 import {
   forkThread,
   forkThreadInputSchema,
@@ -51,7 +51,7 @@ export const startThreadAction = action(
     { user },
   ): Promise<Result<Thread, NotFound | Conflict>> => {
     // Another user's project is answered like a missing one: its id reveals nothing.
-    if (input.projectId && !(await findProject(user, input.projectId)))
+    if (input.projectId && !(await getProject(user, input.projectId)))
       return err(notFound("Project", input.projectId));
     const thread = startThread(input, new Date());
     try {

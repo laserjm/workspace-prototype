@@ -4,7 +4,7 @@ import {
   assertIsolation,
   describeIntegration,
 } from "@/test/support/integration";
-import { createProjectAction } from "@/modules/projects/server";
+import { insertProject } from "@/test/factories";
 import { withUsers } from "@/test/support/users";
 import { callAs } from "@/test/support/session";
 import { aConversation, aNewThread } from "@/test/factories/thread";
@@ -34,11 +34,7 @@ async function aConversationOf(user: ReturnType<typeof aUser>) {
 }
 
 async function aProjectOf(user: ReturnType<typeof aUser>) {
-  const project = await callAs(user, createProjectAction, {
-    name: "workspace",
-  });
-  if (!project.ok) throw new Error("the project was not created");
-  return project.value.id;
+  return (await insertProject(user)).id;
 }
 
 // The actions as the browser calls them (sign-in, validation, the write) and the queries,

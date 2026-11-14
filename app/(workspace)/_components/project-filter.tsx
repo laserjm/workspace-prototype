@@ -6,7 +6,18 @@ import { Check, Folder, ListFilter, Search } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { iconButtonClassName } from "@/components/ui/icon-button";
 import { cn } from "@/lib/utils";
-import { projectInitials, type Project } from "@/modules/projects/contracts";
+import type { ProjectListItem } from "@/modules/projects/contracts";
+
+/** Up to two initials for a project badge: "enterprise-platform" → "EP". */
+export function projectInitials(name: string) {
+  return name
+    .split(/[\s/_-]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
+}
 
 // `project` is the project's id; null: "All projects".
 type ProjectItem = { value: string; label: string; project: string | null };
@@ -28,7 +39,7 @@ export function ProjectFilter({
   onChange,
   anchor,
 }: {
-  projects: Project[];
+  projects: ProjectListItem[];
   /** Project ids. */
   selected: string[];
   onChange: (projectIds: string[]) => void;

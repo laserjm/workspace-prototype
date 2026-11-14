@@ -2,10 +2,9 @@
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useAction } from "@/lib/actions/client";
-import { errorMessage } from "@/lib/actions/messages";
-import { createProjectAction } from "@/modules/projects/actions";
-import { PROJECT_NAME_MAX_LENGTH, type Project } from "@/modules/projects/contracts";
+import { PROJECT_NAME_MAX_LENGTH, type ProjectListItem } from "@/modules/projects/contracts";
+import { createProjectAction } from "../actions";
+import { useAction } from "./use-action";
 
 /** Adds a project; a name the user already uses selects that project. */
 export function ProjectForm({
@@ -16,7 +15,7 @@ export function ProjectForm({
   /** Held by the caller, so the name survives closing the dialog. */
   name: string;
   onNameChange: (name: string) => void;
-  onCreated: (project: Project) => void;
+  onCreated: (project: ProjectListItem) => void;
 }) {
   const create = useAction(createProjectAction, {
     onSuccess: (project) => {
@@ -53,10 +52,7 @@ export function ProjectForm({
           className="text-xs text-destructive-foreground"
           role="alert"
         >
-          {errorMessage(create.error, {
-            ProjectNameMissing: "Give the project a name.",
-            Conflict: "A project with this name was just added. Try again.",
-          })}
+          {create.error}
         </p>
       )}
       <Button

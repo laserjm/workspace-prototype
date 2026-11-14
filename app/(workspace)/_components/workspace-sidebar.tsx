@@ -23,7 +23,7 @@ import {
 import { IconButton } from "@/components/ui/icon-button";
 import { cn } from "@/lib/utils";
 import { ProjectFilter } from "./project-filter";
-import { type Project } from "@/modules/projects/contracts";
+import { type ProjectListItem } from "@/modules/projects/contracts";
 import { CustomSnoozeDialog } from "./custom-snooze-dialog";
 import { shelfOf } from "@/modules/threads/placement";
 import { ThreadContextCard } from "./thread-context-card";
@@ -33,7 +33,7 @@ import { type Thread } from "@/modules/threads/contracts";
 type SidebarProps = {
   user: { name: string; email: string };
   threads: Thread[];
-  projects: Project[];
+  projects: ProjectListItem[];
   /** The name the sidebar shows for a thread's project. */
   projectName: (projectId: string | null) => string;
   activeId?: string;

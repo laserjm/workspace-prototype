@@ -16,7 +16,7 @@ import { invitedProvider, pluralLabels } from "@/modules/integrations/contracts"
 import { useIntegrations } from "./use-integrations";
 import { ProjectForm } from "./project-form";
 import { ProjectIcon } from "./project-icon";
-import { type Project } from "@/modules/projects/contracts";
+import { type ProjectListItem } from "@/modules/projects/contracts";
 import { useSkillPreferences } from "./use-skill-preferences";
 import { RecordPanel, RecordPanelToggle } from "./record-panel";
 import { RecordPanelProvider } from "./record-panel-provider";
@@ -50,7 +50,7 @@ export function WorkspaceShell({
   user,
 }: {
   initialThreads: Thread[];
-  initialProjects: Project[];
+  initialProjects: ProjectListItem[];
   models: ModelChoice[];
   user: { name: string; email: string };
 }) {

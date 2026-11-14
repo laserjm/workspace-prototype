@@ -1,6 +1,8 @@
 import { ChartNoAxesCombined, Infinity, Rocket } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { ProjectKind } from "@/modules/projects/contracts";
+
+/** Selects a project's icon. Every project created in the app is a `workspace` project. */
+export type ProjectKind = "rocket" | "chart" | "conventions" | "automation" | "workspace";
 
 const icon = "size-4 shrink-0";
 const letter =

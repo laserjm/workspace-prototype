@@ -7,7 +7,7 @@ import {
   listConnections,
   listProviderChoices,
 } from "@/modules/integrations/server";
-import { listProjects } from "@/modules/projects/server";
+import * as projects from "@/modules/projects";
 import { SkillsProvider } from "./_components/skills-provider";
 import { listSkills } from "@/modules/skills/server";
 import { listThreads } from "@/modules/threads/server";
@@ -28,11 +28,11 @@ async function Workspace() {
   // proxy.ts only saw a cookie; an ended or revoked session lands here.
   const user = await getUser();
   if (!user) redirect("/api/sign-in");
-  const [skills, threads, projects, models, providers, connections] =
+  const [skills, threads, projectList, models, providers, connections] =
     await Promise.all([
       listSkills(),
       listThreads(user),
-      listProjects(user),
+      projects.getProjects(),
       listModelChoices(),
       listProviderChoices(),
       listConnections(user),
@@ -42,7 +42,7 @@ async function Workspace() {
       <SkillsProvider skills={skills}>
         <WorkspaceShell
           initialThreads={threads}
-          initialProjects={projects}
+          initialProjects={projectList}
           models={models}
           // Name and email only: the id stays on the server.
           user={{ name: user.name, email: user.email }}

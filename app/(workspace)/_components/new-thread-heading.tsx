@@ -9,7 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ProjectIcon } from "./project-icon";
-import { type Project } from "@/modules/projects/contracts";
+import { type ProjectListItem } from "@/modules/projects/contracts";
 
 /** "What would you like to know in <project>?", with the project as a picker. */
 export function NewThreadHeading({
@@ -19,7 +19,7 @@ export function NewThreadHeading({
   onAddProject,
 }: {
   projectId: string | null;
-  projects: Project[];
+  projects: ProjectListItem[];
   onProject: (projectId: string | null) => void;
   onAddProject: () => void;
 }) {
