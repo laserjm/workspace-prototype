@@ -87,7 +87,9 @@ where the adapter's answer is shown. Without the client-held state, Option 0 wou
 - `app/(workspace)/actions.ts` answers `T | Refusal` from every action, `Refusal` being
   `{ error: string; field?: string; gone?: true; signIn?: true }`: `field` names the input the
   copy is about (the connect form's URL), `gone` says the thing no longer exists so the browser
-  drops it from its list. `notFound()` and `forbidden()` are not used there.
+  drops it from its list. `notFound()` and `forbidden()` are not used there. The copy is in
+  `app/(workspace)/refusals.ts`, which maps each module's errors exhaustively (ARCHITECTURE.md,
+  "Adapters map every module error").
 - `app/(workspace)/_components/use-action.ts` holds `callAction` and `useAction`: a rejected
   call answers with copy, and `signIn` sends the browser to `/api/sign-in?returnTo=<this page>`
   with a full load. The ESLint disable for `@next/next/no-location-assign-relative-destination`

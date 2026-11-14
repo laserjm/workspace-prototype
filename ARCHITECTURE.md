@@ -5,9 +5,9 @@ Three documents share the project's decisions, and each fact is in one of them:
 - [`docs/CONVENTIONS.md`](docs/CONVENTIONS.md) owns the structure: the layout, a module's files
   and doors, the import rules, how errors travel and how use cases are tested. This file does not
   restate it.
-- [`docs/adr/`](docs/adr/) records every departure from the conventions, with the options and how
-  to reverse it (0004 onwards; 0001 to 0003 predate the conventions and record product
-  decisions).
+- [`docs/adr/`](docs/adr/) records every departure from the conventions, and every reading of a
+  rule they leave open, with the options and how to reverse it (0004 onwards; 0001 to 0003
+  predate the conventions and record product decisions).
 - This file keeps the product's decisions the conventions leave open: the local stack, the schema,
   who owns what, sign-in, what is stored, the AI Gateway, the agent's tools, the providers, the
   record panel, the vault, skills and styling.
@@ -99,13 +99,37 @@ and it writes nothing. `skills` has no `commands.ts` either: its catalogue is fi
 The files beyond the conventions' are ADRs: a `tools.ts` in `agent`, `integrations`, `records`
 and `skills` (ADR 0005); `integrations`' provider SPI and folders (ADR 0006); the rules the
 browser runs too in `contracts.ts` (ADR 0007).
-All UI lives in `app/(workspace)/_components/`, because the workspace is one route group; flat
-`components/` holds none yet, and `components/ui/` is shadcn only. The component roles NAMING.md
-lacks are ADR 0008.
+All UI lives in `app/(workspace)/_components/`, because the workspace is one route group, in a
+folder per noun it renders (ADR 0010): `threads/`, `records/`, `integrations/`, `skills/`,
+`projects/`, `markdown/`, `html-render/` and `providers/<id>/`, with the shell, the sidebar, the
+settings panel and what several folders share at the root. Flat `components/` holds none yet,
+and `components/ui/` is shadcn only. The component roles NAMING.md lacks are ADR 0008.
 **Enforced by.** The conventions' ESLint config (`eslint.config.mjs`, the conventions' copy
-unchanged); review for the direction between modules and for cycles.
+unchanged); `test/boundaries.test.ts` for the rules this app adds to it (`integrations` imports
+no module, `records` only `integrations`), since a project block in the config would replace the
+conventions' `no-restricted-imports` options for the same files instead of adding to them;
+review for the other directions and for cycles.
 **Recorded in.** This entry; `docs/adr/0003-attached-items-and-record-views.md`;
-`docs/adr/0005-agent-tools-are-a-door.md`; `docs/adr/0006-providers-answer-refusals-as-values.md`.
+`docs/adr/0005-agent-tools-are-a-door.md`; `docs/adr/0006-providers-answer-refusals-as-values.md`;
+`docs/adr/0010-workspace-ui-grouped-by-noun.md`.
+
+### Adapters map every module error
+
+**Decision.** A command throws a class from its module's `errors.ts`, and the adapter maps it
+(CONVENTIONS.md, Errors). Each `errors.ts` also lists its classes (`threadErrors`,
+`integrationErrors`, `agentErrors`), each with a literal `name`, and exports their union and a
+guard (`ThreadError`, `isThreadError`); `index.ts` re-exports them. An adapter maps a module's
+errors with a `switch` on `name` that ends in a `never` check (`unmapped`), so a new class fails
+to compile until every adapter has said what it means, and an error no call of that adapter can
+throw is a case too, rethrown or answered as a bug. What is not the module's is rethrown. The
+copy for the actions is `app/(workspace)/refusals.ts` (`connectionRefusal`, `threadRefusal`,
+`signedIn`), outside the `"use server"` file so it can be tested; the thread messages route's
+statuses are `app/api/threads/[id]/messages/thread-error.ts`, and the record routes'
+`record-error.ts` maps the `RecordReadRefusal` kinds with a `Record` over them (ADR 0006).
+**Enforced by.** `tsc` (the `never` checks); `test/errors.test.ts` (every class a module's
+`errors.ts` exports is in its list, named after itself); `app/(workspace)/refusals.test.ts` and
+`thread-error.test.ts` (the copy and status of each error, plain functions without Next).
+**Recorded in.** This entry; `docs/adr/0004-actions-called-from-client-state.md`.
 
 ### Cross-module references are ids
 
@@ -173,8 +197,8 @@ name and email from Keycloak.
   0004).
 
 **Enforced by.** ESLint (the conventions' Rule 1 and Rule 12: a module imports `lib/auth` only in
-its `index.ts`, and a script never does); review (only `lib/auth/` imports `better-auth`). The
-check constraint `users_id_is_keycloak_sub`. Better Auth's startup schema check, which refuses to
+its `index.ts`, and a script never does); `test/boundaries.test.ts` (only `lib/auth/` imports
+`better-auth`). The check constraint `users_id_is_keycloak_sub`. Better Auth's startup schema check, which refuses to
 run when `schema.ts` and its fields disagree.
 **Recorded in.** This entry; `docs/adr/0001-auth-library-for-keycloak-sign-in.md`;
 `docs/adr/0004-actions-called-from-client-state.md`.
@@ -239,7 +263,7 @@ is not part of the page: a record view reads it from
 `GET /api/connections/[connectionId]/records/[type]/[key]` the first time it is shown, into the
 browser's `RecordViewStore` (see "The record panel"). Skill activation, the record panel's width
 and each thread's record panel persist in `localStorage`; the stored skill ids are parsed with
-`storedSkillIds` (`_components/skill-preferences.ts`), a stored panel with `restorePanel`. There
+`storedSkillIds` (`_components/skills/skill-preferences.ts`), a stored panel with `restorePanel`. There
 are no cache tags: every read is per request, and an action returns what it stored, which the
 browser adds to its state.
 **Enforced by.** The `thread_messages_thread_id_user_id_fkey` and `threads_one_placement`
@@ -346,15 +370,15 @@ The `agent` module is the runtime AI:
   `normalizeHtmlRenderTitle`, which the frame runs too; ADR 0007), so the chat UI never imports the
   server side.
 
-The frame that shows an `html_render` page is `_components/html-render-frame.tsx` (with
+The frame that shows an `html_render` page is `_components/html-render/html-render-frame.tsx` (with
 `html-render-document.tsx` and `html-render-dialog.tsx`); `lib/html-render/` keeps only the
 frame's theme and the bootstrap injected into the page. Message text renders as Markdown through
-`_components/markdown.tsx`: GitHub-flavoured, `$$` math, raw HTML shown as text, a user's single
+`_components/markdown/markdown.tsx`: GitHub-flavoured, `$$` math, raw HTML shown as text, a user's single
 newlines kept. `lib/markdown/` holds the plugins, the block splitting that lets a streamed reply
 re-render only its last block, and the pure readers for code blocks, links and tables. Code blocks
-(`_components/code-block.tsx`) are coloured by Shiki, formulas (`_components/math.tsx`) are
+(`_components/markdown/code-block.tsx`) are coloured by Shiki, formulas (`_components/markdown/math.tsx`) are
 typeset by KaTeX as MathML, and a ```` ```mermaid ```` fence is drawn by
-`_components/mermaid-diagram.tsx` with Pele once its block has finished streaming. Each library
+`_components/markdown/mermaid-diagram.tsx` with Pele once its block has finished streaming. Each library
 loads with the first message that needs it, and all three take their colours from the tokens, so
 `globals.css` stays the only stylesheet. Links to GitHub pull requests and issues, GitLab merge
 requests and files show as chips. The instructions point diagrams at Mermaid, math at `$$`, tables
@@ -423,9 +447,9 @@ door for the agent alone is ADR 0005.
 - **Provider tools.** A tool only one provider answers (GitHub's `github_pull_request_diff`, #65)
   is named after the provider and lives in its folder: its reader beside the provider's readers
   (`providers/github/diff.ts`), the tool in `providers/github/tools.ts` (`githubTools`,
-  `server-only`), its schemas in `integrations/contracts.ts` (`githubPullRequestDiffInput` and
-  `githubPullRequestDiffOutput`, browser-safe) and its card in
-  `_components/github-diff-call.tsx` (`GithubPullRequestDiffCall`). `integrations/tools.ts`
+  `server-only`), its schemas in `providers/github/contracts.ts` (`githubPullRequestDiffInput`
+  and `githubPullRequestDiffOutput`, browser-safe, ADR 0011) and its card in
+  `_components/providers/github/diff-call.tsx` (`GithubPullRequestDiffCall`). `integrations/tools.ts`
   gathers them by provider as `integrationTools`, and `integrationToolsFor(user, connections)`
   offers a provider's tools only while one of its connections is allowed, each seeing only those
   (context `{ user?, connectionIds }`, `connectionToolContextSchema`). Each runs through
@@ -494,9 +518,10 @@ server-side (never on `ProviderChoice`) and in the system prompt while one of it
 allowed (`getProviderForPrompt`, `integrations/queries.ts`; `providers.test.ts` caps its length),
 and an optional `tools.ts` for agent tools of its own, with their readers beside it (GitHub's
 `github_pull_request_diff` and `diff.ts`; see "Agent tools live in their module"; the record tools
-are `records`'). A provider's browser-side parts are not in its folder (ADR 0006): its detail and
-tool schemas are in `integrations/contracts.ts`, its views in
-`app/(workspace)/_components/github-*.tsx`. A provider's code is handed a `ProviderAccess` (the
+are `records`'), and `contracts.ts`: its detail and tool schemas, which the browser reads
+(ADR 0011). Its views and chat cards are in `app/(workspace)/_components/providers/<id>/`
+(ADR 0010). Adding a provider is those two folders and a line in each registry: `providers.ts`,
+`tools.ts` if it has tools, and `_components/records/record-views.ts`. A provider's code is handed a `ProviderAccess` (the
 API address and the `Authorization` header value) and never reads a secret, an env var or the
 database. `auth` lists how a user connects: `token` (sent as `Bearer`) or `basic` (username and
 password, or an email and API token, sent as HTTP Basic); `verify` checks a credential and names
@@ -543,12 +568,12 @@ declared type also has a `read(access, key)`, which answers the record's live `R
 the provider's own detail, and a `readForModel` that trims it for the model
 (`recordType(declaration, read, trim)`; see "Agent tools live in their module"). The detail is the
 provider's own (`GithubIssueDetail` or `GithubPullRequestDetail`, zod schemas in
-`integrations/contracts.ts`; there is no generic detail type), and the manifest's
+`providers/github/contracts.ts`; there is no generic detail type), and the manifest's
 `url(baseUrl, type, key)` builds the record's page from the connection's base URL and the key,
 without asking the provider. The declarations, without code (`getProviderChoices` drops the
 readers), reach the browser on `ProviderChoice.records`. The browser's registry is
-`_components/record-views.ts` (`providerViews`), one line per provider: its views
-(`_components/github-views.tsx` for GitHub) map each declared type to `{ view, icon }`, a
+`_components/records/record-views.ts` (`providerViews`), one line per provider: its views
+(`_components/providers/github/views.tsx` for GitHub) map each declared type to `{ view, icon }`, a
 `React.lazy` body-only view (`({ detail }) => …`, drawn with the shared Markdown renderer, which
 checks the detail against its schema) and the type's kind mark, beside the provider's mark, keyed
 on the provider id. The view kind is derived, `viewKindOf(provider, type)` = `github.issue-view`,
@@ -656,7 +681,7 @@ the open thread) around the header and the conversation, `RecordPanelToggle` in 
 open thread (no panel and no button on the new-thread page), and `ThreadPanel` draws its
 `panel` render prop, `RecordPanel` (`record-panel.tsx`), beside the conversation once that is
 here.
-- **State.** `_components/record-panel-state.ts` is pure: per thread, the open views (in the order
+- **State.** `_components/records/record-panel-state.ts` is pure: per thread, the open views (in the order
   they opened, each with the snapshot it was opened from, so a tab draws without fetching), the
   pinned one (none when nothing is pinned), the active one below the tabs (none shows the fixed
   **Attached** tab; never the pinned one), whether the panel is shown and whether the user
@@ -700,17 +725,17 @@ here.
   reconnecting offers Reconnect (Settings → Data sources) and Retry; a removed connection says so,
   with no link, and reads nothing. On a wide screen the panel is resizable (`ResizablePanel`, its
   width in `localStorage`).
-- **View data.** `RecordViewStore` (`_components/record-view-store.ts`) holds each view's record
+- **View data.** `RecordViewStore` (`_components/records/record-view-store.ts`) holds each view's record
   by view id for the page's lifetime: read the first time the view is shown, shared while in
   flight, kept when the view is shown again; refresh (and Retry) reads again, showing the record it
   has meanwhile. Nothing is cached on the server.
 
-**Enforced by.** `_components/record-panel-state.test.ts` (open and focus, nothing twice,
+**Enforced by.** `_components/records/record-panel-state.test.ts` (open and focus, nothing twice,
 `openSent` with and without "rearranged", the neighbour on close and Attached after the last,
 starting open or hidden; Try again leaving the state unchanged, a fork's fresh state and its first
 new question; pin, re-pin replacing the pin, unpin, closing a pinned view, the focus rules with a
 pin; the pin stored, version 1 migrated, a stored state of another version or a corrupt one);
-`_components/record-view-store.test.ts` (one read per view, refresh, a refusal kept until a
+`_components/records/record-view-store.test.ts` (one read per view, refresh, a refusal kept until a
 retry); `records/attached-items.test.ts` (the grouping by question).
 **Recorded in.** This entry; `docs/adr/0003-attached-items-and-record-views.md`.
 
@@ -729,8 +754,10 @@ connection into a `ConnectionAccess` per request, the only form in which a crede
 module. Nothing returns, logs or renders a credential: `ConnectionListItem` has no secret field
 (`connectionColumns`), and the connect form never shows a stored token. Better Auth's `accounts`
 stays the sign-in identity; it holds no integration tokens.
-**Enforced by.** Review: only `lib/db/vault.ts` imports `connectionSecretsTable` (and
-`integrations/commands.test.ts`, which reads the row to check it holds no token); ESLint (the
+**Enforced by.** `test/boundaries.test.ts`: only `integrations/repo.ts` and `commands.ts` (and
+`test/factories.ts` and integrations' tests) import `lib/db/vault.ts`; review: only
+`lib/db/vault.ts` imports `connectionSecretsTable` (and `integrations/commands.test.ts`, which
+reads the row to check it holds no token); ESLint (the
 conventions' Rule 6: no other module imports `integrations/repo.ts`, so none reaches
 `readCredential` or `accessFor`); `lib/db/cipher.test.ts` (round trip, a fresh iv, the wrong
 binding, a changed ciphertext, an older key version); `integrations/commands.test.ts` (the stored
@@ -751,7 +778,7 @@ the settings panel shows them. Adding a skill is adding a folder.
 
 A skill reaches the agent two ways. The one the user picks for a message is in the prompt in
 full, as before. The others the user switched on (`skillIds` with each message, from
-`useSkillPreferences`; the rules are `_components/skill-preferences.ts`) are listed by id, name
+`useSkillPreferences`; the rules are `_components/skills/skill-preferences.ts`) are listed by id, name
 and description only, and the model loads one's instructions with `load_skill`
 (`skills/tools.ts`) when a question fits it. The tool's context is the offered ids, filled by the
 server, so it never loads a skill the user switched off. Its chat card, `SkillLoadCall`, shows

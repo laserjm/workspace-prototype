@@ -128,7 +128,9 @@ app/
   (workspace)/
     page.tsx                    server component: reads every catalogue, renders the shell
     actions.ts                  the server actions the browser calls
-    _components/                all of the workspace's UI
+    refusals.ts                 the copy an action answers a module's error with
+    _components/                all of the workspace's UI, a folder per noun it renders
+      providers/github/         GitHub's record views and its diff card
   api/
     threads/[id]/messages/      GET loads a thread's conversation, POST streams the next answer
     connections/[connectionId]/records/   the attach dialog's search, and one record for its view
@@ -143,7 +145,7 @@ modules/
   projects/                     the user's projects
 components/ui/                  shadcn primitives only
 lib/                            auth, env, the db (schema, migrations, vault), the AI Gateway, Markdown and html_render helpers
-test/                           global setup (workspace_test), factories, recorded GitHub answers
+test/                           global setup (workspace_test), factories, recorded GitHub answers, the app's import boundaries
 ```
 
 What a module's files are and who may import which is in docs/CONVENTIONS.md. Here,

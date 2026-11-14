@@ -67,9 +67,9 @@ adapter maps a few thrown classes) holds for the commands, which keep it.
   (`Provider`, `ProviderRecords`, `RecordType` with `read` and `readForModel`, `VerifyRefusal`,
   `MODEL_LIMITS` and the trimming helpers). Nothing outside integrations imports it.
 - `modules/integrations/providers.ts` and `providers/<id>/` are the provider pattern of ADR 0002.
-  A provider's browser-side parts are not in its folder: its detail and tool schemas are in
-  `contracts.ts` (browser-safe), its views in `app/(workspace)/_components/github-*.tsx`, and
-  `_components/record-views.ts` registers them.
+  A provider's browser-safe schemas are in its folder too (`providers/<id>/contracts.ts`,
+  ADR 0011); its views are in `app/(workspace)/_components/providers/<id>/` (ADR 0010), and
+  `_components/records/record-views.ts` registers them.
 - A refused credential found while reading marks the connection `needs_reconnect`: the record
   queries (`getRecord`, `getRecordForModel`, `getRecordSearchPage`) and `readWithConnection` write
   that one column through `repo.ts` (`markNeedsReconnect`). A read is what finds out, so the read
