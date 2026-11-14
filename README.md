@@ -8,9 +8,9 @@ Use Node.js 20.9 or newer, pnpm and Docker.
 
 ```sh
 pnpm install
-cp .env.example .env.local   # then fill in AI_GATEWAY_API_KEY and BETTER_AUTH_SECRET
+cp .env.example .env.local   # then fill in AI_GATEWAY_API_KEY, BETTER_AUTH_SECRET and INTEGRATION_KEYS
 pnpm stack:up                # Postgres and Keycloak, waits until both are healthy
-pnpm db:migrate              # applies drizzle/ to the workspace database
+pnpm db:migrate              # applies lib/db/migrations/ to the workspace database
 pnpm dev
 ```
 
@@ -48,26 +48,30 @@ pnpm stack:reset    # stop and delete the volume; the next start re-creates both
 
 ### Database
 
-The schema is code-first with Drizzle: tables live in `src/lib/db/schema.ts`. After a change,
+The schema is code-first with Drizzle: tables live in `lib/db/schema.ts`. After a change,
 generate the migration and apply it:
 
 ```sh
-pnpm db:generate --name create-threads   # writes drizzle/NNNN_create-threads.sql
+pnpm db:generate --name create-threads   # writes lib/db/migrations/NNNN_create-threads.sql
 pnpm db:migrate
 pnpm db:studio                           # browse the data
 ```
 
-Never edit a generated migration; CI fails when `schema.ts` and `drizzle/` disagree.
+Never edit a generated migration; CI fails when `schema.ts` and `lib/db/migrations/` disagree.
 
 ## Checks and production
 
 ```sh
-pnpm lint
-pnpm typecheck
-pnpm test
+pnpm lint          # ESLint, then the design tokens (scripts/check-styles.mjs)
+pnpm typecheck     # route types, then tsc
+pnpm test          # needs the stack (pnpm stack:up); creates and migrates workspace_test
 pnpm build
 pnpm start
 ```
+
+The tests run against their own database, `workspace_test`, on the compose Postgres:
+`test/global-setup.ts` creates it, migrates it and empties it before every run, and refuses any
+database whose name does not end in `_test`. Start the stack with `pnpm stack:up` first.
 
 ## Workspace screen
 
@@ -113,16 +117,18 @@ On desktop, drag the record panel’s left edge to resize it. The width is remem
 
 ## Project structure
 
-[ARCHITECTURE.md](ARCHITECTURE.md) records the structural decisions and what enforces each.
-Paths below are relative to `src/`, which `@/` points to.
+How the code is organised (layout, modules, imports, errors, tests) is
+[docs/CONVENTIONS.md](docs/CONVENTIONS.md); the project's departures from it are in
+[docs/adr/](docs/adr/), and the product's own decisions in [ARCHITECTURE.md](ARCHITECTURE.md).
+Paths below are relative to the repository root, which `@/` points to.
 
 ```
 app/
   layout.tsx                    root layout, fonts, metadata, globals.css
   (workspace)/
     page.tsx                    server component: reads every catalogue, renders the shell
-    layout.tsx, workspace.css   the workspace styles
-    _components/                shell, sidebar, settings and new-thread heading (this route only)
+    actions.ts                  the server actions the browser calls
+    _components/                all of the workspace's UI
   api/
     threads/[id]/messages/      GET loads a thread's conversation, POST streams the next answer
     connections/[connectionId]/records/   the attach dialog's search, and one record for its view
@@ -130,27 +136,19 @@ app/
     auth/[...all]/              Better Auth's endpoints (the Keycloak callback)
 modules/
   agent/                        the runtime AI: models, instructions, tools, the agent loop
-  threads/                      conversations: settle, snooze, wake, fork, the chat UI
-  integrations/                 providers (one folder each), the user's connections, the vault
-  records/                      attaching records to a question, the attach dialog, the record panel, search_records
-  skills/                       skill catalogue (catalog/<id>/SKILL.md), picker, settings, activation
-  projects/                     project list, add-project form, sidebar filter
-components/ui/                  shadcn primitives, the html_render frame, other feature-agnostic UI
-lib/                            `cn`, the html_render helpers shared by server and browser
-tests/                          test factories and support
+  threads/                      conversations: settle, snooze, wake, fork, answering one
+  integrations/                 providers (one folder each), the user's connections
+  records/                      attached items, the allowed connections, search_records and read_record
+  skills/                       skill catalogue (catalog/<id>/SKILL.md)
+  projects/                     the user's projects
+components/ui/                  shadcn primitives only
+lib/                            auth, env, the db (schema, migrations, vault), the AI Gateway, Markdown and html_render helpers
+test/                           global setup (workspace_test), factories, recorded GitHub answers
 ```
 
-A module is reached from outside only through `index.ts` (browser-safe) or `server.ts`
-(server-only); ESLint refuses any deeper import. Inside, `contracts.ts` holds types and input
-schemas, `queries.ts` the reads, `actions.ts` the server actions and `components/` the browser
-UI. `threads/answer.ts` is the work behind `POST /api/threads/[id]/messages`: it hands the
-conversation to `runAgent` (`agent/run.ts`) and stores what comes back. See "Module shape" in ARCHITECTURE.md.
-
-```sh
-pnpm lint          # ESLint, design tokens (scripts/check-styles.mjs), server actions (scripts/check-actions.mjs)
-pnpm typecheck     # route types, then tsc
-pnpm test          # unit tests, plus integration tests when the stack runs (pnpm stack:up)
-```
+What a module's files are and who may import which is in docs/CONVENTIONS.md. Here,
+`threads.answerThread` is the work behind `POST /api/threads/[id]/messages`: it hands the
+conversation to `runAgent` (`modules/agent/commands.ts`) and stores what comes back.
 
 Add shadcn components with:
 

@@ -37,7 +37,7 @@ through; the routes and each tool's `execute` catch it and turn it back into dat
 
 - The provider SPI (`provider.ts`) types a provider's answers as `Answer<T, E>` (`{ ok, value }`
   or `{ ok, error }`), local to the module; `lib/result.ts` goes.
-- `searchRecords`, `readRecord` and `readRecordForModel` (queries) answer an `Answer` with a
+- `getRecordSearchPage`, `getRecord` and `getRecordForModel` (queries) answer an `Answer` with a
   `RecordError`/`RecordReadRefusal`, which the record routes map to a status with
   `{ error, refusal }` and the record tools pass to the model.
 - What is ours to refuse throws classes from `errors.ts`, as the conventions say: connecting to an
@@ -70,10 +70,15 @@ adapter maps a few thrown classes) holds for the commands, which keep it.
   A provider's browser-side parts are not in its folder: its detail and tool schemas are in
   `contracts.ts` (browser-safe), its views in `app/(workspace)/_components/github-*.tsx`, and
   `_components/record-views.ts` registers them.
+- A refused credential found while reading marks the connection `needs_reconnect`: the record
+  queries (`getRecord`, `getRecordForModel`, `getRecordSearchPage`) and `readWithConnection` write
+  that one column through `repo.ts` (`markNeedsReconnect`). A read is what finds out, so the read
+  records it; that is the one write in `queries.ts`.
 - The record routes answer a refusal as `{ error, refusal }`: `error` is the copy, `refusal` the
   `RecordReadRefusal` the panel draws from.
 - Departs from CONVENTIONS.md, Deliberately dropped ("`Result` types"), inside the provider SPI and
-  the record reads, and from Layout (three extra files in one module).
+  the record reads; from Layout (three extra files in one module); and from `queries.ts` being
+  reads only (the reconnect mark).
 - Enforced by review: nothing outside `modules/integrations/` imports `provider.ts`.
 
 ## Reversing this decision

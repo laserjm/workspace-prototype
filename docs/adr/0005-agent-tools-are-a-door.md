@@ -54,8 +54,9 @@ avoid. Without that, Option 0 would be the simpler rule.
 ## Consequences
 
 - `modules/{records,integrations,skills}/tools.ts` export their tools; `modules/agent/tools.ts`
-  imports them and nothing else imports a `tools.ts`. Integrations' `tools.ts` also exports
-  `connectionToolContextSchema`, which the record tools share.
+  imports them and nothing else imports a `tools.ts`. The tool context they share is
+  `connectionToolContextSchema` in integrations' `contracts.ts`; a provider tool reads through
+  `readWithConnection` in its `repo.ts`.
 - Departs from CONVENTIONS.md, Rule 6 (the list of doors): `tools.ts` is a door for the agent.
 - A tool name is stored in conversations, so it is never renamed (`modules/agent/tools.test.ts`
   lists them).

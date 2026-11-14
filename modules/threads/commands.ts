@@ -70,7 +70,7 @@ export async function forkThread(requester: User, input: ForkThreadInput): Promi
   const thread = await getThread(requester, input.fromThreadId);
   if (!thread) throw new ThreadNotFound(input.fromThreadId);
   const point = forkPoint(
-    await getThreadMessages(requester, thread.id),
+    (await getThreadMessages(requester, thread.id)) ?? [],
     input.throughMessageId,
   );
   if (!point) throw new ResponseNotFound(input.throughMessageId);
@@ -155,7 +155,7 @@ export async function answerThread(
 ): Promise<AgentRun> {
   const thread = await getThread(requester, threadId);
   if (!thread) throw new ThreadNotFound(threadId);
-  const stored = await getThreadMessages(requester, thread.id);
+  const stored = (await getThreadMessages(requester, thread.id)) ?? [];
   // A new question may attach only the requester's connections. One the thread already holds,
   // sent again by Try again, is answered: a connection removed since is skipped by the agent.
   const isNew = !stored.some((storedMessage) => storedMessage.id === message.id);

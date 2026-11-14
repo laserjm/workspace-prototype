@@ -33,7 +33,9 @@ function thrownResponse(error: unknown): Response {
 export async function GET(_req: Request, ctx: RouteContext<"/api/threads/[id]/messages">) {
   const { id } = await ctx.params;
   try {
-    return Response.json(await threads.getThreadMessages(id), { headers: noStore });
+    const messages = await threads.getThreadMessages(id);
+    if (!messages) return errorResponse(404, "Thread not found.");
+    return Response.json(messages, { headers: noStore });
   } catch (error) {
     return thrownResponse(error);
   }

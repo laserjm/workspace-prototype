@@ -125,11 +125,11 @@ describe("getThreadMessages", () => {
     const ben = await insertUser();
     const thread = await insertThread(ana);
     await insertMessages(ana, thread, aConversation);
-    expect(await getThreadMessages(ben, thread.id)).toEqual([]);
+    expect(await getThreadMessages(ben, thread.id)).toBeNull();
   });
 
   it("reads nothing for an id that is not a uuid", async () => {
     const ana = await insertUser();
-    expect(await getThreadMessages(ana, "thread-1")).toEqual([]);
+    expect(await getThreadMessages(ana, "thread-1")).toBeNull();
   });
 });

@@ -80,7 +80,7 @@ export type StartThreadInput = z.infer<typeof startThreadInput>;
 
 /**
  * The thread's part of the POST body of /api/threads/[id]/messages: its latest message, which the
- * AI SDK chat transport sends (`prepareSendMessagesRequest` in `ThreadChat`); the URL names the
+ * AI SDK chat transport sends (`prepareSendMessagesRequest` in `useThreadChat`); the URL names the
  * thread and the agent's `chatOptionsInput` reads the rest of the body. The server holds the rest
  * of the conversation, so a browser cannot rewrite it. The message is validated with the
  * conversation against the agent's tools.

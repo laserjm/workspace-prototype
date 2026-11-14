@@ -34,8 +34,3 @@ function driverError(error: unknown, depth = 0): DriverError | undefined {
   return "cause" in error ? driverError(error.cause, depth + 1) : undefined;
 }
 
-/** @deprecated Until the threads module throws its own facts. */
-export function violatedConstraint(error: unknown): string | undefined {
-  const e = driverError(error);
-  return e && /^23/.test(e.code) ? (e.constraint ?? e.code) : undefined;
-}

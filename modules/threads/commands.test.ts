@@ -193,7 +193,7 @@ describe("forkThread", () => {
       forkThread(ben, { fromThreadId: thread.id, id, throughMessageId: "a1" }),
     ).rejects.toThrow(ThreadNotFound);
     expect(await getThreads(ben)).toEqual([]);
-    expect(await getThreadMessages(ben, id)).toEqual([]);
+    expect(await getThreadMessages(ben, id)).toBeNull();
     expect(await getThreads(ana)).toHaveLength(1);
     expect(await getThreadMessages(ana, thread.id)).toEqual(aConversation);
   });
@@ -369,7 +369,7 @@ describe("answerThread", () => {
     await vi.waitFor(async () =>
       expect(await getThreadMessages(requester, threadId)).toHaveLength(length),
     );
-    return getThreadMessages(requester, threadId);
+    return (await getThreadMessages(requester, threadId)) ?? [];
   }
 
   it("asks the agent with the browser's options and the stored conversation", async () => {
@@ -483,7 +483,7 @@ describe("answerThread", () => {
     const model = replying();
     await expect(answer(ben, thread.id, ask("u3"), { model })).rejects.toThrow(ThreadNotFound);
     expect(model.doStreamCalls).toEqual([]);
-    expect(await getThreadMessages(ben, thread.id)).toEqual([]);
+    expect(await getThreadMessages(ben, thread.id)).toBeNull();
     expect(await getThreadMessages(ana, thread.id)).toEqual(aConversation);
     expect(await getThread(ana, thread.id)).toEqual(before);
   });
@@ -608,7 +608,7 @@ describe("saveConversation", () => {
     const thread = await aConversationOf(ana);
     await expect(saveConversation(ben, thread.id, aConversation.slice(0, 2))).rejects.toThrow();
     expect(await getThreadMessages(ana, thread.id)).toEqual(aConversation);
-    expect(await getThreadMessages(ben, thread.id)).toEqual([]);
+    expect(await getThreadMessages(ben, thread.id)).toBeNull();
   });
 
   it("refuses a thread id that is not a uuid", async () => {

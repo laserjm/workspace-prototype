@@ -58,21 +58,22 @@ export async function getThread(requester: User, id: string): Promise<ThreadList
 }
 
 /**
- * The conversation of one of the requester's threads, in order. Empty for a thread they do not
- * have, as for one without messages, and for an id that is not a thread's.
+ * The conversation of one of the requester's threads, in order; null for a missing, foreign or
+ * malformed id, so the route answers each the same.
  */
 export async function getThreadMessages(
   requester: User,
   threadId: string,
-): Promise<WorkspaceUIMessage[]> {
-  if (!z.uuid().safeParse(threadId).success) return [];
+): Promise<WorkspaceUIMessage[] | null> {
+  const thread = await getThread(requester, threadId);
+  if (!thread) return null;
   const rows = await db()
     .select()
     .from(threadMessagesTable)
     .where(
       and(
         eq(threadMessagesTable.userId, requester.id),
-        eq(threadMessagesTable.threadId, threadId),
+        eq(threadMessagesTable.threadId, thread.id),
       ),
     )
     .orderBy(asc(threadMessagesTable.position));
