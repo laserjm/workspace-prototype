@@ -4,11 +4,11 @@ import "server-only";
 import { sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
+import { databaseEnv } from "../env";
 import * as schema from "./schema";
 
 function connect() {
-  const url = process.env.DATABASE_URL;
-  if (!url) throw new Error("DATABASE_URL is not set");
+  const url = databaseEnv().DATABASE_URL;
   // A direct connection to the compose Postgres, so prepared statements are fine. Behind a
   // transaction pooler (PgBouncer, Supavisor) pass `prepare: false`.
   return drizzle(postgres(url), { schema });

@@ -1,3 +1,4 @@
+import "server-only";
 /**
  * Where to send the browser after sign-in: `value` resolved against the app's origin, kept only
  * when it stays on that origin, so `/api/sign-in?returnTo=` cannot become an open redirect

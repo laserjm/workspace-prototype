@@ -2,7 +2,7 @@
 // routes the app links to. Each answers with Better Auth's Set-Cookie headers.
 import "server-only";
 import { z } from "zod";
-import { env } from "@/lib/env";
+import { authEnv } from "@/lib/env";
 import { auth, KEYCLOAK_PROVIDER_ID } from "./auth";
 import { sameOriginPath } from "./return-path";
 
@@ -28,7 +28,7 @@ function redirectWithCookies(location: string, from: Response, status = 302) {
 export async function startSignIn(request: Request) {
   const returnTo = sameOriginPath(
     new URL(request.url).searchParams.get("returnTo"),
-    env.BETTER_AUTH_URL,
+    authEnv().BETTER_AUTH_URL,
   );
   const response = await auth().api.signInSocial({
     body: {
@@ -62,7 +62,7 @@ export async function signOut(request: Request) {
   );
   // No Keycloak session to end (already signed out): back to the start page.
   return redirectWithCookies(
-    url ?? new URL("/", env.BETTER_AUTH_URL).toString(),
+    url ?? new URL("/", authEnv().BETTER_AUTH_URL).toString(),
     response,
     303,
   );

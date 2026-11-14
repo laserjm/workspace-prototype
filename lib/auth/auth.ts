@@ -11,11 +11,12 @@ import {
   usersTable,
   verificationsTable,
 } from "@/lib/db/schema";
-import { env } from "@/lib/env";
+import { authEnv } from "@/lib/env";
 
 export const KEYCLOAK_PROVIDER_ID = "keycloak";
 
 function createAuth() {
+  const env = authEnv();
   return betterAuth({
     baseURL: env.BETTER_AUTH_URL,
     secret: env.BETTER_AUTH_SECRET,

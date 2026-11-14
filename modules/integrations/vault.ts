@@ -15,7 +15,7 @@ let keyring: Keyring | undefined;
  * import, and modules that only import this file (through records.ts) must load without them.
  */
 async function keys() {
-  keyring ??= parseKeyring((await import("@/lib/env")).env.INTEGRATION_KEYS);
+  keyring ??= parseKeyring((await import("@/lib/env")).vaultEnv().INTEGRATION_KEYS);
   return keyring;
 }
 

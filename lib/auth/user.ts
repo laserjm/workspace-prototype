@@ -1,5 +1,6 @@
 // The signed-in user as the app passes them around: the `User` type and the `UserId` brand, so
 // any layer (and any test) can name them. Reading the session is `getUser()` in ./session.ts.
+import "server-only";
 import { z } from "zod";
 
 const userIdSchema = z.string().min(1).brand<"UserId">();
