@@ -10,6 +10,8 @@
   `conventions check`, `lib/safe-action.ts` and `getRequester()` below no longer exist. The
   decision stands; the sign-in as built is `ARCHITECTURE.md`, "Sign-in: Better Auth against
   Keycloak".
+  2026-11-14: the file paths and names below predate the adoption of the conventions
+  (`docs/CONVENTIONS.md`) too; see ARCHITECTURE.md for where things are now.
 
 ## Context
 
