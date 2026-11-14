@@ -12,34 +12,23 @@ import {
 import { IconButton } from "@/components/ui/icon-button";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import {
-  invitedProvider,
-  pluralLabels,
-  useIntegrations,
-} from "@/modules/integrations";
-import { ProjectForm, ProjectIcon, type Project } from "@/modules/projects";
-import { useSkillPreferences } from "@/modules/skills";
-import {
-  RecordPanel,
-  RecordPanelProvider,
-  RecordPanelToggle,
-  type AttachedConnection,
-} from "@/modules/records";
-import {
-  placementOf,
-  PromptForm,
-  ThreadConversation,
-  useThreads,
-  type ConversationControls,
-  type FirstQuestion,
-  type Question,
-  type ForkTarget,
-  type SnoozeTimeInPast,
-  type Thread,
-  type ThreadPlacement,
-  type ThreadStillWorking,
-} from "@/modules/threads";
-import type { ChatOptions, ModelChoice } from "@/modules/agent";
+import { invitedProvider, pluralLabels } from "@/modules/integrations/contracts";
+import { useIntegrations } from "./use-integrations";
+import { ProjectForm } from "./project-form";
+import { ProjectIcon } from "./project-icon";
+import { type Project } from "@/modules/projects/contracts";
+import { useSkillPreferences } from "./use-skill-preferences";
+import { RecordPanel, RecordPanelToggle } from "./record-panel";
+import { RecordPanelProvider } from "./record-panel-provider";
+import { type AttachedConnection } from "@/modules/records/contracts";
+import { placementOf } from "@/modules/threads/placement";
+import { PromptForm } from "./prompt-form";
+import { ThreadConversation } from "./thread-conversation";
+import { useThreads } from "./use-threads";
+import { type ConversationControls, type FirstQuestion, type Question } from "./use-thread-chat";
+import { type ForkTarget } from "./thread-messages";
+import { type SnoozeTimeInPast, type Thread, type ThreadPlacement, type ThreadStillWorking } from "@/modules/threads/contracts";
+import type { ChatOptions, ModelChoice } from "@/modules/agent/contracts";
 import { NewThreadHeading } from "./new-thread-heading";
 import { WorkspaceSettings, type SettingsSection } from "./workspace-settings";
 import { WorkspaceSidebar } from "./workspace-sidebar";

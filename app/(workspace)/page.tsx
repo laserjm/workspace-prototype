@@ -2,13 +2,13 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { getUser } from "@/lib/auth/session";
 import { listModelChoices } from "@/modules/agent/server";
-import { IntegrationsProvider } from "@/modules/integrations";
+import { IntegrationsProvider } from "./_components/integrations-provider";
 import {
   listConnections,
   listProviderChoices,
 } from "@/modules/integrations/server";
 import { listProjects } from "@/modules/projects/server";
-import { SkillsProvider } from "@/modules/skills";
+import { SkillsProvider } from "./_components/skills-provider";
 import { listSkills } from "@/modules/skills/server";
 import { listThreads } from "@/modules/threads/server";
 import { WorkspaceShell } from "./_components/workspace-shell";

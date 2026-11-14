@@ -8,7 +8,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ProjectIcon, type Project } from "@/modules/projects";
+import { ProjectIcon } from "./project-icon";
+import { type Project } from "@/modules/projects/contracts";
 
 /** "What would you like to know in <project>?", with the project as a picker. */
 export function NewThreadHeading({

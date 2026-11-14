@@ -37,10 +37,3 @@ export type {
   GithubPullRequestDiffInput,
   GithubPullRequestDiffOutput,
 } from "./providers/github/diff";
-export { GithubPullRequestDiffCall } from "./providers/github/views/diff-call";
-export { IntegrationsProvider } from "./components/integrations-provider";
-export { ProviderMark, RecordKindMark, RecordStateBadge } from "./components/record-marks";
-export { recordErrorWords } from "./components/record-error-words";
-export { RecordViewBody } from "./components/record-view-body";
-export { SourcesSettingsPanel } from "./components/sources-settings-panel";
-export { useIntegrations } from "./components/use-integrations";

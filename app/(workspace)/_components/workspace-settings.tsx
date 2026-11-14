@@ -8,8 +8,8 @@ import {
   type ThemePreference,
 } from "@/lib/theme/theme";
 import { useThemePreference } from "@/lib/theme/use-theme-preference";
-import { SourcesSettingsPanel } from "@/modules/integrations";
-import { SkillSettingsPanel } from "@/modules/skills";
+import { SourcesSettingsPanel } from "./sources-settings-panel";
+import { SkillSettingsPanel } from "./skill-settings-panel";
 
 export type SettingsSection = "general" | "skills" | "sources";
 

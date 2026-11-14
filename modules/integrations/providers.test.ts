@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 import { RECORD_TONES } from "./contracts";
 import { providers } from "./providers";
-import { providerViews } from "./record-views";
+import { providerViews } from "@/app/(workspace)/_components/record-views";
 
 describe("providers", () => {
   it("have unique ids", () => {
