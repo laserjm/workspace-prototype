@@ -1,8 +1,8 @@
-/* eslint-disable local/require-server-only -- browser-safe like the module's contracts.ts: a provider's browser door (docs/adr/0011) */
 // What GitHub's record views and its tool's chat part read: the detail each view parses and the
 // schemas of `github_pull_request_diff`. Browser-safe: zod, types and the module's own
-// contracts.ts, nothing else (test/boundaries.test.ts). The server's readers in this folder
-// build these shapes; the views in app/(workspace)/_components/providers/github/ draw them.
+// contracts.ts, nothing else (CONVENTIONS.md, Rule 6; lint). The server's readers in this
+// folder build these shapes; the views in app/(workspace)/_components/providers/github/ draw
+// them.
 import { z } from "zod";
 import { recordReadRefusalSchema, recordSummarySchema } from "../../contracts";
 

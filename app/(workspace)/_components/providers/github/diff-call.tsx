@@ -5,7 +5,6 @@ import { FileDiff } from "lucide-react";
 import type { RecordSummary } from "@/modules/integrations/contracts";
 import { recordErrorWords } from "../../records/record-error-words";
 import { useIntegrations } from "../../integrations/use-integrations";
-// eslint-disable-next-line no-restricted-imports -- a provider's browser door (docs/adr/0011)
 import type { GithubPullRequestDiffInput, GithubPullRequestDiffOutput } from "@/modules/integrations/providers/github/contracts";
 import { counted } from "./view-parts";
 

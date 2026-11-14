@@ -4,7 +4,6 @@
 // open, close) belongs to the record panel. Bodies and comments are Markdown, drawn by the shared
 // renderer, which shows raw HTML as text.
 import type { RecordViewProps } from "../../records/record-views";
-// eslint-disable-next-line no-restricted-imports -- a provider's browser door (docs/adr/0011)
 import { githubIssueDetailSchema } from "@/modules/integrations/providers/github/contracts";
 import { GithubCommentList, GithubDescription, GithubOpenedRow } from "./view-parts";
 

@@ -5,7 +5,6 @@
 import type { ReactNode } from "react";
 import { Markdown } from "../../markdown/markdown";
 import { cn } from "@/lib/utils";
-// eslint-disable-next-line no-restricted-imports -- a provider's browser door (docs/adr/0011)
 import type { GithubIssueDetail } from "@/modules/integrations/providers/github/contracts";
 
 const day = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
