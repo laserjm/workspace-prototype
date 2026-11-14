@@ -11,7 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { customSnoozeTime, snoozeRefusal } from "@/modules/threads/contracts";
-import type { Thread } from "@/modules/threads/contracts";
+import type { ThreadListItem } from "@/modules/threads/contracts";
 import { toLocalDateTime } from "./time-format";
 
 export function CustomSnoozeDialog({
@@ -20,7 +20,7 @@ export function CustomSnoozeDialog({
   onClose,
   onSnooze,
 }: {
-  thread: Thread;
+  thread: ThreadListItem;
   /** A response is in flight, which a snooze waits for. */
   working: boolean;
   onClose: () => void;

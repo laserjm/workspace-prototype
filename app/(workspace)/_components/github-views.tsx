@@ -13,13 +13,13 @@ function GithubMark({ className }: { className?: string }) {
   );
 }
 
-const IssueView = lazy(() => import("./github-issue-view"));
-const PullRequestView = lazy(() => import("./github-pull-request-view"));
+const GithubIssueView = lazy(() => import("./github-issue-view"));
+const GithubPullRequestView = lazy(() => import("./github-pull-request-view"));
 
 export const githubViews: ProviderViews = {
   icon: GithubMark,
   types: {
-    issue: { view: IssueView, icon: CircleDot },
-    "pull-request": { view: PullRequestView, icon: GitPullRequest },
+    issue: { view: GithubIssueView, icon: CircleDot },
+    "pull-request": { view: GithubPullRequestView, icon: GitPullRequest },
   },
 };

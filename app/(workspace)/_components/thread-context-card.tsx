@@ -2,7 +2,7 @@
 
 import { Clock, Folder, MessageSquare, Paperclip } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { type Thread } from "@/modules/threads/contracts";
+import { type ThreadListItem } from "@/modules/threads/contracts";
 import { shelfOf } from "@/modules/threads/contracts";
 import { formatWakeTime } from "./time-format";
 
@@ -12,7 +12,7 @@ export function ThreadContextCard({
   projectName,
   className,
 }: {
-  thread: Thread;
+  thread: ThreadListItem;
   projectName: string;
   className?: string;
 }) {

@@ -4,9 +4,9 @@ import { useLayoutEffect, useRef, type ReactNode } from "react";
 import { GitFork } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ModelChoice, WorkspaceUIMessage } from "@/modules/agent/contracts";
-import { type Thread } from "@/modules/threads/contracts";
+import { type ThreadListItem } from "@/modules/threads/contracts";
 import { shelfOf } from "@/modules/threads/contracts";
-import { ThreadMessages, type ForkTarget } from "./thread-messages";
+import { ThreadMessageList, type ForkTarget } from "./thread-message-list";
 import { formatWakeTime } from "./time-format";
 import { useStoredConversation } from "./use-stored-conversation";
 import {
@@ -25,7 +25,7 @@ const conversationLane =
   "mx-auto w-[min(var(--workspace-composer-width),calc(100%-4rem))] max-desktop:w-[calc(100%-3rem)] max-md:w-[calc(100%-1.75rem)]";
 
 type ThreadConversationProps = {
-  thread: Thread;
+  thread: ThreadListItem;
   models: ModelChoice[];
   /** The skills switched on in this browser, which a retry passes on. */
   enabledSkills: string[];
@@ -48,7 +48,7 @@ type ThreadConversationProps = {
  * its conversation is here, the record panel beside it.
  * It opens with the conversation the database holds; key it by the thread's id.
  */
-export function ThreadConversation(props: ThreadConversationProps) {
+export function ThreadPanel(props: ThreadConversationProps) {
   const { conversation, reload } = useStoredConversation(
     props.thread.id,
     Boolean(props.firstQuestion),
@@ -62,7 +62,7 @@ export function ThreadConversation(props: ThreadConversationProps) {
       {...props}
       composer={props.composer(LOADING_CONTROLS)}
       list={(lane) => (
-        <ThreadMessages
+        <ThreadMessageList
           {...lane}
           messages={[]}
           inFlight={false}
@@ -89,7 +89,7 @@ function LiveConversation({
         {...props}
         composer={props.composer(chat.controls)}
         list={(lane) => (
-          <ThreadMessages
+          <ThreadMessageList
             {...lane}
             messages={chat.messages}
             inFlight={chat.busy}
@@ -121,7 +121,7 @@ function ConversationLayout({
   onRestore,
   onOpenThread,
 }: {
-  thread: Thread;
+  thread: ThreadListItem;
   composer: ReactNode;
   list: (lane: ListLane) => ReactNode;
   onRestore: () => void;

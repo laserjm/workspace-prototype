@@ -4,7 +4,7 @@ import "server-only";
 import type { UserId } from "@/lib/auth";
 import type { threadMessagesTable, threadsTable } from "@/lib/db/schema";
 import type { ModelProvider, WorkspaceUIMessage } from "@/modules/agent/contracts";
-import type { ConversationCounts, Thread, ThreadPlacement } from "./contracts";
+import type { ConversationCounts, ThreadListItem, ThreadPlacement } from "./contracts";
 
 type ThreadRow = typeof threadsTable.$inferSelect;
 type NewThreadRow = typeof threadsTable.$inferInsert;
@@ -15,7 +15,7 @@ type NewMessageRow = typeof threadMessagesTable.$inferInsert;
  * The thread as stored, with the counts its messages give (`threadColumns`, `queries.ts`); a due
  * snooze still reads as snoozed here (`wakeIfDue`).
  */
-export function toThread(row: ThreadRow & ConversationCounts): Thread {
+export function toThread(row: ThreadRow & ConversationCounts): ThreadListItem {
   return {
     id: row.id,
     projectId: row.projectId,
@@ -47,7 +47,7 @@ function placementOfRow(row: ThreadRow): ThreadPlacement {
 }
 
 /** The columns that change as a thread is used. */
-export function toThreadChanges(thread: Thread) {
+export function toThreadChanges(thread: ThreadListItem) {
   return {
     provider: thread.provider,
     settledAt: thread.settledAt ? new Date(thread.settledAt) : null,
@@ -56,7 +56,7 @@ export function toThreadChanges(thread: Thread) {
   } satisfies Partial<NewThreadRow>;
 }
 
-export function toThreadRow(userId: UserId, thread: Thread): NewThreadRow {
+export function toThreadRow(userId: UserId, thread: ThreadListItem): NewThreadRow {
   return {
     id: thread.id,
     userId,

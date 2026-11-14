@@ -20,7 +20,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ProjectIcon } from "./project-icon";
-import type { Thread } from "@/modules/threads/contracts";
+import type { ThreadListItem } from "@/modules/threads/contracts";
 import { shelfOf, snoozePresets } from "@/modules/threads/contracts";
 import { ProviderIcon } from "./provider-icon";
 import { ThreadContextCard } from "./thread-context-card";
@@ -49,7 +49,7 @@ export function ThreadRow({
   onCustomSnooze,
   onContext,
 }: {
-  thread: Thread;
+  thread: ThreadListItem;
   /** The thread's project, or "No project". */
   projectName: string;
   active: boolean;

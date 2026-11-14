@@ -6,7 +6,7 @@ import type { User } from "@/lib/auth";
 import { db } from "@/lib/db/client";
 import { threadMessagesTable, threadsTable } from "@/lib/db/schema";
 import type { WorkspaceUIMessage } from "@/modules/agent/contracts";
-import { wakeIfDue, type Thread } from "./contracts";
+import { wakeIfDue, type ThreadListItem } from "./contracts";
 import { toMessage, toThread } from "./mappers";
 
 const questions = sql`${threadMessagesTable.userId} = ${threadsTable.userId}
@@ -33,7 +33,7 @@ const threadColumns = {
 };
 
 /** The requester's threads, newest first, as they read now: a due snooze has woken. */
-export async function getThreads(requester: User): Promise<Thread[]> {
+export async function getThreads(requester: User): Promise<ThreadListItem[]> {
   const now = new Date();
   const rows = await db()
     .select(threadColumns)
@@ -47,7 +47,7 @@ export async function getThreads(requester: User): Promise<Thread[]> {
  * One of the requester's threads as stored; null for a missing, foreign or malformed id. A due
  * snooze still reads as snoozed here; a write applies `wakeIfDue` with its own clock.
  */
-export async function getThread(requester: User, id: string): Promise<Thread | null> {
+export async function getThread(requester: User, id: string): Promise<ThreadListItem | null> {
   const threadId = z.uuid().safeParse(id);
   if (!threadId.success) return null;
   const [row] = await db()

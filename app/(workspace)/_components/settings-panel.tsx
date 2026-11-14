@@ -30,7 +30,7 @@ export const settingsHeadingClassName =
 export const settingsNoteClassName =
   "text-2xs leading-relaxed text-muted-foreground";
 
-export function WorkspaceSettings({
+export function SettingsPanel({
   section,
   onSection,
   enabledSkills,

@@ -75,7 +75,7 @@ async function recordsConnection(requester: User, connectionId: string) {
  * connection's base URL and the key, so a refusal names it too; a key the provider cannot parse
  * is `not_found`. A refusal is a value (docs/adr/0006).
  */
-export async function readRecord(
+export async function getRecord(
   requester: User,
   connectionId: string,
   type: string,
@@ -85,10 +85,10 @@ export async function readRecord(
 }
 
 /**
- * Reads one record as `readRecord` does, with the detail trimmed for the model by its type's own
+ * Reads one record as `getRecord` does, with the detail trimmed for the model by its type's own
  * `readForModel` (`read_record`): the trimmed copy is what the agent sees and the conversation stores.
  */
-export async function readRecordForModel(
+export async function getRecordForModel(
   requester: User,
   connectionId: string,
   type: string,
@@ -125,7 +125,7 @@ async function readWith(
  * connection, or one whose provider holds no records, is `not_found`. A credential the provider
  * refuses marks the connection `needs_reconnect`.
  */
-export async function searchRecords(
+export async function getRecordSearchPage(
   requester: User,
   connectionId: string,
   query: RecordSearchQuery,

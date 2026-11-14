@@ -13,7 +13,7 @@ import {
 import { writeSecret } from "@/lib/db/vault";
 import type { WorkspaceUIMessage } from "@/modules/agent/contracts";
 import type { ConnectionListItem, Credential } from "@/modules/integrations/contracts";
-import type { StartThreadInput, Thread } from "@/modules/threads/contracts";
+import type { StartThreadInput, ThreadListItem } from "@/modules/threads/contracts";
 import type { SkillDetail } from "@/modules/skills/contracts";
 
 /** A signed-up user, as their first sign-in stores them: the id is their Keycloak `sub`. */
@@ -148,7 +148,7 @@ export async function insertMessages(
 }
 
 /** A thread as the browser holds it, for the pure rules' tests. */
-export function aThread(overrides: Partial<Thread> = {}): Thread {
+export function aThread(overrides: Partial<ThreadListItem> = {}): ThreadListItem {
   return {
     id: "thread-1",
     projectId: null,

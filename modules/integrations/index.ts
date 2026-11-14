@@ -7,8 +7,8 @@ import * as queries from "./queries";
 
 export const getConnections = withUser(queries.getConnections);
 export const getProviderChoices = withUser(() => queries.getProviderChoices());
-export const searchRecords = withUser(queries.searchRecords);
-export const readRecord = withUser(queries.readRecord);
+export const getRecordSearchPage = withUser(queries.getRecordSearchPage);
+export const getRecord = withUser(queries.getRecord);
 
 export const connect = withUser(commands.connect);
 export const testConnection = withUser(commands.testConnection);

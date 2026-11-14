@@ -3,7 +3,7 @@ import "server-only";
 // how a conversation grows and forks. The rules read only a message's id, role and attachments,
 // so they hold for the chat's messages as they are stored. Where a thread sits is contracts.ts.
 import type { ModelProvider } from "@/modules/agent/contracts";
-import { ACTIVE, type ConversationCounts, type Thread } from "./contracts";
+import { ACTIVE, type ConversationCounts, type ThreadListItem } from "./contracts";
 
 export type NewThread = {
   id: string;
@@ -14,7 +14,7 @@ export type NewThread = {
 };
 
 /** The thread a first message starts, titled by it. */
-export function newThread(input: NewThread, now: Date): Thread {
+export function newThread(input: NewThread, now: Date): ThreadListItem {
   return {
     id: input.id,
     projectId: input.projectId,
@@ -34,11 +34,11 @@ export function newThread(input: NewThread, now: Date): Thread {
  * that copy's.
  */
 export function forkOf(
-  thread: Thread,
+  thread: ThreadListItem,
   through: { responseIndex: number; counts: ConversationCounts },
   id: string,
   now: Date,
-): Thread {
+): ThreadListItem {
   const { responseIndex, counts } = through;
   return {
     ...thread,

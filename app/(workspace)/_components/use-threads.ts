@@ -13,7 +13,7 @@ import {
   snoozeRefusal,
   withPlacement,
   type StartThreadInput,
-  type Thread,
+  type ThreadListItem,
   type ThreadChange,
   type ThreadPlacement,
 } from "@/modules/threads/contracts";
@@ -28,23 +28,23 @@ import { useSnoozeWake } from "./use-snooze-wake";
  * it was, and
  * `onPlacementNotStored` says so. A snooze wakes here at its deadline, and the server reads it as
  * woken from then on. The conversation is not here: the open thread's chat loads it from the
- * server (`ThreadConversation`); a thread only counts the questions it is sent.
+ * server (`ThreadPanel`); a thread only counts the questions it is sent.
  */
 export function useThreads(
-  initialThreads: Thread[],
+  initialThreads: ThreadListItem[],
   { onPlacementNotStored }: { onPlacementNotStored?: () => void } = {},
 ) {
   const [threads, setThreads] = useState(initialThreads);
   useSnoozeWake(threads, setThreads);
 
-  function update(id: string, change: (thread: Thread) => Thread) {
+  function update(id: string, change: (thread: ThreadListItem) => ThreadListItem) {
     setThreads((previous) =>
       previous.map((thread) => (thread.id === id ? change(thread) : thread)),
     );
   }
 
   /** Stores a change already shown; `before` is the thread as it was. */
-  function store(before: Thread, change: ThreadChange) {
+  function store(before: ThreadListItem, change: ThreadChange) {
     void callAction(placeThreadAction, { threadId: before.id, change }).then(
       (answer) => {
         if (!isRefusal(answer)) return;
@@ -71,7 +71,7 @@ export function useThreads(
     },
 
     /** Snoozes the thread until `until`; why not, when it can't be (`snoozeRefusal`). */
-    snoozeThread(thread: Thread, until: Date, working: boolean) {
+    snoozeThread(thread: ThreadListItem, until: Date, working: boolean) {
       const refused = snoozeRefusal(until, new Date(), working);
       if (refused) return refused;
       const { snoozedUntil } = snooze(thread, until);
@@ -103,7 +103,7 @@ export function useThreads(
     },
 
     /** Stores the thread, then lists it. Null when the server refused or could not be reached. */
-    async startThread(input: StartThreadInput): Promise<Thread | null> {
+    async startThread(input: StartThreadInput): Promise<ThreadListItem | null> {
       const started = await callAction(startThreadAction, input);
       if (isRefusal(started)) return null;
       setThreads((previous) => [started, ...previous]);
@@ -111,7 +111,7 @@ export function useThreads(
     },
 
     /** Asking again; the caller sends only when no response is in flight. */
-    continueThread(thread: Thread, provider: ModelProvider) {
+    continueThread(thread: ThreadListItem, provider: ModelProvider) {
       update(thread.id, (latest) => continueThread(latest, provider));
     },
 
@@ -125,9 +125,9 @@ export function useThreads(
      * refused (the response is not stored yet) or could not be reached.
      */
     async forkThread(
-      thread: Thread,
+      thread: ThreadListItem,
       throughMessageId: string,
-    ): Promise<Thread | null> {
+    ): Promise<ThreadListItem | null> {
       const forked = await callAction(forkThreadAction, {
         fromThreadId: thread.id,
         id: crypto.randomUUID(),

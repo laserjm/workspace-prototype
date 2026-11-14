@@ -55,7 +55,7 @@ function ThinkingIndicator() {
   );
 }
 
-export function ResponseTurn({
+export function ResponseItem({
   timing,
   continuation,
   onFork,

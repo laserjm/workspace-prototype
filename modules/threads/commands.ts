@@ -23,7 +23,7 @@ import {
   type ForkThreadInput,
   type PlaceThreadInput,
   type StartThreadInput,
-  type Thread,
+  type ThreadListItem,
   type ThreadChange,
 } from "./contracts";
 import {
@@ -49,7 +49,7 @@ import { getThread, getThreadMessages } from "./queries";
  * Stores the new thread the requester's first message starts, in one of their projects or in
  * none. The browser sends the message once this answers.
  */
-export async function startThread(requester: User, input: StartThreadInput): Promise<Thread> {
+export async function startThread(requester: User, input: StartThreadInput): Promise<ThreadListItem> {
   // Another user's project is answered like a missing one: its id reveals nothing.
   if (input.projectId && !(await getProject(requester, input.projectId)))
     throw new ProjectNotFound(input.projectId);
@@ -65,7 +65,7 @@ export async function startThread(requester: User, input: StartThreadInput): Pro
 }
 
 /** Stores a fork of one of the requester's threads, with its conversation through the chosen response. */
-export async function forkThread(requester: User, input: ForkThreadInput): Promise<Thread> {
+export async function forkThread(requester: User, input: ForkThreadInput): Promise<ThreadListItem> {
   // Another user's thread is answered like a missing one: its id reveals nothing.
   const thread = await getThread(requester, input.fromThreadId);
   if (!thread) throw new ThreadNotFound(input.fromThreadId);
@@ -100,7 +100,7 @@ export async function forkThread(requester: User, input: ForkThreadInput): Promi
  * Settles, snoozes, restores or wakes one of the requester's threads, or undoes that. The change
  * applies to the thread as it reads now: a due snooze has woken.
  */
-export async function placeThread(requester: User, input: PlaceThreadInput): Promise<Thread> {
+export async function placeThread(requester: User, input: PlaceThreadInput): Promise<ThreadListItem> {
   const now = new Date();
   // Another user's thread is answered like a missing one: its id reveals nothing.
   const thread = await getThread(requester, input.threadId);
@@ -114,7 +114,7 @@ export async function placeThread(requester: User, input: PlaceThreadInput): Pro
   return placed;
 }
 
-function apply(thread: Thread, change: ThreadChange, now: Date): Thread {
+function apply(thread: ThreadListItem, change: ThreadChange, now: Date): ThreadListItem {
   switch (change.kind) {
     case "settle":
       return settle(thread, now);

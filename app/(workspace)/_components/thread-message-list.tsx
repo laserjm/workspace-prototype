@@ -10,7 +10,7 @@ import { attachedConnectionsOf } from "@/modules/records/contracts";
 import { useRecordPanel } from "./record-panel-provider";
 import { type AttachedConnection } from "@/modules/records/contracts";
 import { attachmentChipClassName } from "./attachment-chip";
-import { LiveResponse } from "./live-response";
+import { LiveResponseItem } from "./live-response-item";
 import type { StoredConversation } from "./use-stored-conversation";
 
 export type ForkTarget = { messageId: string; responseIndex: number };
@@ -22,7 +22,7 @@ const errorNotice =
 const PINNED_DISTANCE = 80;
 
 /** The thread's messages, as its chat holds them. */
-export function ThreadMessages({
+export function ThreadMessageList({
   messages,
   inFlight,
   error,
@@ -108,7 +108,7 @@ export function ThreadMessages({
       <div
         ref={laneRef}
         // The end reserves the floating composer's height (--composer-height,
-        // set by ThreadConversation), so the last message stops above it.
+        // set by ThreadPanel), so the last message stops above it.
         className={cn(
           // Under a fading top the first row starts below the fade (1.5rem);
           // under a fixed row, a short gap is enough.
@@ -130,7 +130,7 @@ export function ThreadMessages({
                   attached={attachedConnectionsOf(message)}
                 />
                 {awaitingReply && inFlight && message === last && (
-                  <LiveResponse
+                  <LiveResponseItem
                     requestedAt={requestedAt(message)}
                     working
                     continuation={responseIndex > 0}
@@ -145,7 +145,7 @@ export function ThreadMessages({
           const currentIndex = responseIndex++;
           const request = messages[index - 1];
           return (
-            <LiveResponse
+            <LiveResponseItem
               key={message.id}
               message={message}
               requestedAt={

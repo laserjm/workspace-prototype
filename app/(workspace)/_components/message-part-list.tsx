@@ -8,7 +8,7 @@ import { RecordChip } from "./record-chip";
 import { RecordReadCall } from "./record-read-call";
 import { RecordSearchCall } from "./record-search-call";
 import { SkillLoadCall } from "./skill-load-call";
-import { preparingDotClassName } from "./response-turn";
+import { preparingDotClassName } from "./response-item";
 
 type MessagePart = WorkspaceUIMessage["parts"][number];
 type HtmlRenderPart = Extract<MessagePart, { type: "tool-html_render" }>;
@@ -17,7 +17,7 @@ type ReadRecordPart = Extract<MessagePart, { type: "tool-read_record" }>;
 type PullRequestDiffPart = Extract<MessagePart, { type: "tool-github_pull_request_diff" }>;
 type LoadSkillPart = Extract<MessagePart, { type: "tool-load_skill" }>;
 
-/** Whether a message has anything `MessageParts` would show yet. */
+/** Whether a message has anything `MessagePartList` would show yet. */
 export function hasVisibleParts(message: WorkspaceUIMessage | undefined) {
   return !!message?.parts.some(
     (part) =>
@@ -40,7 +40,7 @@ export function messageMarkdown(message: WorkspaceUIMessage) {
 }
 
 /** Renders an assistant message's parts in stream order. */
-export function MessageParts({
+export function MessagePartList({
   message,
   streaming = false,
 }: {

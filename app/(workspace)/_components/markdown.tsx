@@ -38,7 +38,7 @@ import {
 } from "@/lib/markdown/table";
 import { cn } from "@/lib/utils";
 import { CodeBlock } from "./code-block";
-import { CopyMenu } from "./copy-button";
+import { CopyDropdownMenu } from "./copy-button";
 import { MathFormula } from "./math";
 import { MermaidDiagram } from "./mermaid-diagram";
 
@@ -203,7 +203,7 @@ const components: Components = {
         </div>
         {node ? (
           <div className="mt-0.5 flex justify-end select-none">
-            <CopyMenu
+            <CopyDropdownMenu
               label="Copy table"
               className="size-6"
               formats={[

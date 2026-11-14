@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, type Dispatch, type SetStateAction } from "react";
-import { type Thread } from "@/modules/threads/contracts";
+import { type ThreadListItem } from "@/modules/threads/contracts";
 import { isWakeDue, wake } from "@/modules/threads/contracts";
 
 /** Wakes snoozed threads at their deadlines, and when the tab returns to the foreground. */
 export function useSnoozeWake(
-  threads: Thread[],
-  setThreads: Dispatch<SetStateAction<Thread[]>>,
+  threads: ThreadListItem[],
+  setThreads: Dispatch<SetStateAction<ThreadListItem[]>>,
 ) {
   useEffect(() => {
     const deadlines = threads

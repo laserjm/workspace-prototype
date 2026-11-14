@@ -28,18 +28,18 @@ import { CustomSnoozeDialog } from "./custom-snooze-dialog";
 import { shelfOf } from "@/modules/threads/contracts";
 import { ThreadContextCard } from "./thread-context-card";
 import { ThreadRow } from "./thread-row";
-import { type Thread } from "@/modules/threads/contracts";
+import { type ThreadListItem } from "@/modules/threads/contracts";
 
 type SidebarProps = {
   user: { name: string; email: string };
-  threads: Thread[];
+  threads: ThreadListItem[];
   projects: ProjectListItem[];
   /** The name the sidebar shows for a thread's project. */
   projectName: (projectId: string | null) => string;
   activeId?: string;
   /** The thread with a response in flight: only the open one can have one. */
   workingId?: string | null;
-  onSelect: (thread: Thread) => void;
+  onSelect: (thread: ThreadListItem) => void;
   onNewThread: () => void;
   onNewProject: () => void;
   onToggle: () => void;
@@ -98,7 +98,7 @@ export function WorkspaceSidebar(props: SidebarProps) {
     );
   }
 
-  function renderThread(thread: Thread) {
+  function renderThread(thread: ThreadListItem) {
     return (
       <ThreadRow
         key={thread.id}

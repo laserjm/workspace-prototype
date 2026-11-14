@@ -1,6 +1,6 @@
 import "server-only";
 import { tool } from "ai";
-import { readRecordForModel, searchRecords } from "@/modules/integrations/queries";
+import { getRecordForModel, getRecordSearchPage } from "@/modules/integrations/queries";
 import { connectionToolContextSchema as contextSchema } from "@/modules/integrations/tools";
 import {
   MAX_SEARCH_RESULTS,
@@ -27,7 +27,7 @@ export const recordTools = {
     async execute({ connectionId, query, type, includeClosed }, { context }) {
       if (!context.user || !context.connectionIds.includes(connectionId))
         return { error: { kind: "no_access" as const } };
-      const page = await searchRecords(context.user, connectionId, {
+      const page = await getRecordSearchPage(context.user, connectionId, {
         text: query,
         type,
         includeClosed,
@@ -49,7 +49,7 @@ export const recordTools = {
     async execute({ connectionId, type, key }, { context }) {
       if (!context.user || !context.connectionIds.includes(connectionId))
         return { error: { kind: "no_access" as const } };
-      const read = await readRecordForModel(context.user, connectionId, type, key);
+      const read = await getRecordForModel(context.user, connectionId, type, key);
       // A refusal keeps the record's page, so the model can point the user to it.
       if (!read.ok) return { error: read.error };
       return read.value;

@@ -23,14 +23,14 @@ import { RecordPanelProvider } from "./record-panel-provider";
 import { type AttachedConnection } from "@/modules/records/contracts";
 import { placementOf } from "@/modules/threads/contracts";
 import { PromptForm } from "./prompt-form";
-import { ThreadConversation } from "./thread-conversation";
+import { ThreadPanel } from "./thread-panel";
 import { useThreads } from "./use-threads";
 import { type ConversationControls, type FirstQuestion, type Question } from "./use-thread-chat";
-import { type ForkTarget } from "./thread-messages";
-import { type Thread, type ThreadPlacement } from "@/modules/threads/contracts";
+import { type ForkTarget } from "./thread-message-list";
+import { type ThreadListItem, type ThreadPlacement } from "@/modules/threads/contracts";
 import type { ChatOptions, ModelChoice } from "@/modules/agent/contracts";
-import { NewThreadHeading } from "./new-thread-heading";
-import { WorkspaceSettings, type SettingsSection } from "./workspace-settings";
+import { NewThreadEmpty } from "./new-thread-empty";
+import { SettingsPanel, type SettingsSection } from "./settings-panel";
 import { WorkspaceSidebar } from "./workspace-sidebar";
 
 type DialogKind = "project" | "settings" | "activity" | null;
@@ -46,7 +46,7 @@ export function WorkspaceShell({
   models,
   user,
 }: {
-  initialThreads: Thread[];
+  initialThreads: ThreadListItem[];
   initialProjects: ProjectListItem[];
   models: ModelChoice[];
   user: { name: string; email: string };
@@ -144,7 +144,7 @@ export function WorkspaceShell({
    * the sidebar, continue with the next active one (`nextId`).
    */
   function announcePlacement(
-    previous: Thread,
+    previous: ThreadListItem,
     message: string,
     nextId?: string | null,
   ) {
@@ -417,7 +417,7 @@ export function WorkspaceShell({
             >
               {!activeThread ? (
                 <div className="absolute top-[47%] left-1/2 flex w-[min(var(--workspace-composer-width),calc(100%-4rem))] -translate-1/2 flex-col gap-5 max-desktop:w-[calc(100%-3rem)] max-md:top-[46%] max-md:w-[calc(100%-2rem)] max-md:gap-4 short:static short:mx-auto short:mt-7.5 short:mb-15 short:w-[min(var(--workspace-composer-width),calc(100%-2.5rem))] short:translate-none">
-                  <NewThreadHeading
+                  <NewThreadEmpty
                     projectId={projectId}
                     projects={projects}
                     onProject={setProjectId}
@@ -444,7 +444,7 @@ export function WorkspaceShell({
                   )}
                 </div>
               ) : (
-                <ThreadConversation
+                <ThreadPanel
                   key={`conversation:${activeThread.id}`}
                   thread={activeThread}
                   models={models}
@@ -546,7 +546,7 @@ export function WorkspaceShell({
             )}
 
             {dialog === "settings" && (
-              <WorkspaceSettings
+              <SettingsPanel
                 section={settingsSection}
                 onSection={setSettingsSection}
                 enabledSkills={enabledSkills}

@@ -23,7 +23,7 @@ export async function GET(
 ) {
   const { connectionId, type, key } = await ctx.params;
   try {
-    const read = await integrations.readRecord(connectionId, type, decodedKey(key));
+    const read = await integrations.getRecord(connectionId, type, decodedKey(key));
     return read.ok ? recordResponse(read.value) : recordErrorResponse(read.error);
   } catch (error) {
     return thrownResponse(error);

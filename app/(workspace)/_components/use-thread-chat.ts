@@ -6,7 +6,7 @@ import { DefaultChatTransport } from "ai";
 import type { ChatOptions, ModelChoice, WorkspaceUIMessage } from "@/modules/agent/contracts";
 import { ATTACHED_ITEMS_PART } from "@/modules/records/contracts";
 import { type AttachedConnection } from "@/modules/records/contracts";
-import type { Thread } from "@/modules/threads/contracts";
+import type { ThreadListItem } from "@/modules/threads/contracts";
 import { lastRequest } from "./last-request";
 
 /** A question as the composer sends it. */
@@ -56,7 +56,7 @@ export function useThreadChat({
   onFirstQuestionSent,
   onWorkingChange,
 }: {
-  thread: Thread;
+  thread: ThreadListItem;
   models: ModelChoice[];
   enabledSkills: string[];
   initialMessages: WorkspaceUIMessage[];

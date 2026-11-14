@@ -21,7 +21,7 @@ export type ThreadShelf = "active" | "snoozed" | "settled";
  * Sidebar and session metadata. The conversation is stored apart, in the thread's messages. `projectId`
  * refers to a project of the projects module; null: the thread has no project.
  */
-export type Thread = ThreadPlacement & {
+export type ThreadListItem = ThreadPlacement & {
   id: string;
   projectId: string | null;
   title: string;
@@ -48,12 +48,12 @@ export const ACTIVE: { [K in keyof Required<ThreadPlacement>]: undefined } = {
  * Asking again: the thread records the provider it now talks to and, if it was parked, returns to
  * active. The browser asks only when no response is in flight.
  */
-export function continueThread(thread: Thread, provider: ModelProvider): Thread {
+export function continueThread(thread: ThreadListItem, provider: ModelProvider): ThreadListItem {
   return { ...thread, ...ACTIVE, provider };
 }
 
 /** The thread with one more question, carrying `attachmentCount` attachments. */
-export function countTurn(thread: Thread, attachmentCount: number): Thread {
+export function countTurn(thread: ThreadListItem, attachmentCount: number): ThreadListItem {
   return {
     ...thread,
     turnCount: thread.turnCount + 1,
@@ -141,7 +141,7 @@ export function shelfOf(thread: ThreadPlacement): ThreadShelf {
   return thread.settledAt ? "settled" : "active";
 }
 
-export function placementOf(thread: Thread): ThreadPlacement {
+export function placementOf(thread: ThreadListItem): ThreadPlacement {
   return {
     settledAt: thread.settledAt,
     snoozedUntil: thread.snoozedUntil,
@@ -151,13 +151,13 @@ export function placementOf(thread: Thread): ThreadPlacement {
 
 /** Puts a thread back where it was, e.g. to undo a settle or snooze. */
 export function withPlacement(
-  thread: Thread,
+  thread: ThreadListItem,
   placement: ThreadPlacement,
-): Thread {
+): ThreadListItem {
   return { ...thread, ...ACTIVE, ...placement };
 }
 
-export function settle(thread: Thread, now: Date): Thread {
+export function settle(thread: ThreadListItem, now: Date): ThreadListItem {
   return { ...thread, ...ACTIVE, settledAt: now.toISOString() };
 }
 
@@ -177,23 +177,23 @@ export function snoozeRefusal(
 }
 
 /** The thread snoozed until `until`; check `snoozeRefusal` first. */
-export function snooze(thread: Thread, until: Date): Thread {
+export function snooze(thread: ThreadListItem, until: Date): ThreadListItem {
   return { ...thread, ...ACTIVE, snoozedUntil: until.toISOString() };
 }
 
 /** Un-settles or wakes a thread by hand. */
-export function restore(thread: Thread): Thread {
+export function restore(thread: ThreadListItem): ThreadListItem {
   return { ...thread, ...ACTIVE };
 }
 
-export function isWakeDue(thread: Thread, now: Date) {
+export function isWakeDue(thread: ThreadListItem, now: Date) {
   return Boolean(
     thread.snoozedUntil && Date.parse(thread.snoozedUntil) <= now.getTime(),
   );
 }
 
 /** A snoozed thread whose time has come returns to active, marked as woken. */
-export function wake(thread: Thread, now: Date): Thread {
+export function wake(thread: ThreadListItem, now: Date): ThreadListItem {
   return { ...thread, ...ACTIVE, wokeAt: now.toISOString() };
 }
 
@@ -201,14 +201,14 @@ export function wake(thread: Thread, now: Date): Thread {
  * A thread as it reads at `now`: a snooze whose time has come reads as woken at its deadline.
  * Nothing needs to run at the deadline; the browser wakes an open page's threads live.
  */
-export function wakeIfDue(thread: Thread, now: Date): Thread {
+export function wakeIfDue(thread: ThreadListItem, now: Date): ThreadListItem {
   return thread.snoozedUntil && isWakeDue(thread, now)
     ? wake(thread, new Date(thread.snoozedUntil))
     : thread;
 }
 
 /** Opening a woken thread clears its "Woke" mark. */
-export function acknowledgeWake(thread: Thread): Thread {
+export function acknowledgeWake(thread: ThreadListItem): ThreadListItem {
   return thread.wokeAt ? { ...thread, wokeAt: undefined } : thread;
 }
 

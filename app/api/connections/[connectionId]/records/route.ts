@@ -26,7 +26,7 @@ export async function GET(
   const { q, type, closed, cursor } = query.data;
   const { connectionId } = await ctx.params;
   try {
-    const page = await integrations.searchRecords(connectionId, {
+    const page = await integrations.getRecordSearchPage(connectionId, {
       ...(q?.trim() ? { text: q.trim() } : {}),
       ...(type ? { type } : {}),
       includeClosed: closed === "1",

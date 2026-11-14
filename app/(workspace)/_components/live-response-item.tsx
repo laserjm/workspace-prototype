@@ -4,14 +4,14 @@ import { findSkill, useSkills } from "./use-skills";
 import type { ModelChoice, WorkspaceUIMessage } from "@/modules/agent/contracts";
 import {
   hasVisibleParts,
-  MessageParts,
+  MessagePartList,
   messageMarkdown,
-} from "./message-parts";
+} from "./message-part-list";
 import { awaitsNextStep } from "./reply-progress";
-import { ResponseTurn } from "./response-turn";
+import { ResponseItem } from "./response-item";
 
 /** A model response, or the placeholder while the request is in flight. */
-export function LiveResponse({
+export function LiveResponseItem({
   message,
   requestedAt,
   working,
@@ -42,7 +42,7 @@ export function LiveResponse({
   ].filter((detail) => !!detail);
 
   return (
-    <ResponseTurn
+    <ResponseItem
       timing={{
         startedAt,
         completedAt: working ? null : (metadata?.completedAt ?? startedAt),
@@ -55,7 +55,7 @@ export function LiveResponse({
       copyText={message ? messageMarkdown(message) : ""}
       onFork={onFork}
     >
-      {message && <MessageParts message={message} streaming={working} />}
-    </ResponseTurn>
+      {message && <MessagePartList message={message} streaming={working} />}
+    </ResponseItem>
   );
 }

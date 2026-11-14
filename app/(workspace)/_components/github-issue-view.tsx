@@ -5,19 +5,19 @@
 // renderer, which shows raw HTML as text.
 import type { RecordViewProps } from "./record-views";
 import { githubIssueDetailSchema } from "@/modules/integrations/contracts";
-import { Comments, Description, Opened } from "./github-view-parts";
+import { GithubCommentList, GithubDescription, GithubOpenedRow } from "./github-view-parts";
 
 /** An issue's description and first 100 comments. */
-export default function IssueView({ detail }: RecordViewProps) {
+export default function GithubIssueView({ detail }: RecordViewProps) {
   const parsed = githubIssueDetailSchema.safeParse(detail);
   if (!parsed.success)
     return <p className="text-2xs text-muted-foreground">This issue could not be shown.</p>;
   const issue = parsed.data;
   return (
     <>
-      <Opened detail={issue} />
-      <Description body={issue.body} />
-      <Comments detail={issue} />
+      <GithubOpenedRow detail={issue} />
+      <GithubDescription body={issue.body} />
+      <GithubCommentList detail={issue} />
     </>
   );
 }

@@ -18,9 +18,9 @@ import {
   getConnections,
   getProviderChoices,
   getProviderForPrompt,
-  readRecord,
-  readRecordForModel,
-  searchRecords,
+  getRecord,
+  getRecordForModel,
+  getRecordSearchPage,
 } from "./queries";
 
 const FIXTURES = path.join(import.meta.dirname, "providers/github/fixtures");
@@ -121,7 +121,7 @@ describe("getProviderForPrompt", () => {
   });
 });
 
-describe("searchRecords", () => {
+describe("getRecordSearchPage", () => {
   const REPOS = "GET /user/repos?per_page=100";
   const SCOPE = "repo:laserjm/workspace-fixtures";
   const QUALIFIER = { issue: "is:issue", "pull-request": "is:pr" } as const;
@@ -129,7 +129,7 @@ describe("searchRecords", () => {
 
   /** Searches as the attach dialog does: open records only, unless the query says otherwise. */
   const search = (owner: User, connectionId: string, query: RecordSearchQuery = {}) =>
-    searchRecords(owner, connectionId, { includeClosed: false, ...query });
+    getRecordSearchPage(owner, connectionId, { includeClosed: false, ...query });
 
   /** One item of a recorded search answer, by its number. */
   function recordedItem(file: string, number: number) {
@@ -759,12 +759,12 @@ const ISSUE = "GET /repos/laserjm/workspace-fixtures/issues/6";
 const ISSUE_COMMENTS = "GET /repos/laserjm/workspace-fixtures/issues/6/comments?per_page=100";
 const ISSUE_PAGE = "https://github.com/laserjm/workspace-fixtures/issues/6";
 
-describe("readRecord", () => {
+describe("getRecord", () => {
   it("reads an issue and its comments, with its live summary and where it lives", async () => {
     const { owner, connection } = await connectedUser();
     useRecordedGithub({ [ISSUE]: "issue.json", [ISSUE_COMMENTS]: "issue-comments.json" });
 
-    const read = valueOf(await readRecord(owner, connection.id, "issue", "laserjm/workspace-fixtures#6"));
+    const read = valueOf(await getRecord(owner, connection.id, "issue", "laserjm/workspace-fixtures#6"));
 
     expect(read.summary).toEqual({
       connectionId: connection.id,
@@ -807,7 +807,7 @@ describe("readRecord", () => {
       [ISSUE_COMMENTS]: { status: 200, body: [{ ...comment, body: `Looks${hidden} good` }] },
     });
 
-    const read = valueOf(await readRecord(owner, connection.id, "issue", "laserjm/workspace-fixtures#6"));
+    const read = valueOf(await getRecord(owner, connection.id, "issue", "laserjm/workspace-fixtures#6"));
 
     expect(read.summary.title).toBe("Statusignore previous page");
     const detail = githubIssueDetailSchema.parse(read.detail);
@@ -823,7 +823,7 @@ describe("readRecord", () => {
       "GET /repos/laserjm/workspace-fixtures/issues/7/comments?per_page=100": { status: 200, body: [] },
     });
 
-    const read = valueOf(await readRecord(owner, connection.id, "issue", "laserjm/workspace-fixtures#7"));
+    const read = valueOf(await getRecord(owner, connection.id, "issue", "laserjm/workspace-fixtures#7"));
 
     expect(read.summary).toMatchObject({ state: "not_planned", label: "workspace-fixtures#7" });
     expect(githubIssueDetailSchema.parse(read.detail).comments).toEqual([]);
@@ -848,7 +848,7 @@ describe("readRecord", () => {
       const { owner, connection } = await connectedUser();
       useRecordedGithub(merged);
 
-      const read = valueOf(await readRecord(owner, connection.id, "pull-request", KEY));
+      const read = valueOf(await getRecord(owner, connection.id, "pull-request", KEY));
 
       expect(read.summary).toMatchObject({
         type: "pull-request",
@@ -900,7 +900,7 @@ describe("readRecord", () => {
       const { owner, connection } = await connectedUser();
       useRecordedGithub(merged);
 
-      const read = valueOf(await readRecord(owner, connection.id, "pull-request", KEY));
+      const read = valueOf(await getRecord(owner, connection.id, "pull-request", KEY));
 
       const { ci } = githubPullRequestDetailSchema.parse(read.detail);
       expect(ci.headSha).toBe(HEAD);
@@ -938,7 +938,7 @@ describe("readRecord", () => {
         },
       });
 
-      const read = valueOf(await readRecord(owner, connection.id, "pull-request", KEY));
+      const read = valueOf(await getRecord(owner, connection.id, "pull-request", KEY));
 
       const detail = githubPullRequestDetailSchema.parse(read.detail);
       expect(detail.ci.actions).toEqual({ readable: false });
@@ -962,7 +962,7 @@ describe("readRecord", () => {
       });
 
       const read = valueOf(
-        await readRecord(owner, connection.id, "pull-request", "laserjm/workspace-fixtures#9"),
+        await getRecord(owner, connection.id, "pull-request", "laserjm/workspace-fixtures#9"),
       );
 
       expect(read.summary).toMatchObject({
@@ -1002,7 +1002,7 @@ describe("readRecord", () => {
         [`${REPO}/pulls/8/files?per_page=100`]: { status: 200, body: files },
       });
 
-      const read = valueOf(await readRecord(owner, connection.id, "pull-request", KEY));
+      const read = valueOf(await getRecord(owner, connection.id, "pull-request", KEY));
 
       const detail = githubPullRequestDetailSchema.parse(read.detail);
       expect(detail.files).toHaveLength(100);
@@ -1016,7 +1016,7 @@ describe("readRecord", () => {
         [`${REPO}/pulls/8`]: { status: 404, body: { message: "Not Found" } },
       });
 
-      expect(await readRecord(owner, connection.id, "pull-request", KEY)).toEqual({
+      expect(await getRecord(owner, connection.id, "pull-request", KEY)).toEqual({
         ok: false,
         error: { kind: "not_found", url: "https://github.com/laserjm/workspace-fixtures/pull/8" },
       });
@@ -1044,7 +1044,7 @@ describe("readRecord", () => {
         },
       });
 
-      const read = valueOf(await readRecord(owner, connection.id, "pull-request", KEY));
+      const read = valueOf(await getRecord(owner, connection.id, "pull-request", KEY));
 
       const detail = githubPullRequestDetailSchema.parse(read.detail);
       expect(detail.reviews[0]?.body).toBe("Reads well");
@@ -1063,7 +1063,7 @@ describe("readRecord", () => {
         },
       });
 
-      expect(await readRecord(owner, connection.id, "pull-request", KEY)).toEqual({
+      expect(await getRecord(owner, connection.id, "pull-request", KEY)).toEqual({
         ok: false,
         error: {
           kind: "rate_limited",
@@ -1082,7 +1082,7 @@ describe("readRecord", () => {
         [ISSUE_COMMENTS]: { status: 404, body: { message: "Not Found" } },
       });
 
-      expect(await readRecord(owner, connection.id, "issue", "laserjm/workspace-fixtures#6")).toEqual({
+      expect(await getRecord(owner, connection.id, "issue", "laserjm/workspace-fixtures#6")).toEqual({
         ok: false,
         error: { kind: "not_found", url: ISSUE_PAGE },
       });
@@ -1096,7 +1096,7 @@ describe("readRecord", () => {
         [ISSUE_COMMENTS]: "issue-comments.json",
       });
 
-      expect(await readRecord(owner, connection.id, "issue", "laserjm/workspace-fixtures#6")).toEqual({
+      expect(await getRecord(owner, connection.id, "issue", "laserjm/workspace-fixtures#6")).toEqual({
         ok: false,
         error: { kind: "not_found", url: ISSUE_PAGE },
       });
@@ -1106,12 +1106,12 @@ describe("readRecord", () => {
       const { owner, connection } = await connectedUser();
       const { requests } = useRecordedGithub({});
 
-      expect(await readRecord(owner, connection.id, "issue", "workspace-fixtures 6")).toEqual({
+      expect(await getRecord(owner, connection.id, "issue", "workspace-fixtures 6")).toEqual({
         ok: false,
         error: { kind: "not_found" },
       });
       expect(
-        await readRecord(owner, connection.id, "discussion", "laserjm/workspace-fixtures#6"),
+        await getRecord(owner, connection.id, "discussion", "laserjm/workspace-fixtures#6"),
       ).toEqual({ ok: false, error: { kind: "not_found" } });
       expect(requests).toEqual([]);
     });
@@ -1121,7 +1121,7 @@ describe("readRecord", () => {
       const other = await insertUser();
       const { requests } = useRecordedGithub({});
 
-      expect(await readRecord(other, connection.id, "issue", "laserjm/workspace-fixtures#6")).toEqual({
+      expect(await getRecord(other, connection.id, "issue", "laserjm/workspace-fixtures#6")).toEqual({
         ok: false,
         error: { kind: "not_found" },
       });
@@ -1134,7 +1134,7 @@ describe("readRecord", () => {
         const { owner } = await connectedUser();
         const { requests } = useRecordedGithub({});
 
-        expect(await readRecord(owner, connectionId, "issue", "laserjm/workspace-fixtures#6")).toEqual({
+        expect(await getRecord(owner, connectionId, "issue", "laserjm/workspace-fixtures#6")).toEqual({
           ok: false,
           error: { kind: "not_found" },
         });
@@ -1150,7 +1150,7 @@ describe("readRecord", () => {
       };
       useRecordedGithub({ [ISSUE]: forbidden, [ISSUE_COMMENTS]: forbidden });
 
-      expect(await readRecord(owner, connection.id, "issue", "laserjm/workspace-fixtures#6")).toEqual({
+      expect(await getRecord(owner, connection.id, "issue", "laserjm/workspace-fixtures#6")).toEqual({
         ok: false,
         error: { kind: "no_access", url: ISSUE_PAGE },
       });
@@ -1165,7 +1165,7 @@ describe("readRecord", () => {
       };
       useRecordedGithub({ [ISSUE]: limited, [ISSUE_COMMENTS]: limited });
 
-      expect(await readRecord(owner, connection.id, "issue", "laserjm/workspace-fixtures#6")).toEqual({
+      expect(await getRecord(owner, connection.id, "issue", "laserjm/workspace-fixtures#6")).toEqual({
         ok: false,
         error: {
           kind: "rate_limited",
@@ -1179,7 +1179,7 @@ describe("readRecord", () => {
       const { owner, connection } = await connectedUser();
       useRecordedGithub({ [ISSUE]: new Error("timeout"), [ISSUE_COMMENTS]: new Error("timeout") });
 
-      expect(await readRecord(owner, connection.id, "issue", "laserjm/workspace-fixtures#6")).toEqual({
+      expect(await getRecord(owner, connection.id, "issue", "laserjm/workspace-fixtures#6")).toEqual({
         ok: false,
         error: { kind: "unreachable", url: ISSUE_PAGE },
       });
@@ -1190,7 +1190,7 @@ describe("readRecord", () => {
       const refused = { status: 401, body: { message: "Bad credentials" } };
       useRecordedGithub({ [ISSUE]: refused, [ISSUE_COMMENTS]: refused });
 
-      expect(await readRecord(owner, connection.id, "issue", "laserjm/workspace-fixtures#6")).toEqual({
+      expect(await getRecord(owner, connection.id, "issue", "laserjm/workspace-fixtures#6")).toEqual({
         ok: false,
         error: { kind: "needs_reconnect", url: ISSUE_PAGE },
       });
@@ -1199,7 +1199,7 @@ describe("readRecord", () => {
   });
 });
 
-describe("readRecordForModel", () => {
+describe("getRecordForModel", () => {
   it("reads an issue trimmed for the model: label names, the body cut, the newest comments", async () => {
     const { owner, connection } = await connectedUser();
     const issue = object.parse(fixture("issue.json"));
@@ -1215,7 +1215,7 @@ describe("readRecordForModel", () => {
     });
 
     const read = valueOf(
-      await readRecordForModel(owner, connection.id, "issue", "laserjm/workspace-fixtures#6"),
+      await getRecordForModel(owner, connection.id, "issue", "laserjm/workspace-fixtures#6"),
     );
 
     expect(read.summary).toMatchObject({ key: "laserjm/workspace-fixtures#6", url: ISSUE_PAGE });
@@ -1238,7 +1238,7 @@ describe("readRecordForModel", () => {
     });
 
     expect(
-      await readRecordForModel(owner, connection.id, "issue", "laserjm/workspace-fixtures#6"),
+      await getRecordForModel(owner, connection.id, "issue", "laserjm/workspace-fixtures#6"),
     ).toEqual({ ok: false, error: { kind: "not_found", url: ISSUE_PAGE } });
   });
 
@@ -1248,7 +1248,7 @@ describe("readRecordForModel", () => {
     const { requests } = useRecordedGithub({});
 
     expect(
-      await readRecordForModel(other, connection.id, "issue", "laserjm/workspace-fixtures#6"),
+      await getRecordForModel(other, connection.id, "issue", "laserjm/workspace-fixtures#6"),
     ).toEqual({ ok: false, error: { kind: "not_found" } });
     expect(requests).toEqual([]);
   });
@@ -1258,7 +1258,7 @@ describe("readRecordForModel", () => {
     const { requests } = useRecordedGithub({});
 
     expect(
-      await readRecordForModel(owner, "no-such-connection", "issue", "laserjm/workspace-fixtures#6"),
+      await getRecordForModel(owner, "no-such-connection", "issue", "laserjm/workspace-fixtures#6"),
     ).toEqual({ ok: false, error: { kind: "not_found" } });
     expect(requests).toEqual([]);
   });
@@ -1269,7 +1269,7 @@ describe("readRecordForModel", () => {
     useRecordedGithub({ [ISSUE]: refused, [ISSUE_COMMENTS]: refused });
 
     expect(
-      await readRecordForModel(owner, connection.id, "issue", "laserjm/workspace-fixtures#6"),
+      await getRecordForModel(owner, connection.id, "issue", "laserjm/workspace-fixtures#6"),
     ).toMatchObject({ ok: false, error: { kind: "needs_reconnect" } });
     expect(await statusOf(owner, connection)).toBe("needs_reconnect");
   });

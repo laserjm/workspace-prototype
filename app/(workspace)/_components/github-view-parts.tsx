@@ -31,7 +31,7 @@ function Label({ children }: { children: ReactNode }) {
 }
 
 /** Who opened it, when, its labels and assignees. */
-export function Opened({
+export function GithubOpenedRow({
   detail,
   children,
 }: {
@@ -54,7 +54,7 @@ export function Opened({
   );
 }
 
-export function Description({ body }: { body: string }) {
+export function GithubDescription({ body }: { body: string }) {
   return body ? (
     <Markdown text={body} className="text-xs" />
   ) : (
@@ -63,7 +63,7 @@ export function Description({ body }: { body: string }) {
 }
 
 /** A titled part of a view. */
-export function Section({ title, children }: { title: string; children: ReactNode }) {
+export function GithubSection({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="mt-5">
       <h4 className="mb-2 text-3xs font-medium tracking-wide text-muted-foreground uppercase">
@@ -75,17 +75,17 @@ export function Section({ title, children }: { title: string; children: ReactNod
 }
 
 /** A quiet line under a list: what GitHub has beyond it, or why it is empty. */
-export function Note({ children }: { children: ReactNode }) {
+export function GithubNote({ children }: { children: ReactNode }) {
   return <p className="mt-2 text-2xs text-muted-foreground">{children}</p>;
 }
 
 /** `+ 3 more files on GitHub`, when GitHub has more than the view shows. */
-export function MoreOnGitHub({ count, noun }: { count: number; noun: string }) {
-  return count > 0 ? <Note>+ {counted(count, noun)} on GitHub</Note> : null;
+export function GithubMoreNote({ count, noun }: { count: number; noun: string }) {
+  return count > 0 ? <GithubNote>+ {counted(count, noun)} on GitHub</GithubNote> : null;
 }
 
 /** A bordered box: a comment, a review, the merge state. */
-export function Card({
+export function GithubCard({
   as: Tag = "div",
   className,
   children,
@@ -100,7 +100,7 @@ export function Card({
 }
 
 /** Who wrote something, and when. */
-export function Byline({ author, at, children }: { author: string; at?: string; children?: ReactNode }) {
+export function GithubBylineRow({ author, at, children }: { author: string; at?: string; children?: ReactNode }) {
   return (
     <div className="mb-1 flex flex-wrap items-center gap-1 text-3xs text-muted-foreground">
       <span className="font-medium text-secondary-foreground">{author}</span>
@@ -111,21 +111,21 @@ export function Byline({ author, at, children }: { author: string; at?: string; 
 }
 
 /** The conversation's first 100 comments, and how many more GitHub has. */
-export function Comments({ detail }: { detail: GithubIssueDetail }) {
+export function GithubCommentList({ detail }: { detail: GithubIssueDetail }) {
   const { comments, commentCount } = detail;
   if (commentCount === 0) return null;
   const more = commentCount - comments.length;
   return (
-    <Section title={counted(commentCount, "comment")}>
+    <GithubSection title={counted(commentCount, "comment")}>
       <ul className="flex flex-col gap-2">
         {comments.map((comment) => (
-          <Card as="li" key={comment.id}>
-            <Byline author={comment.author} at={comment.createdAt} />
+          <GithubCard as="li" key={comment.id}>
+            <GithubBylineRow author={comment.author} at={comment.createdAt} />
             <Markdown text={comment.body || "_No text._"} className="text-xs" />
-          </Card>
+          </GithubCard>
         ))}
       </ul>
-      <MoreOnGitHub count={more} noun="more comment" />
-    </Section>
+      <GithubMoreNote count={more} noun="more comment" />
+    </GithubSection>
   );
 }

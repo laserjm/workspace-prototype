@@ -21,16 +21,16 @@ import { cn } from "@/lib/utils";
 import type { RecordViewProps } from "./record-views";
 import { githubPullRequestDetailSchema, type GithubPullRequestDetail } from "@/modules/integrations/contracts";
 import {
-  Byline,
-  Card,
-  Comments,
   counted,
   dayOf,
-  Description,
-  MoreOnGitHub,
-  Note,
-  Opened,
-  Section,
+  GithubBylineRow,
+  GithubCard,
+  GithubCommentList,
+  GithubDescription,
+  GithubMoreNote,
+  GithubNote,
+  GithubOpenedRow,
+  GithubSection,
 } from "./github-view-parts";
 
 // Success, failure and waiting carry meaning, so they take their tokens; `done` (merged) only
@@ -115,12 +115,12 @@ function MergeState({ merge }: { merge: GithubPullRequestDetail["merge"] }) {
     );
   }
   return (
-    <Card className="mt-1 mb-4 flex flex-col gap-1 text-xs">
+    <GithubCard className="mt-1 mb-4 flex flex-col gap-1 text-xs">
       {line}
       <span className="pl-5 text-2xs text-muted-foreground">
         {counted(merge.commits, "commit")} · <Diffstat {...merge} />
       </span>
-    </Card>
+    </GithubCard>
   );
 }
 
@@ -157,9 +157,9 @@ function ChangedFiles({ detail }: { detail: GithubPullRequestDetail }) {
   const { files, fileCount } = detail;
   const more = fileCount - files.length;
   return (
-    <Section title={counted(fileCount, "changed file")}>
+    <GithubSection title={counted(fileCount, "changed file")}>
       {files.length === 0 ? (
-        <Note>No changed files.</Note>
+        <GithubNote>No changed files.</GithubNote>
       ) : (
         <ul className="flex flex-col rounded-md border border-border/70 py-1">
           {files.map((file) => {
@@ -184,8 +184,8 @@ function ChangedFiles({ detail }: { detail: GithubPullRequestDetail }) {
           })}
         </ul>
       )}
-      <MoreOnGitHub count={more} noun="more file" />
-    </Section>
+      <GithubMoreNote count={more} noun="more file" />
+    </GithubSection>
   );
 }
 
@@ -221,8 +221,8 @@ function Outcome({ state }: { state: string }) {
 const EVENT: Record<string, string> = { pull_request: "pull request", push: "push" };
 
 function ActionsRuns({ actions }: { actions: GithubPullRequestDetail["ci"]["actions"] }) {
-  if (!actions.readable) return <Note>Give the token Actions: read to see CI.</Note>;
-  if (actions.runs.length === 0) return <Note>No GitHub Actions runs.</Note>;
+  if (!actions.readable) return <GithubNote>Give the token Actions: read to see CI.</GithubNote>;
+  if (actions.runs.length === 0) return <GithubNote>No GitHub Actions runs.</GithubNote>;
   const more = actions.total - actions.runs.length;
   return (
     <>
@@ -245,14 +245,14 @@ function ActionsRuns({ actions }: { actions: GithubPullRequestDetail["ci"]["acti
           </li>
         ))}
       </ul>
-      <MoreOnGitHub count={more} noun="more run" />
+      <GithubMoreNote count={more} noun="more run" />
     </>
   );
 }
 
 function CommitStatuses({ statuses }: { statuses: GithubPullRequestDetail["ci"]["statuses"] }) {
-  if (!statuses.readable) return <Note>Give the token Commit statuses: read to see commit statuses.</Note>;
-  if (statuses.statuses.length === 0) return <Note>No commit statuses.</Note>;
+  if (!statuses.readable) return <GithubNote>Give the token Commit statuses: read to see commit statuses.</GithubNote>;
+  if (statuses.statuses.length === 0) return <GithubNote>No commit statuses.</GithubNote>;
   return (
     <ul className="flex flex-col gap-1">
       {statuses.statuses.map((status) => (
@@ -273,7 +273,7 @@ function CommitStatuses({ statuses }: { statuses: GithubPullRequestDetail["ci"][
 /** CI for the head commit, labelled as exactly what it is: not every check. */
 function Ci({ ci }: { ci: GithubPullRequestDetail["ci"] }) {
   return (
-    <Section title="GitHub Actions and commit statuses">
+    <GithubSection title="GitHub Actions and commit statuses">
       <p className="mb-2 text-3xs text-muted-foreground">
         For the head commit <code className="font-mono">{ci.headSha.slice(0, 7)}</code>
       </p>
@@ -281,7 +281,7 @@ function Ci({ ci }: { ci: GithubPullRequestDetail["ci"] }) {
         <ActionsRuns actions={ci.actions} />
         <CommitStatuses statuses={ci.statuses} />
       </div>
-    </Section>
+    </GithubSection>
   );
 }
 
@@ -298,18 +298,18 @@ function Reviews({ detail }: { detail: GithubPullRequestDetail }) {
   const shownComments = reviews.reduce((sum, review) => sum + review.comments.length, 0);
   const more = reviewCommentCount - shownComments;
   return (
-    <Section title={reviews.length ? counted(reviews.length, "review") : "Reviews"}>
+    <GithubSection title={reviews.length ? counted(reviews.length, "review") : "Reviews"}>
       {reviews.length === 0 ? (
-        <Note>No reviews yet.</Note>
+        <GithubNote>No reviews yet.</GithubNote>
       ) : (
         <ul className="flex flex-col gap-2">
           {reviews.map((review) => {
             const state = REVIEW_STATE[review.state] ?? { label: review.state.toLowerCase(), tone: "quiet" };
             return (
-              <Card as="li" key={review.id}>
-                <Byline author={review.author} at={review.submittedAt}>
+              <GithubCard as="li" key={review.id}>
+                <GithubBylineRow author={review.author} at={review.submittedAt}>
                   <span className={TONE[state.tone]}>{state.label}</span>
-                </Byline>
+                </GithubBylineRow>
                 {review.body && <Markdown text={review.body} className="text-xs" />}
                 {review.comments.length > 0 && (
                   <ul className="mt-2 flex flex-col gap-1.5 border-l-2 border-border/70 pl-2">
@@ -324,35 +324,35 @@ function Reviews({ detail }: { detail: GithubPullRequestDetail }) {
                     ))}
                   </ul>
                 )}
-              </Card>
+              </GithubCard>
             );
           })}
         </ul>
       )}
-      <MoreOnGitHub count={more} noun="more review comment" />
-    </Section>
+      <GithubMoreNote count={more} noun="more review comment" />
+    </GithubSection>
   );
 }
 
 /** A pull request laid out for review. */
-export default function PullRequestView({ detail }: RecordViewProps) {
+export default function GithubPullRequestView({ detail }: RecordViewProps) {
   const parsed = githubPullRequestDetailSchema.safeParse(detail);
   if (!parsed.success)
     return <p className="text-2xs text-muted-foreground">This pull request could not be shown.</p>;
   const pull = parsed.data;
   return (
     <>
-      <Opened detail={pull}>
+      <GithubOpenedRow detail={pull}>
         <span className="flex items-center gap-1">
           · <Branch name={pull.merge.head} /> into <Branch name={pull.merge.base} />
         </span>
-      </Opened>
+      </GithubOpenedRow>
       <MergeState merge={pull.merge} />
-      <Description body={pull.body} />
+      <GithubDescription body={pull.body} />
       <ChangedFiles detail={pull} />
       <Ci ci={pull.ci} />
       <Reviews detail={pull} />
-      <Comments detail={pull} />
+      <GithubCommentList detail={pull} />
     </>
   );
 }

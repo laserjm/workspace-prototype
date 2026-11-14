@@ -49,7 +49,7 @@ export function CopyButton({
 }
 
 /** An icon button with a menu of formats to copy; each format's text is made when chosen. */
-export function CopyMenu({
+export function CopyDropdownMenu({
   label,
   formats,
   className,

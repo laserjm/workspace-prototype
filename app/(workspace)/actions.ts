@@ -17,7 +17,7 @@ import {
   forkThreadInput,
   placeThreadInput,
   startThreadInput,
-  type Thread,
+  type ThreadListItem,
 } from "@/modules/threads/contracts";
 import { createProjectInput, type ProjectListItem } from "@/modules/projects/contracts";
 
@@ -156,21 +156,21 @@ function threadRefusal(error: unknown): Refusal {
  * Stores the new thread the user's first message starts, in one of their projects or in none.
  * The browser sends the message once this answers.
  */
-export async function startThreadAction(input: unknown): Promise<Thread | Refusal> {
+export async function startThreadAction(input: unknown): Promise<ThreadListItem | Refusal> {
   const parsed = startThreadInput.safeParse(input);
   if (!parsed.success) return { error: "That message can't start a thread." };
   return signedIn(() => threads.startThread(parsed.data).catch(threadRefusal));
 }
 
 /** Stores a fork of one of the user's threads through one of its responses. */
-export async function forkThreadAction(input: unknown): Promise<Thread | Refusal> {
+export async function forkThreadAction(input: unknown): Promise<ThreadListItem | Refusal> {
   const parsed = forkThreadInput.safeParse(input);
   if (!parsed.success) return { error: "That response can't be forked." };
   return signedIn(() => threads.forkThread(parsed.data).catch(threadRefusal));
 }
 
 /** Settles, snoozes, restores or wakes one of the user's threads, or undoes that. */
-export async function placeThreadAction(input: unknown): Promise<Thread | Refusal> {
+export async function placeThreadAction(input: unknown): Promise<ThreadListItem | Refusal> {
   const parsed = placeThreadInput.safeParse(input);
   if (!parsed.success) return { error: "That change can't be made to a thread." };
   return signedIn(() => threads.placeThread(parsed.data).catch(threadRefusal));
