@@ -4,6 +4,7 @@
 // zod and types, and the pure rules the browser runs too (docs/adr/0007). The provider SPI, which
 // is server-only, is ./provider.ts.
 import { z } from "zod";
+import type { User } from "@/lib/auth";
 
 /** How a user connects. Phase 5 adds `oauth`. */
 export type AuthMethod =
@@ -464,3 +465,16 @@ export const githubPullRequestDiffOutput = z.union([
   z.object({ error: recordReadRefusalSchema }),
 ]);
 export type GithubPullRequestDiffOutput = z.infer<typeof githubPullRequestDiffOutput>;
+
+// --- What a tool that reads connections is given (docs/adr/0005). ---
+
+/**
+ * What a tool that reads connections may see: the requester and the connections the server
+ * allowed for this answer (for a provider tool, only its provider's: `integrationToolsFor`).
+ * Never from the model. The record tools share it.
+ */
+export const connectionToolContextSchema = z.object({
+  user: z.custom<User>().optional(),
+  connectionIds: z.array(z.string()),
+});
+export type ConnectionToolContext = z.infer<typeof connectionToolContextSchema>;

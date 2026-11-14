@@ -2,9 +2,13 @@ import "server-only";
 // GitHub's own agent tools: what only GitHub can answer, beside the record tools every provider
 // answers (`records/tools.ts`). Each runs through `readWithConnection`, so it only gets an access.
 import { tool } from "ai";
-import { connectionToolContextSchema, readWithConnection } from "../../tools";
+import { readWithConnection } from "../../repo";
 import { github } from ".";
-import { githubPullRequestDiffInput, githubPullRequestDiffOutput } from "../../contracts";
+import {
+  connectionToolContextSchema,
+  githubPullRequestDiffInput,
+  githubPullRequestDiffOutput,
+} from "../../contracts";
 import { readGithubPullRequestDiff } from "./diff";
 
 /** Keys are the names the model sees and stored conversations hold, so a tool is never renamed. */

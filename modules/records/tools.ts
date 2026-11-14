@@ -1,7 +1,7 @@
 import "server-only";
 import { tool } from "ai";
 import { getRecordForModel, getRecordSearchPage } from "@/modules/integrations/queries";
-import { connectionToolContextSchema as contextSchema } from "@/modules/integrations/tools";
+import { connectionToolContextSchema as contextSchema } from "@/modules/integrations/contracts";
 import {
   MAX_SEARCH_RESULTS,
   readRecordInput,

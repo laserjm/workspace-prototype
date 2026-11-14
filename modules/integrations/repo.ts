@@ -7,8 +7,14 @@ import type { User } from "@/lib/auth";
 import { db } from "@/lib/db/client";
 import { connectionsTable } from "@/lib/db/schema";
 import { readSecret } from "@/lib/db/vault";
-import { credentialSchema, type ConnectionListItem, type Credential } from "./contracts";
-import { authorizationOf, type ConnectionAccess } from "./provider";
+import {
+  credentialSchema,
+  type ConnectionListItem,
+  type ConnectionToolContext,
+  type Credential,
+  type RecordReadRefusal,
+} from "./contracts";
+import { authorizationOf, type Answer, type ConnectionAccess } from "./provider";
 
 /** The columns a `ConnectionListItem` is read from; never the secret, which is in another table. */
 export const connectionColumns = {
@@ -78,4 +84,27 @@ export async function markNeedsReconnect(requester: User, connectionId: string) 
         eq(connectionsTable.status, "active"),
       ),
     );
+}
+
+/**
+ * Runs `read` with the access of one of the requester's connections of `providerId`, answering a
+ * refusal as data. A `connectionId` outside the allowed ones is `no_access`, whatever the model
+ * asks, and nothing is read; one that is gone, or of another provider, is `not_found`. A
+ * credential the provider refuses marks the connection `needs_reconnect`.
+ */
+export async function readWithConnection<T>(
+  { user, connectionIds }: ConnectionToolContext,
+  connectionId: string,
+  providerId: string,
+  read: (access: ConnectionAccess) => Promise<Answer<T, RecordReadRefusal>>,
+): Promise<T | { error: RecordReadRefusal }> {
+  if (!user || !connectionIds.includes(connectionId)) return { error: { kind: "no_access" } };
+  const connection = await findOwnedConnection(user, connectionId);
+  const access =
+    connection?.providerId === providerId ? await accessFor(user, connection) : undefined;
+  if (!access) return { error: { kind: "not_found" } };
+  const answer = await read(access);
+  if (answer.ok) return answer.value;
+  if (answer.error.kind === "needs_reconnect") await markNeedsReconnect(user, connectionId);
+  return { error: answer.error };
 }
