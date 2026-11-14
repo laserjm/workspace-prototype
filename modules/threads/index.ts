@@ -20,5 +20,13 @@ export {
   SnoozeTimeInPast,
   ThreadIdTaken,
   ThreadNotFound,
+  isThreadError,
+  type ThreadError,
 } from "./errors";
-export { MessagesRejected, ModelNotFound, SkillNotFound } from "@/modules/agent/errors";
+export {
+  MessagesRejected,
+  ModelNotFound,
+  SkillNotFound,
+  isAgentError,
+  type AgentError,
+} from "@/modules/agent/errors";

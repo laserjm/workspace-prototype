@@ -3,7 +3,7 @@
 // way, or a bug on the server, answers with copy, and a refusal that asks to sign in sends the
 // browser to sign in and back to this page, so no component handles an ended session itself.
 import { useState, useTransition } from "react";
-import type { Refusal } from "../actions";
+import type { Refusal } from "../refusals";
 
 type ServerAction<Input, T> = (input: Input) => Promise<T | Refusal>;
 

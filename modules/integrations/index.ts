@@ -21,4 +21,6 @@ export {
   ProviderNotFound,
   ProviderRateLimited,
   ProviderUnreachable,
+  isIntegrationError,
+  type IntegrationError,
 } from "./errors";
