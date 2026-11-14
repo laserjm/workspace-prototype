@@ -2,7 +2,7 @@
 // opens in a view and has a mark, and no view is drawn for a type or provider that does not exist.
 // It lives in test/ because a module may not import app/ (Rule 5).
 import { describe, expect, it } from "vitest";
-import { providerViews } from "@/app/(workspace)/_components/record-views";
+import { providerViews } from "@/app/(workspace)/_components/records/record-views";
 import { providers } from "@/modules/integrations/providers";
 
 describe("providerViews", () => {

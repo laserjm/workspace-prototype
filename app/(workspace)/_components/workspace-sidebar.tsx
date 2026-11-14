@@ -22,12 +22,12 @@ import {
 } from "@/components/ui/dialog";
 import { IconButton } from "./icon-button";
 import { cn } from "@/lib/utils";
-import { ProjectFilter } from "./project-filter";
+import { ProjectFilter } from "./projects/project-filter";
 import { type ProjectListItem } from "@/modules/projects/contracts";
-import { CustomSnoozeDialog } from "./custom-snooze-dialog";
+import { CustomSnoozeDialog } from "./threads/custom-snooze-dialog";
 import { shelfOf } from "@/modules/threads/contracts";
-import { ThreadContextCard } from "./thread-context-card";
-import { ThreadRow } from "./thread-row";
+import { ThreadContextCard } from "./threads/thread-context-card";
+import { ThreadRow } from "./threads/thread-row";
 import { type ThreadListItem } from "@/modules/threads/contracts";
 
 type SidebarProps = {

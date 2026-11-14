@@ -8,7 +8,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ProjectIcon } from "./project-icon";
+import { ProjectIcon } from "./projects/project-icon";
 import { type ProjectListItem } from "@/modules/projects/contracts";
 
 /** "What would you like to know in <project>?", with the project as a picker. */

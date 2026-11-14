@@ -6,8 +6,8 @@ import * as integrations from "@/modules/integrations";
 import * as projects from "@/modules/projects";
 import * as skills from "@/modules/skills";
 import * as threads from "@/modules/threads";
-import { IntegrationsProvider } from "./_components/integrations-provider";
-import { SkillsProvider } from "./_components/skills-provider";
+import { IntegrationsProvider } from "./_components/integrations/integrations-provider";
+import { SkillsProvider } from "./_components/skills/skills-provider";
 import { WorkspaceShell } from "./_components/workspace-shell";
 
 // The whole workspace is per user, so it streams behind one boundary: with Cache Components a
