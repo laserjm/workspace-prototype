@@ -14,16 +14,16 @@ export default defineConfig({
   plugins: [markdownAsText],
   resolve: {
     alias: {
-      "@": path.resolve(import.meta.dirname, "src"),
+      "@": path.resolve(import.meta.dirname, "."),
       "server-only": path.resolve(
         import.meta.dirname,
-        "src/tests/support/server-only.ts",
+        "test/support/server-only.ts",
       ),
     },
   },
   test: {
-    include: ["src/**/*.test.ts"],
-    setupFiles: ["src/tests/support/env.ts"],
-    exclude: ["node_modules/**", "src/tests/browser/**"],
+    include: ["{app,lib,modules,components,test}/**/*.test.ts"],
+    setupFiles: ["test/support/env.ts"],
+    exclude: ["node_modules/**", "test/browser/**"],
   },
 });

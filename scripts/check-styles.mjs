@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // Keeps styling on the design tokens: colours, type sizes and spacing come from
-// src/app/globals.css and reach components as Tailwind classes. See
+// app/globals.css and reach components as Tailwind classes. See
 // "Styling: design tokens and Tailwind classes" in ARCHITECTURE.md.
 //
-//   STYLE-01  the only stylesheet is src/app/globals.css
+//   STYLE-01  the only stylesheet is app/globals.css
 //   STYLE-02  no hex colours or colour functions outside globals.css
 //   STYLE-03  no arbitrary font sizes (text-[13px], fontSize, font-size)
 
@@ -11,15 +11,15 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 
 const root = process.cwd();
-const TOKENS = "src/app/globals.css";
+const TOKENS = "app/globals.css";
 
 // Files that may break a rule, each with the reason. Keep this list short.
 const ALLOWED = {
-  "src/lib/html-render/html-render.ts": {
+  "lib/html-render/html-render.ts": {
     rules: ["STYLE-02", "STYLE-03"],
     why: "the palette and base CSS of html_render pages, which render in an iframe that cannot read the app's CSS variables",
   },
-  "src/components/ui/vscode-icon.tsx": {
+  "components/ui/vscode-icon.tsx": {
     rules: ["STYLE-02"],
     why: "the VS Code brand colour",
   },
@@ -65,7 +65,8 @@ function withoutComments(source) {
 }
 
 const findings = [];
-for (const file of walk(join(root, "src"))) {
+const SOURCES = ["app", "components", "lib", "modules"];
+for (const file of SOURCES.flatMap((dir) => walk(join(root, dir)))) {
   const path = relative(root, file).split(sep).join("/");
   const allowed = ALLOWED[path]?.rules ?? [];
   if (path.endsWith(".css")) {
