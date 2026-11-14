@@ -10,10 +10,7 @@ import type {
   SearchRecordsInput,
   SearchRecordsOutput,
 } from "@/modules/records/contracts";
-import type {
-  GithubPullRequestDiffInput,
-  GithubPullRequestDiffOutput,
-} from "@/modules/integrations/contracts";
+import type { GithubPullRequestDiffInput, GithubPullRequestDiffOutput } from "@/modules/integrations/providers/github/contracts";
 import type { LoadSkillInput, LoadSkillOutput } from "@/modules/skills/contracts";
 
 export const MODEL_PROVIDERS = ["claude", "openai"] as const;

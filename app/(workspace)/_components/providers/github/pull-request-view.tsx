@@ -19,7 +19,8 @@ import {
 import { Markdown } from "../../markdown/markdown";
 import { cn } from "@/lib/utils";
 import type { RecordViewProps } from "../../records/record-views";
-import { githubPullRequestDetailSchema, type GithubPullRequestDetail } from "@/modules/integrations/contracts";
+// eslint-disable-next-line no-restricted-imports -- a provider's browser door (docs/adr/0011)
+import { githubPullRequestDetailSchema, type GithubPullRequestDetail } from "@/modules/integrations/providers/github/contracts";
 import {
   counted,
   dayOf,

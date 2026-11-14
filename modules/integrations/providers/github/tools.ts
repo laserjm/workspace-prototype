@@ -4,11 +4,8 @@ import "server-only";
 import { tool } from "ai";
 import { readWithConnection } from "../../repo";
 import { github } from ".";
-import {
-  connectionToolContextSchema,
-  githubPullRequestDiffInput,
-  githubPullRequestDiffOutput,
-} from "../../contracts";
+import { connectionToolContextSchema } from "../../contracts";
+import { githubPullRequestDiffInput, githubPullRequestDiffOutput } from "./contracts";
 import { readGithubPullRequestDiff } from "./diff";
 
 /** Keys are the names the model sees and stored conversations hold, so a tool is never renamed. */

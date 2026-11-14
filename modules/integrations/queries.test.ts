@@ -7,12 +7,8 @@ import { z } from "zod";
 import type { User } from "@/lib/auth";
 import { insertConnection, insertUser } from "@/test/factories";
 import { useRecordedGithub, type RecordedAnswer } from "@/test/support/recorded-github";
-import {
-  githubIssueDetailSchema,
-  githubPullRequestDetailSchema,
-  type ConnectionListItem,
-  type RecordSearchQuery,
-} from "./contracts";
+import { type ConnectionListItem, type RecordSearchQuery } from "./contracts";
+import { githubIssueDetailSchema, githubPullRequestDetailSchema } from "./providers/github/contracts";
 import type { Answer } from "./provider";
 import {
   getConnections,

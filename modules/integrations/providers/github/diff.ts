@@ -1,14 +1,10 @@
 // A pull request's code change for the agent (`github_pull_request_diff`, #65): its changed files
-// with their patches, cut to the model's limits. Its schemas are browser-safe, so the chat can type
-// the tool's parts; `tools.ts` runs it on the server.
+// with their patches, cut to the model's limits. Its schemas are in ./contracts.ts, so the chat can
+// type the tool's parts; `tools.ts` runs it on the server.
 import "server-only";
 import { z } from "zod";
-import {
-  type RecordReadRefusal,
-  type RecordSummary,
-  githubDiffFileSchema,
-  type GithubPullRequestDiffOutput,
-} from "../../contracts";
+import { type RecordReadRefusal, type RecordSummary } from "../../contracts";
+import { githubDiffFileSchema, type GithubPullRequestDiffOutput } from "./contracts";
 import {
   cutText,
   MODEL_LIMITS,

@@ -3,15 +3,8 @@
 // comes back as a `RecordError`, never thrown.
 import "server-only";
 import { z } from "zod";
-import {
-  type RecordError,
-  type RecordSearchPage,
-  type RecordSearchQuery,
-  type RecordSummary,
-  type RecordTypeDeclaration,
-  type GithubIssueDetail,
-  type GithubPullRequestDetail,
-} from "../../contracts";
+import { type RecordError, type RecordSearchPage, type RecordSearchQuery, type RecordSummary, type RecordTypeDeclaration } from "../../contracts";
+import { type GithubIssueDetail, type GithubPullRequestDetail } from "./contracts";
 import {
   cutNote,
   cutText,
