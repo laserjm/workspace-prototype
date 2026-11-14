@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseSkill, skillCatalog } from "./catalog";
+import { getSkills, parseSkill } from "./queries";
 
 const skillMd = (frontmatter: string, body = "Do the thing.") =>
   `---\n${frontmatter}\n---\n\n${body}\n`;
@@ -12,14 +12,15 @@ const valid = [
   "order: 1",
 ].join("\n");
 
-describe("skillCatalog", () => {
-  it("reads every SKILL.md, in order", () => {
-    expect(skillCatalog.map((skill) => skill.id)).toEqual([
+describe("getSkills", () => {
+  it("reads every SKILL.md, in order", async () => {
+    const skills = await getSkills();
+    expect(skills.map((skill) => skill.id)).toEqual([
       "summary",
       "risk-review",
       "action-plan",
     ]);
-    expect(skillCatalog[2]).toMatchObject({
+    expect(skills[2]).toMatchObject({
       name: "Action plan",
       enabledByDefault: false,
       instructions: expect.stringMatching(/^Collect the recorded next step/),

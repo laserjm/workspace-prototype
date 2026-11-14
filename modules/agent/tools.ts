@@ -2,7 +2,7 @@ import "server-only";
 import type { User } from "@/lib/auth/user";
 import { integrationTools, integrationToolsFor } from "@/modules/integrations/server";
 import { recordTools } from "@/modules/records/server";
-import { skillTools } from "@/modules/skills/server";
+import { skillTools } from "@/modules/skills/tools";
 import type { AgentContext } from "./context";
 import { htmlRenderTool } from "./html-render.tool";
 

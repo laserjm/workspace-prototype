@@ -2,7 +2,7 @@ import type { User } from "@/lib/auth/user";
 import { notFound, type NotFound } from "@/lib/errors";
 import { err, ok, type Result } from "@/lib/result";
 import type { AllowedConnection } from "@/modules/records/server";
-import type { Skill } from "@/modules/skills";
+import type { SkillDetail } from "@/modules/skills/contracts";
 import type { ChatOptions } from "./contracts";
 import type { AgentModel } from "./models";
 
@@ -12,9 +12,9 @@ export type AgentContext = {
   user: User;
   model: AgentModel;
   /** The skill the user picked for this message: its instructions are in the prompt. */
-  skill?: Skill;
+  skill?: SkillDetail;
   /** The other skills switched on in this browser: the agent may load one (`load_skill`). */
-  offeredSkills: Skill[];
+  offeredSkills: SkillDetail[];
   /**
    * The connections the answer may use, decided by the server from what the thread's questions
    * attached. Left out when the thread attached nothing; empty when none of it is usable.
@@ -24,7 +24,7 @@ export type AgentContext = {
 
 export type Catalogs = {
   models: readonly AgentModel[];
-  skills: readonly Skill[];
+  skills: readonly SkillDetail[];
 };
 
 /**

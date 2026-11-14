@@ -17,7 +17,7 @@ import type {
   GithubPullRequestDiffInput,
   GithubPullRequestDiffOutput,
 } from "@/modules/integrations";
-import type { LoadSkillInput, LoadSkillOutput } from "@/modules/skills";
+import type { LoadSkillInput, LoadSkillOutput } from "@/modules/skills/contracts";
 
 export const MODEL_PROVIDERS = ["claude", "openai"] as const;
 export type ModelProvider = (typeof MODEL_PROVIDERS)[number];

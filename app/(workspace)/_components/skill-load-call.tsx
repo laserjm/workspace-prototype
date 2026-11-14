@@ -1,8 +1,7 @@
 "use client";
 
-import { findSkill } from "@/modules/skills/contracts";
 import { SkillIcon } from "./skill-icon";
-import { useSkills } from "./use-skills";
+import { findSkill, useSkills } from "./use-skills";
 
 /** One `load_skill` call in a reply: which skill the agent chose to follow. */
 export function SkillLoadCall({

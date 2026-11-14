@@ -9,7 +9,7 @@ import {
 } from "@/modules/integrations/server";
 import * as projects from "@/modules/projects";
 import { SkillsProvider } from "./_components/skills-provider";
-import { listSkills } from "@/modules/skills/server";
+import * as skills from "@/modules/skills";
 import { listThreads } from "@/modules/threads/server";
 import { WorkspaceShell } from "./_components/workspace-shell";
 
@@ -28,9 +28,9 @@ async function Workspace() {
   // proxy.ts only saw a cookie; an ended or revoked session lands here.
   const user = await getUser();
   if (!user) redirect("/api/sign-in");
-  const [skills, threads, projectList, models, providers, connections] =
+  const [skillList, threads, projectList, models, providers, connections] =
     await Promise.all([
-      listSkills(),
+      skills.getSkills(),
       listThreads(user),
       projects.getProjects(),
       listModelChoices(),
@@ -39,7 +39,7 @@ async function Workspace() {
     ]);
   return (
     <IntegrationsProvider providers={providers} connections={connections}>
-      <SkillsProvider skills={skills}>
+      <SkillsProvider skills={skillList}>
         <WorkspaceShell
           initialThreads={threads}
           initialProjects={projectList}

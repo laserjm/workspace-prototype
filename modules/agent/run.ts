@@ -18,7 +18,7 @@ import {
   recordsDataSchemas,
 } from "@/modules/records/server";
 import { integrationToolsFor } from "@/modules/integrations/server";
-import { listSkills } from "@/modules/skills/server";
+import { getSkills } from "@/modules/skills/queries";
 import { resolveContext, type AgentContext } from "./context";
 import type {
   ChatOptions,
@@ -108,7 +108,7 @@ export async function runAgent({
   signal,
   onEnd,
 }: AgentRequest): Promise<Result<AgentRun, NotFound | ValidationFailed>> {
-  const context = resolveContext(user, options, { models, skills: await listSkills() });
+  const context = resolveContext(user, options, { models, skills: await getSkills() });
   if (!context.ok) return context;
   const { model, skill } = context.value;
 

@@ -1,12 +1,25 @@
 import { describe, expect, it } from "vitest";
-import { aSkill } from "@/test/factories/skill";
+import type { SkillDetail } from "@/modules/skills/contracts";
 import {
   activeSkills,
   defaultSkillIds,
   knownSkillIds,
-  storedSkillIdsSchema,
+  storedSkillIds,
   toggleSkill,
-} from "./contracts";
+} from "./skill-preferences";
+
+function aSkill(overrides: Partial<SkillDetail> = {}): SkillDetail {
+  return {
+    id: "summary",
+    name: "Summary",
+    description: "A test skill.",
+    output: "Overview",
+    instructions: "Summarize the records.",
+    prompt: "Create a summary of these",
+    enabledByDefault: true,
+    ...overrides,
+  };
+}
 
 const catalogue = [
   aSkill({ id: "summary", enabledByDefault: true }),
@@ -58,19 +71,19 @@ describe("activeSkills", () => {
   });
 });
 
-describe("storedSkillIdsSchema", () => {
+describe("storedSkillIds", () => {
   it.each([
     { stored: ["summary", "action-plan"], ids: ["summary", "action-plan"] },
     { stored: ["action-plan", 1, null], ids: ["action-plan"] },
     { stored: [], ids: [] },
   ])("reads $stored as $ids", ({ stored, ids }) => {
-    expect(storedSkillIdsSchema.parse(stored)).toEqual(ids);
+    expect(storedSkillIds.parse(stored)).toEqual(ids);
   });
 
   it.each([{ skills: ["summary"] }, "summary", null])(
     "rejects %j",
     (stored) => {
-      expect(storedSkillIdsSchema.safeParse(stored).success).toBe(false);
+      expect(storedSkillIds.safeParse(stored).success).toBe(false);
     },
   );
 });

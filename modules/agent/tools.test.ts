@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { aSkill } from "@/test/factories/skill";
+import { aSkill } from "@/test/factories";
 import { aUser } from "@/test/factories/user";
 import type { AgentModel } from "./models";
 import { tools, toolsFor } from "./tools";

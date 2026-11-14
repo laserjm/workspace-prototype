@@ -1,7 +1,6 @@
 "use client";
 
-import { findSkill } from "@/modules/skills/contracts";
-import { useSkills } from "./use-skills";
+import { findSkill, useSkills } from "./use-skills";
 import type { ModelChoice, WorkspaceUIMessage } from "@/modules/agent/contracts";
 import {
   hasVisibleParts,

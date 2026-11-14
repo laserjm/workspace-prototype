@@ -4,9 +4,9 @@ import { useMemo, useSyncExternalStore } from "react";
 import {
   defaultSkillIds,
   knownSkillIds,
-  storedSkillIdsSchema,
+  storedSkillIds,
   toggleSkill,
-} from "@/modules/skills/contracts";
+} from "./skill-preferences";
 import { useSkills } from "./use-skills";
 
 const storageKey = "workspace:enabled-skills";
@@ -38,7 +38,7 @@ function subscribe(listener: () => void) {
 
 function parseStored(snapshot: string) {
   try {
-    const parsed = storedSkillIdsSchema.safeParse(JSON.parse(snapshot));
+    const parsed = storedSkillIds.safeParse(JSON.parse(snapshot));
     return parsed.success ? parsed.data : undefined;
   } catch {
     return undefined;

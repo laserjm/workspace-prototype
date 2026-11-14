@@ -1,6 +1,6 @@
 import "server-only";
 import type { AllowedConnection } from "@/modules/records/server";
-import type { Skill } from "@/modules/skills";
+import type { SkillDetail } from "@/modules/skills/contracts";
 import type { AgentContext } from "./context";
 import attachedItems from "./instructions/attached-items.md";
 import formatting from "./instructions/formatting.md";
@@ -12,7 +12,7 @@ export const baseInstructions = [workspace, formatting]
   .join("\n\n");
 
 /** The skills the agent may load, by name and description only: their text comes on demand. */
-function skillList(skills: readonly Skill[]) {
+function skillList(skills: readonly SkillDetail[]) {
   return [
     "# Skills you can load",
     "The user switched these skills on. When a question fits one, call load_skill with its id and follow the instructions it returns. Otherwise answer without one.",

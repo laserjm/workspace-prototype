@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { UserId, type User } from "@/lib/auth";
 import { db } from "@/lib/db/client";
 import { projectsTable, usersTable } from "@/lib/db/schema";
+import type { SkillDetail } from "@/modules/skills/contracts";
 
 /** A signed-up user, as their first sign-in stores them: the id is their Keycloak `sub`. */
 export async function insertUser(): Promise<User> {
@@ -23,4 +24,18 @@ export async function insertProject(owner: User, values: { name?: string } = {})
     .returning({ id: projectsTable.id, name: projectsTable.name });
   if (!project) throw new Error("The insert returned no project");
   return project;
+}
+
+/** A skill as the catalogue holds them; the catalogue is files, so this builds the DTO. */
+export function aSkill(overrides: Partial<SkillDetail> = {}): SkillDetail {
+  return {
+    id: "summary",
+    name: "Summary",
+    description: "A test skill.",
+    output: "Overview",
+    instructions: "Summarize the records.",
+    prompt: "Create a summary of these",
+    enabledByDefault: true,
+    ...overrides,
+  };
 }
