@@ -4,7 +4,7 @@ import { useMemo, useRef, useState, type RefObject } from "react";
 import { Combobox } from "@base-ui/react/combobox";
 import { Check, Folder, ListFilter, Search } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
-import { iconButtonClassName } from "@/components/ui/icon-button";
+import { iconButtonClassName } from "./icon-button";
 import { cn } from "@/lib/utils";
 import type { ProjectListItem } from "@/modules/projects/contracts";
 

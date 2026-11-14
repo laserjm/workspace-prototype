@@ -4,7 +4,6 @@
 import { describe, expect, it } from "vitest";
 import { RECORD_TONES } from "./contracts";
 import { providers } from "./providers";
-import { providerViews } from "@/app/(workspace)/_components/record-views";
 
 describe("providers", () => {
   it("have unique ids", () => {
@@ -41,25 +40,12 @@ describe("providers", () => {
     }
   });
 
-  it("read, trim, show and mark each declared record type, and show no type they do not declare", () => {
-    for (const provider of providers) {
-      const declared = Object.keys(provider.records?.types ?? {}).toSorted();
-      const views = providerViews[provider.id];
-      if (!provider.records) {
-        expect(views, provider.id).toBeUndefined();
-        continue;
+  it("read each declared record type, for its view and for the model", () => {
+    for (const provider of providers)
+      for (const [type, declared] of Object.entries(provider.records?.types ?? {})) {
+        expect(declared.read, `${provider.id} ${type}`).toBeTypeOf("function");
+        expect(declared.readForModel, `${provider.id} ${type}`).toBeTypeOf("function");
       }
-      expect(views?.icon, provider.id).toBeDefined();
-      expect(Object.keys(views?.types ?? {}).toSorted(), provider.id).toEqual(declared);
-      for (const type of declared) {
-        expect(provider.records.types[type]?.read, `${provider.id} ${type}`).toBeTypeOf("function");
-        expect(provider.records.types[type]?.trim, `${provider.id} ${type}`).toBeTypeOf("function");
-        expect(views?.types[type]?.view, `${provider.id} ${type}`).toBeDefined();
-        expect(views?.types[type]?.icon, `${provider.id} ${type}`).toBeDefined();
-      }
-    }
-    for (const id of Object.keys(providerViews))
-      expect(providers.map((provider) => provider.id)).toContain(id);
   });
 });
 

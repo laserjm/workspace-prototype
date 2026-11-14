@@ -1,7 +1,7 @@
 "use client";
 
-import { HtmlRenderFrame } from "@/components/ui/html-render-frame";
-import { Markdown } from "@/components/ui/markdown";
+import { HtmlRenderFrame } from "./html-render-frame";
+import { Markdown } from "./markdown";
 import type { WorkspaceUIMessage } from "@/modules/agent/contracts";
 import { GithubPullRequestDiffCall } from "./github-diff-call";
 import { RecordChip } from "./record-chip";

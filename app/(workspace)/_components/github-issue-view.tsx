@@ -4,7 +4,7 @@
 // open, close) belongs to the record panel. Bodies and comments are Markdown, drawn by the shared
 // renderer, which shows raw HTML as text.
 import type { RecordViewProps } from "./record-views";
-import { githubIssueDetailSchema } from "@/modules/integrations/providers/github/records";
+import { githubIssueDetailSchema } from "@/modules/integrations/contracts";
 import { Comments, Description, Opened } from "./github-view-parts";
 
 /** An issue's description and first 100 comments. */

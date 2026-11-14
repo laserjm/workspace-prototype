@@ -1,90 +1,11 @@
 // Adapted from T3 Code's packages/shared/src/htmlRender.ts and the html_render
 // tool in apps/server/src/mcp/toolkits/html (MIT). See THIRD_PARTY_NOTICES.md.
 //
-// Shared by the server tool and the client frame: no React, no Node APIs.
+// What the client frame needs to show a page: its theme and the bootstrap that reports the
+// page's height and links. No React, no Node APIs. The tool's limits and checks are the agent's
+// (modules/agent/contracts.ts, tools.ts).
 
 import { z } from "zod";
-
-export const HTML_RENDER_TOOL_NAME = "html_render";
-export const HTML_RENDER_MIN_HEIGHT = 80;
-export const HTML_RENDER_MAX_HEIGHT = 2000;
-// The client fits the frame to the live page up to this height. It only stops a
-// page that grows with its frame, since vh units are rejected by the tool.
-export const HTML_RENDER_MAX_FIT_HEIGHT = 20_000;
-export const HTML_RENDER_MAX_TITLE_LENGTH = 200;
-export const HTML_RENDER_MAX_HTML_LENGTH = 512_000;
-export const HTML_RENDER_COLUMN_WIDTH = 856;
-
-export function clampHtmlRenderHeight(height: number): number {
-  return Math.min(
-    HTML_RENDER_MAX_HEIGHT,
-    Math.max(HTML_RENDER_MIN_HEIGHT, Math.round(height)),
-  );
-}
-
-export function normalizeHtmlRenderTitle(title: string): string {
-  return title.trim().slice(0, HTML_RENDER_MAX_TITLE_LENGTH) || "HTML";
-}
-
-/**
- * A page even a few pixels taller than its frame scrolls inside it and takes
- * the reader's scroll, so the frame fits the page. Once the live page reports
- * its height, that wins over the model's estimate.
- */
-export function htmlRenderFrameHeight(height: number, contentHeight?: number) {
-  if (contentHeight !== undefined) {
-    return Math.min(
-      HTML_RENDER_MAX_FIT_HEIGHT,
-      Math.max(HTML_RENDER_MIN_HEIGHT, Math.ceil(contentHeight)),
-    );
-  }
-  return clampHtmlRenderHeight(height);
-}
-
-export const HTML_RENDER_THEME_GUIDE = [
-  "Use theme CSS variables on :root, not fixed colors:",
-  "--background, --foreground, --muted, --card, --popover, --secondary, --border, --ring, --primary, --accent, --destructive, --warning, --success, --info, --code-background",
-  "(most have a matching -foreground; accent, destructive, and warning also have -surface),",
-  "--chart-1 to --chart-6, --radius, --font-sans, --font-mono.",
-  "The base sheet sets background, text, and font.",
-].join(" ");
-
-export const HTML_RENDER_LAYOUT_GUIDE = [
-  `Frame width is reply width (up to ${HTML_RENDER_COLUMN_WIDTH}px desktop, about 360px phones), on the thread background.`,
-  "Leave html, body, and the outer element with no background color, no outer card, border, banner title, or side padding. This wins over any rule that sets a page background.",
-  "The host adds an overridable 8px html gutter for selection rings and shadows. Use fluid widths within it.",
-  "A box that needs its own background gets 16px padding and var(--radius) corners. Give charts fixed pixel heights.",
-  "Let content set the height. Do not use vh units or height:100% on html or body. Both are rejected or loop.",
-].join(" ");
-
-export const HTML_RENDER_PAGE_RULES =
-  "Write a complete, self-contained document. Inline <style> and <script>. Remote URLs (for example a chart library from a CDN) load as-is.";
-
-export const HTML_RENDER_DESCRIPTION = `Show a finished HTML page (chart, dashboard, mockup, a long or sortable table, or a diagram Mermaid cannot draw) inline in this thread, above your final reply. Use it when a visual makes the answer clearer or the user asks for one. Do not announce or restate the page. Frame fits height up to ${HTML_RENDER_MAX_FIT_HEIGHT}px. ${HTML_RENDER_PAGE_RULES} ${HTML_RENDER_LAYOUT_GUIDE} ${HTML_RENDER_THEME_GUIDE}`;
-
-// Check only stylesheets and style attributes, even inside scripts; skip comments whole.
-// Consume unclosed comments, tags, or quotes through EOF to keep both patterns linear.
-const CSS_SOURCE =
-  /<!--[\s\S]*?(?:-->|$)|<style\b[^>]*(?:>|$)([\s\S]*?)(?:<\/style\s*>|$)|\sstyle\s*=\s*(?:"([^"]*)(?:"|$)|'([^']*)(?:'|$)|([^\s>]+))/gi;
-// The lookbehind skips base64 runs, such as an inlined image that happens to contain "1vh".
-const VIEWPORT_HEIGHT_UNIT =
-  /(?<![\w.+/])(?:\d+(?:\.\d+)?|\.\d+)[sld]?vh(?![\w-])/i;
-
-/** Returns the first viewport height unit in the page's CSS, if any. */
-export function findViewportHeightUnit(html: string): string | undefined {
-  for (const [, sheet, doubleQuoted, singleQuoted, unquoted] of html.matchAll(
-    CSS_SOURCE,
-  )) {
-    const css = sheet ?? doubleQuoted ?? singleQuoted ?? unquoted ?? "";
-    const found = VIEWPORT_HEIGHT_UNIT.exec(css)?.[0];
-    if (found !== undefined) return found;
-  }
-  return undefined;
-}
-
-export function viewportHeightErrorMessage(found: string) {
-  return `The page uses a viewport height unit (${found}). The frame grows to fit the page, so a size that follows the viewport makes it grow again and again. Let content set the height, or use fixed pixel heights.`;
-}
 
 export interface HtmlRenderTheme {
   readonly appearance: "light" | "dark";

@@ -2,7 +2,7 @@
 
 import { useEffect, type Dispatch, type SetStateAction } from "react";
 import { type Thread } from "@/modules/threads/contracts";
-import { isWakeDue, wake } from "@/modules/threads/placement";
+import { isWakeDue, wake } from "@/modules/threads/contracts";
 
 /** Wakes snoozed threads at their deadlines, and when the tab returns to the foreground. */
 export function useSnoozeWake(

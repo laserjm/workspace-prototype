@@ -45,7 +45,8 @@ export const usersTable = pgTable(
       .defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
-      .defaultNow(),
+      .defaultNow()
+      .$onUpdate(() => new Date()),
     lastSignedInAt: timestamp("last_signed_in_at", { withTimezone: true }),
   },
   (table) => [
@@ -70,7 +71,8 @@ export const sessionsTable = pgTable(
       .defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
-      .defaultNow(),
+      .defaultNow()
+      .$onUpdate(() => new Date()),
   },
   (table) => [index("sessions_user_id_idx").on(table.userId)],
 );
@@ -101,7 +103,8 @@ export const accountsTable = pgTable(
       .defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
-      .defaultNow(),
+      .defaultNow()
+      .$onUpdate(() => new Date()),
   },
   (table) => [
     uniqueIndex("accounts_provider_id_account_id_key").on(
@@ -125,7 +128,8 @@ export const verificationsTable = pgTable(
       .defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
-      .defaultNow(),
+      .defaultNow()
+      .$onUpdate(() => new Date()),
   },
   (table) => [index("verifications_identifier_idx").on(table.identifier)],
 );
@@ -283,7 +287,8 @@ export const connectionsTable = pgTable(
       .defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
-      .defaultNow(),
+      .defaultNow()
+      .$onUpdate(() => new Date()),
   },
   (table) => [
     uniqueIndex("connections_user_id_provider_id_base_url_account_ref_key").on(
@@ -312,7 +317,8 @@ export const connectionSecretsTable = pgTable(
     ciphertext: text("ciphertext").notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
-      .defaultNow(),
+      .defaultNow()
+      .$onUpdate(() => new Date()),
   },
   (table) => [
     foreignKey({

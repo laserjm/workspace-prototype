@@ -1,12 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { RecordSearchPage } from "@/modules/integrations/contracts";
+import {
+  recordRefusalBodySchema,
+  recordSearchPageSchema,
+  type RecordSearchPage,
+} from "@/modules/integrations/contracts";
 
 /** Typing settles for this long before the dialog searches. */
 const PAUSE_MS = 250;
 
-/** What the record routes answer when they refuse (`app/api/connections/…/record-error.ts`). */
+/** Why a search did not answer, as the record routes said (`app/api/connections/…/record-error.ts`). */
 export type SearchError = { kind: string; message: string; retryAt?: string };
 
 export type SearchInput = {
@@ -40,10 +44,16 @@ async function fetchPage(
       `/api/connections/${encodeURIComponent(connectionId)}/records?${params}`,
       { signal },
     );
-    const body = await response.json().catch(() => undefined);
-    if (response.ok) return { ok: true, page: body as RecordSearchPage };
-    const error = (body as { error?: SearchError } | undefined)?.error;
-    return { ok: false, error: typeof error === "object" ? error : UNREACHABLE };
+    const body: unknown = await response.json().catch(() => undefined);
+    const page = recordSearchPageSchema.safeParse(body);
+    if (response.ok && page.success) return { ok: true, page: page.data };
+    const refused = recordRefusalBodySchema.safeParse(body);
+    if (!refused.success) return { ok: false, error: UNREACHABLE };
+    const { refusal, error: message } = refused.data;
+    return {
+      ok: false,
+      error: { kind: refusal.kind, message, ...("retryAt" in refusal ? { retryAt: refusal.retryAt } : {}) },
+    };
   } catch {
     return { ok: false, error: UNREACHABLE };
   }

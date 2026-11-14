@@ -20,12 +20,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { IconButton } from "@/components/ui/icon-button";
+import { IconButton } from "./icon-button";
 import { cn } from "@/lib/utils";
 import { ProjectFilter } from "./project-filter";
 import { type ProjectListItem } from "@/modules/projects/contracts";
 import { CustomSnoozeDialog } from "./custom-snooze-dialog";
-import { shelfOf } from "@/modules/threads/placement";
+import { shelfOf } from "@/modules/threads/contracts";
 import { ThreadContextCard } from "./thread-context-card";
 import { ThreadRow } from "./thread-row";
 import { type Thread } from "@/modules/threads/contracts";

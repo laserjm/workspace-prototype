@@ -85,7 +85,9 @@ where the adapter's answer is shown. Without the client-held state, Option 0 wou
 ## Consequences
 
 - `app/(workspace)/actions.ts` answers `T | Refusal` from every action, `Refusal` being
-  `{ error: string; signIn?: true }`. `notFound()` and `forbidden()` are not used there.
+  `{ error: string; field?: string; gone?: true; signIn?: true }`: `field` names the input the
+  copy is about (the connect form's URL), `gone` says the thing no longer exists so the browser
+  drops it from its list. `notFound()` and `forbidden()` are not used there.
 - `app/(workspace)/_components/use-action.ts` holds `callAction` and `useAction`: a rejected
   call answers with copy, and `signIn` sends the browser to `/api/sign-in?returnTo=<this page>`
   with a full load. The ESLint disable for `@next/next/no-location-assign-relative-destination`

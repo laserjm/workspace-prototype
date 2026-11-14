@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { RecordSummary } from "@/modules/integrations";
+import type { RecordSummary } from "@/modules/integrations/contracts";
 import {
   applyPicks,
   attachedPhrase,

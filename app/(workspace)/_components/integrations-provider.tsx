@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, type ReactNode } from "react";
-import type { Connection, ProviderChoice } from "@/modules/integrations/contracts";
+import type { ConnectionListItem, ProviderChoice } from "@/modules/integrations/contracts";
 import { IntegrationsContext } from "./use-integrations";
 
 /**
@@ -14,7 +14,7 @@ export function IntegrationsProvider({
   children,
 }: {
   providers: ProviderChoice[];
-  connections: Connection[];
+  connections: ConnectionListItem[];
   children: ReactNode;
 }) {
   const [connections, setConnections] = useState(initialConnections);
@@ -22,7 +22,7 @@ export function IntegrationsProvider({
     () => ({
       providers,
       connections,
-      putConnection(connection: Connection) {
+      putConnection(connection: ConnectionListItem) {
         setConnections((previous) =>
           previous.some((item) => item.id === connection.id)
             ? previous.map((item) => (item.id === connection.id ? connection : item))

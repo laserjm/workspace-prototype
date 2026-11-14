@@ -4,7 +4,7 @@ import {
   attachedItemsText,
   threadAttachedItems,
   type ThreadAttachedItem,
-} from "./attached-items";
+} from "./contracts";
 
 const acme = {
   connectionId: "8f0e1c5a-4b9d-4e2f-9a37-2c6d1e0b7f41",
@@ -90,7 +90,17 @@ describe("a thread's attached items", () => {
       { id: "u0", role: "user" as const, parts: [{ type: "text", text: "Hello" }] },
       question("u1", [{ ...acme, items: [] }]),
       { ...question("a1", [{ ...acme, items: [issue(9)] }]), role: "assistant" as const },
-      question("u2", [{ ...acme, label: undefined, items: [issue(3)] }] as never),
+      // A part without the connection's label is malformed, and attaches nothing.
+      {
+        id: "u2",
+        role: "user" as const,
+        parts: [
+          {
+            type: "data-attached-items",
+            data: { connections: [{ ...acme, label: undefined, items: [issue(3)] }] },
+          },
+        ],
+      },
       { id: "u3", role: "user" as const },
     ];
     expect(threadAttachedItems(messages)).toEqual([]);

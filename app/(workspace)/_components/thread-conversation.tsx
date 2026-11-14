@@ -5,7 +5,7 @@ import { GitFork } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ModelChoice, WorkspaceUIMessage } from "@/modules/agent/contracts";
 import { type Thread } from "@/modules/threads/contracts";
-import { shelfOf } from "@/modules/threads/placement";
+import { shelfOf } from "@/modules/threads/contracts";
 import { ThreadMessages, type ForkTarget } from "./thread-messages";
 import { formatWakeTime } from "./time-format";
 import { useStoredConversation } from "./use-stored-conversation";

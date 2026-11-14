@@ -1,4 +1,7 @@
-import { defineProvider } from "../../contracts";
+import "server-only";
+import {
+  defineProvider,
+} from "../../provider";
 import { verifyGithubToken } from "./api";
 import guide from "./guide.md";
 import { githubRecordTypes, githubRecordUrl, searchGithubRecords } from "./records";

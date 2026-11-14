@@ -53,29 +53,33 @@ function signInAgain() {
 
 /**
  * A server action for a component: `run` calls it in a transition, `pending` is true until it
- * answers, `error` holds the last refusal's copy (null after a success).
+ * answers, `refusal` holds the last refusal (null after a success).
  *
  *   const create = useAction(createProjectAction, { onSuccess: onCreated });
  *   create.run({ name });
  */
 export function useAction<Input, T>(
   serverAction: ServerAction<Input, T>,
-  { onSuccess }: { onSuccess?: (value: T) => void } = {},
+  {
+    onSuccess,
+    onRefusal,
+  }: { onSuccess?: (value: T) => void; onRefusal?: (refusal: Refusal) => void } = {},
 ) {
   const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
+  const [refusal, setRefusal] = useState<Refusal | null>(null);
 
   function run(input: Input): Promise<T | Refusal> {
     return new Promise((resolve) => {
       startTransition(async () => {
         const answer = await callAction(serverAction, input);
-        const refused = isRefusal(answer);
-        startTransition(() => setError(refused ? answer.error : null));
-        if (!refused) onSuccess?.(answer);
+        const refused = isRefusal(answer) ? answer : null;
+        startTransition(() => setRefusal(refused));
+        if (refused) onRefusal?.(refused);
+        else if (!isRefusal(answer)) onSuccess?.(answer);
         resolve(answer);
       });
     });
   }
 
-  return { run, pending, error, reset: () => setError(null) };
+  return { run, pending, refusal, reset: () => setRefusal(null) };
 }

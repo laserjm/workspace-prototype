@@ -22,8 +22,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { IconButton, iconButtonClassName } from "@/components/ui/icon-button";
-import { inlineTriggerClassName } from "@/components/ui/inline-trigger";
+import { IconButton, iconButtonClassName } from "./icon-button";
+import { inlineTriggerClassName } from "./inline-trigger";
 import { cn } from "@/lib/utils";
 import { SkillPicker } from "./skill-picker";
 import { useSkills } from "./use-skills";

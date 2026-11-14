@@ -43,16 +43,16 @@ export function ProjectForm({
         onChange={(event) => onNameChange(event.target.value)}
         maxLength={PROJECT_NAME_MAX_LENGTH}
         required
-        aria-invalid={create.error ? true : undefined}
-        aria-describedby={create.error ? "project-name-error" : undefined}
+        aria-invalid={create.refusal ? true : undefined}
+        aria-describedby={create.refusal ? "project-name-error" : undefined}
       />
-      {create.error && (
+      {create.refusal && (
         <p
           id="project-name-error"
           className="text-xs text-destructive-foreground"
           role="alert"
         >
-          {create.error}
+          {create.refusal.error}
         </p>
       )}
       <Button

@@ -1,25 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
-  authorizationOf,
+  connectInput,
+  connectionInput,
   credentialSchema,
   expiryLabel,
   invitedProvider,
   type ProviderChoice,
 } from "./contracts";
-
-describe("authorizationOf", () => {
-  it("sends a token as Bearer", () => {
-    expect(authorizationOf({ kind: "token", token: "github_pat_1" })).toBe(
-      "Bearer github_pat_1",
-    );
-  });
-
-  it("sends a username and password as HTTP Basic, UTF-8 encoded", () => {
-    expect(
-      authorizationOf({ kind: "basic", username: "jürgen", password: "pässword" }),
-    ).toBe(`Basic ${Buffer.from("jürgen:pässword", "utf8").toString("base64")}`);
-  });
-});
 
 describe("credentialSchema", () => {
   it("trims a token and refuses an empty one", () => {
@@ -65,5 +52,32 @@ describe("invitedProvider", () => {
 
   it("invites none when no provider holds records", () => {
     expect(invitedProvider([choice("stripe", false)])).toBeUndefined();
+  });
+});
+
+describe("connectInput", () => {
+  const token = { kind: "token", token: "github_pat_1" } as const;
+
+  it("takes an HTTPS address, or none for the provider's default", () => {
+    expect(
+      connectInput.safeParse({ providerId: "github", baseUrl: "https://github.example.com/api/v3", credential: token })
+        .success,
+    ).toBe(true);
+    expect(connectInput.safeParse({ providerId: "github", credential: token }).success).toBe(true);
+  });
+
+  it("refuses an address that is not HTTPS", () => {
+    const parsed = connectInput.safeParse({
+      providerId: "github",
+      baseUrl: "http://github.example.com/api/v3",
+      credential: token,
+    });
+    expect(parsed.error?.issues).toMatchObject([{ path: ["baseUrl"] }]);
+  });
+});
+
+describe("connectionInput", () => {
+  it("refuses an id that is not a UUID", () => {
+    expect(connectionInput.safeParse({ connectionId: "no-such-connection" }).success).toBe(false);
   });
 });

@@ -10,7 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { customSnoozeTime } from "@/modules/threads/placement";
+import { customSnoozeTime, snoozeRefusal } from "@/modules/threads/contracts";
 import type { Thread } from "@/modules/threads/contracts";
 import { toLocalDateTime } from "./time-format";
 
@@ -56,7 +56,7 @@ export function CustomSnoozeDialog({
                 : { mode, minutes },
               new Date(),
             );
-            if (!until.ok) {
+            if (!until || snoozeRefusal(until, new Date(), false)) {
               // Unreadable and past times get the same hint for each mode.
               setError(
                 mode === "date"
@@ -69,7 +69,7 @@ export function CustomSnoozeDialog({
               setError("Wait for the response to finish before snoozing.");
               return;
             }
-            onSnooze(until.value.toISOString());
+            onSnooze(until.toISOString());
           }}
         >
           <div

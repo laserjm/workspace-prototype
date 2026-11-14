@@ -7,7 +7,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { IconButton } from "@/components/ui/icon-button";
+import { IconButton } from "./icon-button";
 import { cn } from "@/lib/utils";
 import type { ResponseTiming } from "@/modules/threads/contracts";
 import {

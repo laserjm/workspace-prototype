@@ -16,10 +16,10 @@ import {
   LoaderCircle,
   TriangleAlert,
 } from "lucide-react";
-import { Markdown } from "@/components/ui/markdown";
+import { Markdown } from "./markdown";
 import { cn } from "@/lib/utils";
 import type { RecordViewProps } from "./record-views";
-import { githubPullRequestDetailSchema, type GithubPullRequestDetail } from "@/modules/integrations/providers/github/records";
+import { githubPullRequestDetailSchema, type GithubPullRequestDetail } from "@/modules/integrations/contracts";
 import {
   Byline,
   Card,

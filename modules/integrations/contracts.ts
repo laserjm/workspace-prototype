@@ -1,18 +1,9 @@
-// The provider contract (docs/adr/0002, 0003): what a provider folder in ./providers/ declares,
-// and the record vocabulary every provider answers in. Browser-safe: types, constants and schemas
-// only.
+// What the integrations module takes and gives (docs/adr/0002, 0003, 0006): the record vocabulary
+// every provider answers in, what the browser gets of a provider and a connection, the inputs of
+// connecting, and the GitHub detail and tool schemas its views and chat parts read. Browser-safe:
+// zod and types, and the pure rules the browser runs too (docs/adr/0007). The provider SPI, which
+// is server-only, is ./provider.ts.
 import { z } from "zod";
-import type { Result } from "@/lib/result";
-
-/**
- * What a provider's code gets to reach its system: the API address and the `Authorization` header
- * value, built per request on the server from the vault. A provider never reads a secret, an env
- * var or the database itself.
- */
-export type ProviderAccess = { baseUrl: string; authorization?: string };
-
-/** `ProviderAccess` for one stored connection. */
-export type ConnectionAccess = ProviderAccess & { connectionId: string };
 
 /** How a user connects. Phase 5 adds `oauth`. */
 export type AuthMethod =
@@ -47,91 +38,12 @@ export const credentialSchema = z.discriminatedUnion("kind", [
 ]);
 export type Credential = z.infer<typeof credentialSchema>;
 
-/** The `Authorization` header value a credential is sent as. */
-export function authorizationOf(credential: Credential): string {
-  if (credential.kind === "token") return `Bearer ${credential.token}`;
-  const pair = `${credential.username}:${credential.password}`;
-  const bytes = new TextEncoder().encode(pair);
-  return `Basic ${btoa(String.fromCharCode(...bytes))}`;
-}
-
 /** Where a provider's API lives, when a user may say: GitHub Enterprise, a codebeamer instance. */
 export type BaseUrlSetting = {
   label: string;
   /** The public service's address, prefilled; none for a system that is always self-hosted. */
   default?: string;
   placeholder?: string;
-};
-
-/** Who a credential belongs to, as its provider answered. */
-export type VerifiedAccount = {
-  /** The provider's stable id for the account, e.g. GitHub's numeric user id. */
-  accountRef: string;
-  /** "@micha", "ana@acme.com". */
-  accountLabel: string;
-  scopes: string[];
-  /** When the credential stops working, if the provider says. */
-  expiresAt?: Date;
-};
-
-/** The provider answered that the credential is not valid. `message` is for the user. */
-export type CredentialRejected = {
-  readonly _tag: "CredentialRejected";
-  readonly message: string;
-};
-export const credentialRejected = (message: string): CredentialRejected => ({
-  _tag: "CredentialRejected",
-  message,
-});
-
-/** The provider could not be reached, or answered with something unexpected. */
-export type ProviderUnreachable = {
-  readonly _tag: "ProviderUnreachable";
-  readonly message: string;
-};
-export const providerUnreachable = (message: string): ProviderUnreachable => ({
-  _tag: "ProviderUnreachable",
-  message,
-});
-
-/** The provider's rate limit is reached; the credential was not judged. `message` is for the user. */
-export type RateLimited = {
-  readonly _tag: "RateLimited";
-  readonly message: string;
-  /** ISO 8601. */
-  readonly retryAt: string;
-};
-export const rateLimited = (message: string, retryAt: string): RateLimited => ({
-  _tag: "RateLimited",
-  message,
-  retryAt,
-});
-
-/**
- * A system the workspace can connect to. Code, not rows: one folder in ./providers/ and one line
- * in ../providers.ts. Capabilities are optional, so a provider has records, tools or both.
- */
-export type Provider = {
-  id: string;
-  name: string;
-  description: string;
-  auth: readonly AuthMethod[];
-  /** Where its API lives; asked for when connecting. */
-  baseUrl: BaseUrlSetting;
-  /** Checks a credential and says whose it is. */
-  verify: (
-    access: ProviderAccess,
-  ) => Promise<
-    Result<VerifiedAccount, CredentialRejected | ProviderUnreachable | RateLimited>
-  >;
-  /** The records a user can find and attach to a question (ADR 0003 §3). */
-  records?: ProviderRecords;
-  /**
-   * What the agent should know to use one of its connections: what its records and states mean
-   * and how its search reads. Markdown imported as text (`guide.md`), in the system prompt while
-   * one of its connections is allowed. Server-only: never on `ProviderChoice`.
-   */
-  guide?: string;
 };
 
 // --- Records (ADR 0003): what a provider holds that a question can be about. ---
@@ -210,96 +122,20 @@ export type RecordTypeDeclaration = {
   states: Readonly<Record<string, RecordStateDeclaration>>;
 };
 
-/**
- * One record as its view shows it: the live summary, and the provider's own detail (such as
- * `GithubIssueDetail`), which only that provider's view reads. There is no generic detail type.
- */
-export type RecordDetail = { summary: RecordSummary; detail: unknown };
-
 /** What the detail route answers: the detail, and where the record is on its provider's site. */
 export type RecordRead = { summary: RecordSummary & { url: string }; detail: unknown };
 
-/** A declared record type with its reader: server-side, never on `ProviderChoice`. */
-export type RecordType = RecordTypeDeclaration & {
-  /** Reads one record by its key, which only this provider parses; never throws. */
-  read: (access: ConnectionAccess, key: string) => Promise<Result<RecordDetail, RecordError>>;
-  /**
-   * The detail `read` answered, trimmed for the model (`read_record`) within `MODEL_LIMITS`, every
-   * cut saying what it cut. Only ever handed what this type's `read` answered.
-   */
-  trim: (detail: unknown) => unknown;
-};
+/** A `RecordRead` as the browser parses the detail route's answer. */
+export const recordReadSchema = z.object({
+  summary: recordSummarySchema.extend({ url: z.string() }),
+  detail: z.unknown(),
+}) satisfies z.ZodType<RecordRead>;
 
-/**
- * How much of a record the model reads (`read_record`): each provider trims its own detail with
- * these, next to its readers. The view shows everything it read.
- */
-export const MODEL_LIMITS = {
-  /** A record's body (an issue's description): its first characters. */
-  bodyCharacters: 8_000,
-  /** A list of comments (or reviews): its newest entries. */
-  comments: 30,
-  /** Each kept comment: its first characters. */
-  commentCharacters: 2_000,
-  /** Each changed file's diff (a provider tool's, such as GitHub's): its first characters. */
-  diffFileCharacters: 4_000,
-  /** All the diffs of one answer; the files past it are listed without theirs. */
-  diffCharacters: 40_000,
-} as const;
-
-/**
- * `text` cut to its first `max` characters, ending with what was cut and where the rest is:
- * `[… 32,000 more characters, open the view]`. A character is never split in two.
- */
-export function cutText(text: string, max: number, rest = "open the view"): string {
-  if (text.length <= max) return text;
-  const lead = text.charCodeAt(max - 1);
-  const end = lead >= 0xd800 && lead <= 0xdbff ? max - 1 : max;
-  const more = (text.length - end).toLocaleString("en-US");
-  return `${text.slice(0, end)}\n\n[… ${more} more characters, ${rest}]`;
-}
-
-/**
- * What a trimmed list left out: `+ 12 older comments`, and `+ 50 later comments not read, open
- * the view` when the reader read fewer than there are. Nothing when nothing was left out.
- */
-export function cutNote(noun: string, older: number, unread: number): string | undefined {
-  const notes = [
-    ...(older > 0 ? [`+ ${older} older ${noun}`] : []),
-    ...(unread > 0 ? [`+ ${unread} later ${noun} not read, open the view`] : []),
-  ];
-  return notes.length ? notes.join(", ") : undefined;
-}
-
-/**
- * The newest `MODEL_LIMITS.comments` entries of a list as read (oldest first), of `total` there
- * are, and the `cutNote` of what was left out.
- */
-export function newestEntries<T>(
-  read: readonly T[],
-  total: number,
-  noun: string,
-): { kept: T[]; note?: string } {
-  const kept = read.slice(-MODEL_LIMITS.comments);
-  const note = cutNote(noun, read.length - kept.length, total - read.length);
-  return note ? { kept, note } : { kept };
-}
-
-/**
- * A record type from its declaration, its reader and the trim of what that reader answers, so the
- * trim is typed against the reader's own detail.
- */
-export function recordType<D>(
-  declaration: RecordTypeDeclaration,
-  read: (
-    access: ConnectionAccess,
-    key: string,
-  ) => Promise<Result<{ summary: RecordSummary; detail: D }, RecordError>>,
-  trim: (detail: D) => unknown,
-): RecordType {
-  // `trim` only ever gets what `read` answered, which is a `D`.
-  return { ...declaration, read, trim: trim as (detail: unknown) => unknown };
-}
+/** What the record routes answer when they refuse: the copy, and the refusal as data. */
+export const recordRefusalBodySchema = z.object({
+  error: z.string(),
+  refusal: recordReadRefusalSchema,
+});
 
 /** The generic filters the attach dialog offers; a provider says which its search supports. */
 export type RecordFilter = "type" | "includeClosed";
@@ -331,6 +167,15 @@ export type RecordSearchPage = {
   narrowedTo?: string[];
 };
 
+/** A `RecordSearchPage` as the browser parses the search route's answer. */
+export const recordSearchPageSchema = z.object({
+  results: z.array(recordSummarySchema),
+  next: z.string().optional(),
+  total: z.number().optional(),
+  reach: z.string().optional(),
+  narrowedTo: z.array(z.string()).optional(),
+}) satisfies z.ZodType<RecordSearchPage>;
+
 /** The line under the attach dialog's search field: what the provider's search makes of the text. */
 export type RecordSearchHint = {
   /** Before typing: what is listed, and what one can type. */
@@ -339,25 +184,11 @@ export type RecordSearchHint = {
   typing: string;
 };
 
-/** The records part of a provider's manifest. */
-export type ProviderRecords = {
-  types: Readonly<Record<string, RecordType>>;
+/** The records declaration as the browser gets it: no code. */
+export type RecordDeclarations = {
+  types: Readonly<Record<string, RecordTypeDeclaration>>;
   filters: readonly RecordFilter[];
   hint: RecordSearchHint;
-  search: (
-    access: ConnectionAccess,
-    query: RecordSearchQuery,
-  ) => Promise<Result<RecordSearchPage, RecordError>>;
-  /**
-   * Where a record is on the provider's site, built from the connection's base URL and the key
-   * without asking the provider; nothing for a key it cannot parse.
-   */
-  url: (baseUrl: string, type: string, key: string) => string | undefined;
-};
-
-/** The records declaration as the browser gets it: no code. */
-export type RecordDeclarations = Pick<ProviderRecords, "filters" | "hint"> & {
-  types: Readonly<Record<string, RecordTypeDeclaration>>;
 };
 
 /**
@@ -388,16 +219,15 @@ export function waitLabel(retryAt: string, now = Date.now()): string {
   return seconds < 90 ? `${seconds} s` : `${Math.ceil(seconds / 60)} min`;
 }
 
-/** Declares a provider; only checks it against the contract. */
-export function defineProvider<const P extends Provider>(provider: P): P {
-  return provider;
-}
-
 /** What a provider offers the browser: the provider without its code. */
-export type ProviderChoice = Pick<
-  Provider,
-  "id" | "name" | "description" | "auth" | "baseUrl"
-> & { records?: RecordDeclarations };
+export type ProviderChoice = {
+  id: string;
+  name: string;
+  description: string;
+  auth: readonly AuthMethod[];
+  baseUrl: BaseUrlSetting;
+  records?: RecordDeclarations;
+};
 
 /**
  * The provider a user with nothing connected is invited to connect: the first that holds records.
@@ -415,7 +245,7 @@ export function invitedProvider(
 export type ConnectionStatus = "active" | "needs_reconnect";
 
 /** One user's link to one provider account or site. Never holds a secret. */
-export type Connection = {
+export type ConnectionListItem = {
   id: string;
   providerId: string;
   /** Who or what it is connected as: "@micha", "acme.atlassian.net". */
@@ -438,19 +268,199 @@ export function expiryLabel(expiresAt: Date, now: Date): string {
 }
 
 /** Connects to a provider with a credential; connecting the same account again updates it. */
-export const connectInputSchema = z.object({
+export const connectInput = z.object({
   providerId: z.string().min(1).max(100),
-  /**
-   * The provider's default when left out. HTTPS only; `connectAction` also refuses an internal
-   * address. The messages are the form's field error.
-   */
-  baseUrl: z
-    .url({ protocol: /^https$/, error: "Enter an address that starts with https://." })
-    .max(500, "That address is too long.")
-    .optional(),
+  /** The provider's default when left out. HTTPS only; `connect` also refuses an internal address. */
+  baseUrl: z.url({ protocol: /^https$/ }).max(500).optional(),
   credential: credentialSchema,
 });
-export type ConnectInput = z.infer<typeof connectInputSchema>;
+export type ConnectInput = z.infer<typeof connectInput>;
 
 /** Names one of the user's stored connections. */
-export const connectionInputSchema = z.object({ connectionId: z.uuid() });
+export const connectionInput = z.object({ connectionId: z.uuid() });
+export type ConnectionInput = z.infer<typeof connectionInput>;
+
+// --- GitHub: what its record views and its tool's chat part read. ---
+
+/** An issue's or pull request's text and comments, as its view shows them. Markdown bodies. */
+export const githubIssueDetailSchema = z.object({
+  number: z.number(),
+  author: z.string(),
+  /** ISO 8601. */
+  createdAt: z.string(),
+  labels: z.array(z.object({ name: z.string(), color: z.string().optional() })),
+  assignees: z.array(z.string()),
+  body: z.string(),
+  /** All of them; `comments` holds the first 100. */
+  commentCount: z.number(),
+  comments: z.array(
+    z.object({ id: z.number(), author: z.string(), createdAt: z.string(), body: z.string() }),
+  ),
+});
+export type GithubIssueDetail = z.infer<typeof githubIssueDetailSchema>;
+
+/**
+ * A pull request laid out for review (#61): its description and conversation as an issue's, its
+ * reviews with their inline comments, the merge state and the changed files without their patches.
+ */
+export const githubPullRequestDetailSchema = githubIssueDetailSchema.extend({
+  merge: z.object({
+    mergeableState: z
+      .string()
+      .describe(
+        "GitHub's mergeable_state: clean (can merge), unstable (can merge, but a check is failing), has_hooks (can merge, with hooks), behind (the base branch moved on), blocked (a required review or check is missing), dirty (a merge conflict), draft, or unknown (GitHub is still working it out, and after a merge).",
+      ),
+    draft: z
+      .boolean()
+      .describe("Not ready for review: GitHub may still call it clean, but it cannot be merged."),
+    merged: z.boolean(),
+    closed: z
+      .boolean()
+      .describe("Closed, merged or not: the mergeable state no longer applies."),
+    /** ISO 8601, when merged. */
+    mergedAt: z.string().optional(),
+    mergedBy: z.string().optional(),
+    /** The branch it merges into, and the branch it merges. */
+    base: z.string(),
+    head: z.string(),
+    commits: z.number(),
+    additions: z.number(),
+    deletions: z.number(),
+  }),
+  /** The first 100 reviews, each with its inline comments among the first 100 of those. */
+  reviews: z.array(
+    z.object({
+      id: z.number(),
+      author: z.string(),
+      state: z
+        .string()
+        .describe("APPROVED, CHANGES_REQUESTED, COMMENTED, DISMISSED or PENDING (not submitted yet)."),
+      /** ISO 8601; a pending review has none. */
+      submittedAt: z.string().optional(),
+      body: z.string(),
+      comments: z.array(
+        z.object({
+          id: z.number(),
+          author: z.string(),
+          createdAt: z.string(),
+          path: z.string(),
+          line: z.number().optional(),
+          body: z.string(),
+        }),
+      ),
+    }),
+  ),
+  /** All inline review comments, shown or not. */
+  reviewCommentCount: z.number(),
+  /** All changed files; `files` holds the first 100. */
+  fileCount: z.number(),
+  files: z.array(
+    z.object({
+      path: z.string(),
+      /** Where a renamed file was. */
+      previousPath: z.string().optional(),
+      status: z
+        .string()
+        .describe("added, removed, modified, renamed, copied, changed or unchanged."),
+      additions: z.number(),
+      deletions: z.number(),
+    }),
+  ),
+  /**
+   * CI for the head commit: its GitHub Actions runs and its combined commit status. Check runs
+   * from other apps are not read, because a fine-grained token cannot read them (#43). Each part
+   * is `readable: false` when the token lacks its permission, and the rest of the view still loads.
+   */
+  ci: z.object({
+    headSha: z.string(),
+    actions: z.discriminatedUnion("readable", [
+      z.object({ readable: z.literal(false) }),
+      z.object({
+        readable: z.literal(true),
+        /** All runs for the head commit; `runs` holds the first page. */
+        total: z.number(),
+        runs: z.array(
+          z.object({
+            id: z.number(),
+            name: z.string(),
+            title: z.string(),
+            event: z.string().describe("What started the run: push, pull_request, …"),
+            status: z.string().describe("queued, in_progress, completed, …"),
+            conclusion: z
+              .string()
+              .optional()
+              .describe("Once completed: success, failure, cancelled, skipped, …"),
+            /** Its page on GitHub, built from the connection's base URL. */
+            url: z.string(),
+          }),
+        ),
+      }),
+    ]),
+    statuses: z.discriminatedUnion("readable", [
+      z.object({ readable: z.literal(false) }),
+      z.object({
+        readable: z.literal(true),
+        state: z
+          .string()
+          .describe("The combined state of the commit statuses: success, pending, failure or error."),
+        statuses: z.array(
+          z.object({
+            id: z.number(),
+            context: z.string(),
+            state: z.string(),
+            description: z.string().optional(),
+          }),
+        ),
+      }),
+    ]),
+  }),
+});
+export type GithubPullRequestDetail = z.infer<typeof githubPullRequestDetailSchema>;
+
+/** What the model may ask `github_pull_request_diff` for. */
+export const githubPullRequestDiffInput = z.object({
+  connectionId: z
+    .string()
+    .min(1)
+    .max(100)
+    .describe("The pull request's connection: the connectionId of a GitHub connection you may use."),
+  key: z
+    .string()
+    .min(1)
+    .max(200)
+    .describe("The pull request's key, as an attached item or a search result names it, e.g. acme/web#42."),
+  path: z
+    .string()
+    .min(1)
+    .max(1000)
+    .optional()
+    .describe("Only this changed file's diff, by its path as a file list names it. Every file when left out."),
+});
+export type GithubPullRequestDiffInput = z.infer<typeof githubPullRequestDiffInput>;
+
+export const githubDiffFileSchema = z.object({
+  path: z.string(),
+  previousPath: z.string().optional().describe("Where a renamed file was."),
+  status: z.string().describe("added, removed, modified, renamed, copied, changed or unchanged."),
+  additions: z.number(),
+  deletions: z.number(),
+  patch: z
+    .string()
+    .optional()
+    .describe("The file's change as a unified diff; a long one ends with what was cut."),
+  note: z.string().optional().describe("Why the file has no patch."),
+});
+
+/** The pull request's changed files with their diffs, or why they cannot be read. */
+export const githubPullRequestDiffOutput = z.union([
+  z.object({
+    summary: recordSummarySchema.extend({
+      url: z.string().describe("The pull request's page on GitHub."),
+    }),
+    fileCount: z.number().describe("How many files the pull request changes in all."),
+    files: z.array(githubDiffFileSchema),
+    note: z.string().optional().describe("What this answer left out, and how to read it."),
+  }),
+  z.object({ error: recordReadRefusalSchema }),
+]);
+export type GithubPullRequestDiffOutput = z.infer<typeof githubPullRequestDiffOutput>;

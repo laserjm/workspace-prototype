@@ -9,7 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { IconButton } from "@/components/ui/icon-button";
+import { IconButton } from "./icon-button";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { invitedProvider, pluralLabels } from "@/modules/integrations/contracts";
@@ -21,13 +21,13 @@ import { useSkillPreferences } from "./use-skill-preferences";
 import { RecordPanel, RecordPanelToggle } from "./record-panel";
 import { RecordPanelProvider } from "./record-panel-provider";
 import { type AttachedConnection } from "@/modules/records/contracts";
-import { placementOf } from "@/modules/threads/placement";
+import { placementOf } from "@/modules/threads/contracts";
 import { PromptForm } from "./prompt-form";
 import { ThreadConversation } from "./thread-conversation";
 import { useThreads } from "./use-threads";
 import { type ConversationControls, type FirstQuestion, type Question } from "./use-thread-chat";
 import { type ForkTarget } from "./thread-messages";
-import { type SnoozeTimeInPast, type Thread, type ThreadPlacement, type ThreadStillWorking } from "@/modules/threads/contracts";
+import { type Thread, type ThreadPlacement } from "@/modules/threads/contracts";
 import type { ChatOptions, ModelChoice } from "@/modules/agent/contracts";
 import { NewThreadHeading } from "./new-thread-heading";
 import { WorkspaceSettings, type SettingsSection } from "./workspace-settings";
@@ -35,13 +35,10 @@ import { WorkspaceSidebar } from "./workspace-sidebar";
 
 type DialogKind = "project" | "settings" | "activity" | null;
 
-const SNOOZE_REFUSED: Record<
-  (SnoozeTimeInPast | ThreadStillWorking)["_tag"],
-  string
-> = {
-  SnoozeTimeInPast: "That time has passed. Choose another time.",
-  ThreadStillWorking: "Wait for the response to finish before snoozing.",
-};
+const SNOOZE_REFUSED = {
+  "time-in-past": "That time has passed. Choose another time.",
+  "still-working": "Wait for the response to finish before snoozing.",
+} as const;
 
 export function WorkspaceShell({
   initialThreads,
@@ -178,13 +175,13 @@ export function WorkspaceShell({
   function handleSnooze(id: string, until: string, nextId: string | null) {
     const thread = threads.find((item) => item.id === id);
     if (!thread) return;
-    const result = snoozeThread(
+    const refused = snoozeThread(
       thread,
       new Date(until),
       workingThreadId === thread.id,
     );
-    if (!result.ok) {
-      setThreadNotice({ message: SNOOZE_REFUSED[result.error._tag] });
+    if (refused) {
+      setThreadNotice({ message: SNOOZE_REFUSED[refused] });
       return;
     }
     announcePlacement(thread, "Session snoozed", nextId);
@@ -266,12 +263,9 @@ export function WorkspaceShell({
     // Until the stored conversation is here, the composer keeps the draft: a send now would
     // show without the messages before it.
     if (!activeThread || !model || !controls.ready) return false;
-    const continued = continueThread(
-      activeThread,
-      model.provider,
-      controls.busy,
-    );
-    if (!continued.ok) return false;
+    // Nothing is sent while a response is in flight.
+    if (controls.busy) return false;
+    continueThread(activeThread, model.provider);
     if (threadNotice?.undo?.threadId === activeThread.id)
       setThreadNotice(undefined);
     controls.send(question, chatOptions(modelId, skillId));

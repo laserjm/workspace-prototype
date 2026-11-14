@@ -3,12 +3,11 @@
 import { useState } from "react";
 import { CircleAlert, CircleCheck, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useAction } from "@/lib/actions/client";
-import { errorMessage } from "@/lib/actions/messages";
-import { disconnectAction, testConnectionAction } from "@/modules/integrations/actions";
+import { disconnectAction, testConnectionAction } from "../actions";
+import { useAction } from "./use-action";
 import {
   expiryLabel,
-  type Connection,
+  type ConnectionListItem,
   type ProviderChoice,
 } from "@/modules/integrations/contracts";
 import { ConnectForm } from "./connect-form";
@@ -93,20 +92,24 @@ function ConnectionRow({
   connection,
   provider,
 }: {
-  connection: Connection;
+  connection: ConnectionListItem;
   provider: ProviderChoice;
 }) {
   const { putConnection, removeConnection } = useIntegrations();
-  const test = useAction(testConnectionAction, { onSuccess: putConnection });
+  // Already gone on the server: take it off the list too.
+  const dropIfGone = (refusal: { gone?: true }) => {
+    if (refusal.gone) removeConnection(connection.id);
+  };
+  const test = useAction(testConnectionAction, {
+    onSuccess: putConnection,
+    onRefusal: dropIfGone,
+  });
   const disconnect = useAction(disconnectAction, {
     onSuccess: ({ id }) => removeConnection(id),
-    // Already gone on the server: take it off the list too.
-    onError: (error) => {
-      if (error._tag === "NotFound") removeConnection(connection.id);
-    },
+    onRefusal: dropIfGone,
   });
   const healthy = connection.status === "active";
-  const error = test.error ?? disconnect.error;
+  const refusal = test.refusal ?? disconnect.refusal;
   return (
     <li className="flex flex-col gap-1.5 rounded-md bg-muted/50 px-3 py-2.5">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
@@ -151,11 +154,9 @@ function ConnectionRow({
           </Button>
         </span>
       </div>
-      {error && error._tag !== "NotFound" && (
+      {refusal && !refusal.gone && (
         <p className="text-2xs text-destructive-foreground" role="alert">
-          {error._tag === "ProviderUnreachable" || error._tag === "RateLimited"
-            ? error.message
-            : errorMessage(error)}
+          {refusal.error}
         </p>
       )}
     </li>

@@ -1,17 +1,24 @@
-// Browser-safe public API of the threads module.
-export type {
-  ChatTurnDto,
-  NewThread,
-  ResponseTiming,
+// The session-bound API of the threads module for app/: every function is bound to the current
+// user here, and only here (Rule 1).
+import "server-only";
+import { withUser } from "@/lib/auth";
+import * as commands from "./commands";
+import * as queries from "./queries";
+
+export const getThreads = withUser(queries.getThreads);
+export const getThreadMessages = withUser(queries.getThreadMessages);
+
+export const startThread = withUser(commands.startThread);
+export const forkThread = withUser(commands.forkThread);
+export const placeThread = withUser(commands.placeThread);
+export const answerThread = withUser(commands.answerThread);
+
+export {
+  ForeignConnectionAttached,
+  ProjectNotFound,
+  ResponseNotFound,
   SnoozeTimeInPast,
-  SnoozeTimeUnreadable,
-  StartThreadInput,
-  Thread,
-  ThreadError,
-  ThreadPlacement,
-  ThreadShelf,
-  ThreadStillWorking,
-} from "./contracts";
-export { chatTurnDtoSchema } from "./contracts";
-export type { SnoozePreset } from "./placement";
-export { placementOf, shelfOf } from "./placement";
+  ThreadIdTaken,
+  ThreadNotFound,
+} from "./errors";
+export { MessagesRejected, ModelNotFound, SkillNotFound } from "@/modules/agent/errors";

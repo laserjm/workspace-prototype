@@ -8,7 +8,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { inlineTriggerClassName } from "@/components/ui/inline-trigger";
+import { inlineTriggerClassName } from "./inline-trigger";
 import { cn } from "@/lib/utils";
 import { activeSkills } from "./skill-preferences";
 import { SkillIcon } from "./skill-icon";

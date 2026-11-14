@@ -6,6 +6,7 @@
 //   STYLE-01  the only stylesheet is app/globals.css
 //   STYLE-02  no hex colours or colour functions outside globals.css
 //   STYLE-03  no arbitrary font sizes (text-[13px], fontSize, font-size)
+import "server-only";
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
@@ -19,7 +20,7 @@ const ALLOWED = {
     rules: ["STYLE-02", "STYLE-03"],
     why: "the palette and base CSS of html_render pages, which render in an iframe that cannot read the app's CSS variables",
   },
-  "components/ui/vscode-icon.tsx": {
+  "app/(workspace)/_components/vscode-icon.tsx": {
     rules: ["STYLE-02"],
     why: "the VS Code brand colour",
   },

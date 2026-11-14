@@ -11,7 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { invitedProvider, pluralLabels, waitLabel, type Connection, type ProviderChoice, type RecordSummary } from "@/modules/integrations/contracts";
+import { invitedProvider, pluralLabels, waitLabel, type ConnectionListItem, type ProviderChoice, type RecordSummary } from "@/modules/integrations/contracts";
 import { ProviderMark, RecordKindMark } from "./record-marks";
 import { useIntegrations } from "./use-integrations";
 import {
@@ -35,7 +35,7 @@ import {
 } from "./use-record-search";
 
 /** A connection the dialog can search: its provider declares records. */
-type Searchable = { connection: Connection; provider: ProviderChoice };
+type Searchable = { connection: ConnectionListItem; provider: ProviderChoice };
 
 const refOf = ({ connection }: Searchable): ConnectionRef => connectionRefOf(connection);
 

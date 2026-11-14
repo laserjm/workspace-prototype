@@ -2,11 +2,11 @@
 
 import { Fragment, useLayoutEffect, useRef, type ReactNode } from "react";
 import { FileText } from "lucide-react";
-import { Markdown } from "@/components/ui/markdown";
+import { Markdown } from "./markdown";
 import { cn } from "@/lib/utils";
 import type { ModelChoice, WorkspaceUIMessage } from "@/modules/agent/contracts";
 import { AttachedItemChip } from "./attached-item-chip";
-import { attachedConnectionsOf } from "@/modules/records/attached-items";
+import { attachedConnectionsOf } from "@/modules/records/contracts";
 import { useRecordPanel } from "./record-panel-provider";
 import { type AttachedConnection } from "@/modules/records/contracts";
 import { attachmentChipClassName } from "./attachment-chip";

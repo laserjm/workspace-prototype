@@ -69,9 +69,9 @@ describe("verifyGithubToken", () => {
 
   it.each([401, 403])("refuses a token GitHub answers %i to", async (status) => {
     answer(status, { message: "Bad credentials" });
-    expect(await verifyGithubToken(access)).toMatchObject({
+    expect(await verifyGithubToken(access)).toEqual({
       ok: false,
-      error: { _tag: "CredentialRejected" },
+      error: { kind: "credential_rejected" },
     });
   });
 
@@ -80,21 +80,22 @@ describe("verifyGithubToken", () => {
     { status: 429, headers: { "retry-after": "40" } },
   ])("reports a rate limit ($status) as rate_limited, not as a refused token", async ({ status, headers }) => {
     answer(status, { message: "API rate limit exceeded" }, headers);
-    expect(await verifyGithubToken(access)).toMatchObject({
+    expect(await verifyGithubToken(access)).toEqual({
       ok: false,
-      error: { _tag: "RateLimited", retryAt: expect.any(String) },
+      error: { kind: "rate_limited", retryAt: expect.any(String) },
     });
   });
 
   it("says GitHub is unreachable on a server error, an odd answer or no answer", async () => {
     answer(502, {});
-    expect(await verifyGithubToken(access)).toMatchObject({
+    expect(await verifyGithubToken(access)).toEqual({
       ok: false,
-      error: { _tag: "ProviderUnreachable", message: "GitHub answered with HTTP 502." },
+      error: { kind: "unreachable", status: 502 },
     });
     answer(200, { login: "no id" });
-    expect(await verifyGithubToken(access)).toMatchObject({
-      error: { _tag: "ProviderUnreachable" },
+    expect(await verifyGithubToken(access)).toEqual({
+      ok: false,
+      error: { kind: "unreachable", status: 200 },
     });
     vi.stubGlobal(
       "fetch",
@@ -102,8 +103,9 @@ describe("verifyGithubToken", () => {
         throw new TypeError("fetch failed");
       }),
     );
-    expect(await verifyGithubToken(access)).toMatchObject({
-      error: { _tag: "ProviderUnreachable" },
+    expect(await verifyGithubToken(access)).toEqual({
+      ok: false,
+      error: { kind: "unreachable" },
     });
   });
 });

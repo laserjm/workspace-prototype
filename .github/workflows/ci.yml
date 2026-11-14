@@ -10,7 +10,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 24, cache: pnpm }
       - run: pnpm install --frozen-lockfile
-      - name: lint (ESLint, design tokens, server actions)
+      - name: lint (ESLint, design tokens)
         run: pnpm lint
       - name: schema drift — a schema.ts change needs its generated migration
         run: |

@@ -3,9 +3,9 @@
 // What GitHub's issue and pull request views share: the meta line, labels, section headings and
 // the conversation's comments.
 import type { ReactNode } from "react";
-import { Markdown } from "@/components/ui/markdown";
+import { Markdown } from "./markdown";
 import { cn } from "@/lib/utils";
-import type { GithubIssueDetail } from "@/modules/integrations/providers/github/records";
+import type { GithubIssueDetail } from "@/modules/integrations/contracts";
 
 const day = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
 export const dayOf = (iso: string) => day.format(new Date(iso));

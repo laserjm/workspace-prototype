@@ -1,16 +1,13 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
-import { getUser } from "@/lib/auth/session";
-import { listModelChoices } from "@/modules/agent/server";
-import { IntegrationsProvider } from "./_components/integrations-provider";
-import {
-  listConnections,
-  listProviderChoices,
-} from "@/modules/integrations/server";
+import { getUser } from "@/lib/auth";
+import * as agent from "@/modules/agent";
+import * as integrations from "@/modules/integrations";
 import * as projects from "@/modules/projects";
-import { SkillsProvider } from "./_components/skills-provider";
 import * as skills from "@/modules/skills";
-import { listThreads } from "@/modules/threads/server";
+import * as threads from "@/modules/threads";
+import { IntegrationsProvider } from "./_components/integrations-provider";
+import { SkillsProvider } from "./_components/skills-provider";
 import { WorkspaceShell } from "./_components/workspace-shell";
 
 // The whole workspace is per user, so it streams behind one boundary: with Cache Components a
@@ -28,20 +25,20 @@ async function Workspace() {
   // proxy.ts only saw a cookie; an ended or revoked session lands here.
   const user = await getUser();
   if (!user) redirect("/api/sign-in");
-  const [skillList, threads, projectList, models, providers, connections] =
+  const [skillList, threadList, projectList, models, providers, connections] =
     await Promise.all([
       skills.getSkills(),
-      listThreads(user),
+      threads.getThreads(),
       projects.getProjects(),
-      listModelChoices(),
-      listProviderChoices(),
-      listConnections(user),
+      agent.getModelChoices(),
+      integrations.getProviderChoices(),
+      integrations.getConnections(),
     ]);
   return (
     <IntegrationsProvider providers={providers} connections={connections}>
       <SkillsProvider skills={skillList}>
         <WorkspaceShell
-          initialThreads={threads}
+          initialThreads={threadList}
           initialProjects={projectList}
           models={models}
           // Name and email only: the id stays on the server.

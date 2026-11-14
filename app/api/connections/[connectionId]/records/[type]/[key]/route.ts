@@ -1,6 +1,6 @@
-import { getUser } from "@/lib/auth/session";
-import { readRecord } from "@/modules/integrations/server";
-import { recordErrorResponse } from "../../record-error";
+import "server-only";
+import * as integrations from "@/modules/integrations";
+import { recordErrorResponse, recordResponse, thrownResponse } from "../../record-error";
 
 /** `key` as the browser encoded it, decoded once if the router left it encoded. */
 function decodedKey(key: string): string {
@@ -14,20 +14,18 @@ function decodedKey(key: string): string {
 /**
  * Reads one record of one of the user's connections for its record view. `[type]` is one of the
  * provider's declared types and `[key]` the URL-encoded key, which only the provider parses.
- * Answers `{ summary: RecordSummary & { url }, detail }`, or a `RecordError` with the record's
- * `url` when the provider can say where it is (`record-error.ts`).
+ * Answers `{ summary: RecordSummary & { url }, detail }`, or a refusal with the record's `url`
+ * when the provider can say where it is (`record-error.ts`).
  */
 export async function GET(
   _req: Request,
   ctx: RouteContext<"/api/connections/[connectionId]/records/[type]/[key]">,
 ) {
-  const user = await getUser();
-  if (!user)
-    return Response.json({ error: "Sign in to continue." }, { status: 401 });
   const { connectionId, type, key } = await ctx.params;
-  const read = await readRecord(user, connectionId, type, decodedKey(key));
-  if (!read.ok) return recordErrorResponse(read.error);
-  return Response.json(read.value, {
-    headers: { "Cache-Control": "private, no-store" },
-  });
+  try {
+    const read = await integrations.readRecord(connectionId, type, decodedKey(key));
+    return read.ok ? recordResponse(read.value) : recordErrorResponse(read.error);
+  } catch (error) {
+    return thrownResponse(error);
+  }
 }

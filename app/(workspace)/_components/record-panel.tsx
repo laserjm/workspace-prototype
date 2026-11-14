@@ -24,7 +24,7 @@ import {
   TriangleAlert,
   X,
 } from "lucide-react";
-import { IconButton } from "@/components/ui/icon-button";
+import { IconButton } from "./icon-button";
 import { cn } from "@/lib/utils";
 import { RecordKindMark, RecordStateBadge } from "./record-marks";
 import { RecordViewBody } from "./record-view-body";
@@ -33,7 +33,7 @@ import { viewKindOf, waitLabel } from "@/modules/integrations/contracts";
 import {
   attachedByQuestion,
   type MessageWithParts,
-} from "@/modules/records/attached-items";
+} from "@/modules/records/contracts";
 import type { AttachedConnection } from "@/modules/records/contracts";
 import { tabsOf, viewIdOf, type OpenView } from "./record-panel-state";
 import { AttachDialog } from "./attach-dialog";

@@ -3,7 +3,7 @@
 import { Clock, Folder, MessageSquare, Paperclip } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { type Thread } from "@/modules/threads/contracts";
-import { shelfOf } from "@/modules/threads/placement";
+import { shelfOf } from "@/modules/threads/contracts";
 import { formatWakeTime } from "./time-format";
 
 /** "About this thread": its full title, project, shelf and how much its conversation holds. */

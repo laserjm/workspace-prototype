@@ -4,7 +4,7 @@ import { useEffect, useEffectEvent, useState } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import type { ChatOptions, ModelChoice, WorkspaceUIMessage } from "@/modules/agent/contracts";
-import { ATTACHED_ITEMS_PART } from "@/modules/records/attached-items";
+import { ATTACHED_ITEMS_PART } from "@/modules/records/contracts";
 import { type AttachedConnection } from "@/modules/records/contracts";
 import type { Thread } from "@/modules/threads/contracts";
 import { lastRequest } from "./last-request";

@@ -1,39 +1,24 @@
-// Browser-safe public API of the integrations module.
-export type {
-  AuthMethod,
-  ConnectInput,
-  Connection,
-  ConnectionStatus,
-  Credential,
-  CredentialKind,
-  CredentialRejected,
-  ProviderChoice,
-  ProviderUnreachable,
-  Provider,
-  RateLimited,
-  RecordDeclarations,
-  RecordError,
-  RecordFilter,
-  RecordRead,
-  RecordReadRefusal,
-  RecordSearchHint,
-  RecordSearchPage,
-  RecordSearchQuery,
-  RecordSummary,
-  RecordTone,
-  RecordTypeDeclaration,
-} from "./contracts";
+// The session-bound API of the integrations module for app/: every function is bound to the
+// current user here, and only here (Rule 1).
+import "server-only";
+import { withUser } from "@/lib/auth";
+import * as commands from "./commands";
+import * as queries from "./queries";
+
+export const getConnections = withUser(queries.getConnections);
+export const getProviderChoices = withUser(() => queries.getProviderChoices());
+export const searchRecords = withUser(queries.searchRecords);
+export const readRecord = withUser(queries.readRecord);
+
+export const connect = withUser(commands.connect);
+export const testConnection = withUser(commands.testConnection);
+export const disconnect = withUser(commands.disconnect);
+
 export {
-  defineProvider,
-  expiryLabel,
-  invitedProvider,
-  pluralLabels,
-  RECORD_TONES,
-  toneOf,
-  viewKindOf,
-  waitLabel,
-} from "./contracts";
-export type {
-  GithubPullRequestDiffInput,
-  GithubPullRequestDiffOutput,
-} from "./providers/github/diff";
+  BaseUrlRefused,
+  ConnectionNotFound,
+  CredentialRejected,
+  ProviderNotFound,
+  ProviderRateLimited,
+  ProviderUnreachable,
+} from "./errors";

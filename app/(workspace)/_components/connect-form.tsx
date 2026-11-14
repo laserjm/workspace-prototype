@@ -3,10 +3,13 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useAction } from "@/lib/actions/client";
-import { errorMessage } from "@/lib/actions/messages";
-import { connectAction } from "@/modules/integrations/actions";
-import type { Connection, Credential, ProviderChoice } from "@/modules/integrations/contracts";
+import type {
+  ConnectionListItem,
+  Credential,
+  ProviderChoice,
+} from "@/modules/integrations/contracts";
+import { connectAction } from "../actions";
+import { useAction } from "./use-action";
 
 const fieldLabel = "text-xs font-medium text-secondary-foreground";
 const fieldHelp = "text-2xs leading-relaxed text-muted-foreground";
@@ -21,7 +24,7 @@ export function ConnectForm({
   onCancel,
 }: {
   provider: ProviderChoice;
-  onConnected: (connection: Connection) => void;
+  onConnected: (connection: ConnectionListItem) => void;
   onCancel: () => void;
 }) {
   const [methodIndex, setMethodIndex] = useState(0);
@@ -43,9 +46,7 @@ export function ConnectForm({
   // Any issue with the address (not HTTPS, internal, not found) is the URL field's error; every
   // other error is the form's.
   const urlError =
-    connect.error?._tag === "ValidationFailed"
-      ? connect.error.issues.find((issue) => issue.path === "baseUrl")?.message
-      : undefined;
+    connect.refusal?.field === "baseUrl" ? connect.refusal.error : undefined;
 
   return (
     <form
@@ -150,15 +151,9 @@ export function ConnectForm({
           </div>
         </>
       )}
-      {connect.error && !urlError && (
+      {connect.refusal && !urlError && (
         <p className="text-xs text-destructive-foreground" role="alert">
-          {connect.error._tag === "CredentialRejected" ||
-          connect.error._tag === "ProviderUnreachable" ||
-          connect.error._tag === "RateLimited"
-            ? connect.error.message
-            : errorMessage(connect.error, {
-                NotFound: `${provider.name} cannot be connected this way.`,
-              })}
+          {connect.refusal.error}
         </p>
       )}
       <div className="flex items-center justify-end gap-2">

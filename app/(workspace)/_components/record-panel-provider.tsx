@@ -10,9 +10,8 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
-import { bug } from "@/lib/errors";
 import { viewKindOf } from "@/modules/integrations/contracts";
-import { attachedConnectionsOf, type MessageWithParts } from "@/modules/records/attached-items";
+import { attachedConnectionsOf, type MessageWithParts } from "@/modules/records/contracts";
 import type { AttachedConnection, AttachedItem, ConnectionRef } from "@/modules/records/contracts";
 import {
   closeView,
@@ -180,8 +179,7 @@ export function RecordPanelProvider({
 
 /** The open thread's record panel, provided by `RecordPanelProvider`. */
 export function useRecordPanel(): RecordPanelControls {
-  return (
-    useContext(RecordPanelContext) ??
-    bug("useRecordPanel is called outside RecordPanelProvider")
-  );
+  const panel = useContext(RecordPanelContext);
+  if (!panel) throw new Error("useRecordPanel is called outside RecordPanelProvider");
+  return panel;
 }

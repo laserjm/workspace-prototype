@@ -1,8 +1,17 @@
 // GitHub's issues and pull requests as records (ADR 0003 §3): their declared types and states, and
 // the search the attach dialog runs. Every answer is parsed before it is used, and every failure
 // comes back as a `RecordError`, never thrown.
+import "server-only";
 import { z } from "zod";
-import { err, ok, type Result } from "@/lib/result";
+import {
+  type RecordError,
+  type RecordSearchPage,
+  type RecordSearchQuery,
+  type RecordSummary,
+  type RecordTypeDeclaration,
+  type GithubIssueDetail,
+  type GithubPullRequestDetail,
+} from "../../contracts";
 import {
   cutNote,
   cutText,
@@ -11,12 +20,10 @@ import {
   recordType,
   type ConnectionAccess,
   type ProviderRecords,
-  type RecordError,
-  type RecordSearchPage,
-  type RecordSearchQuery,
-  type RecordSummary,
-  type RecordTypeDeclaration,
-} from "../../contracts";
+  err,
+  ok,
+  type Answer,
+} from "../../provider";
 import { classifyGithubAnswer, githubGet } from "./api";
 
 const PAGE_SIZE = 20;
@@ -48,10 +55,10 @@ const declaredTypes = {
 
 type GithubRecordType = keyof typeof declaredTypes;
 
-const RECORD_TYPES = Object.keys(declaredTypes) as GithubRecordType[];
-
 const isRecordType = (type: string): type is GithubRecordType =>
   Object.hasOwn(declaredTypes, type);
+
+const RECORD_TYPES = Object.keys(declaredTypes).filter(isRecordType);
 
 const QUALIFIER: Record<GithubRecordType, string> = {
   issue: "is:issue",
@@ -63,7 +70,7 @@ export async function getJson<T>(
   path: string,
   access: ConnectionAccess,
   schema: z.ZodType<T>,
-): Promise<Result<T, RecordError>> {
+): Promise<Answer<T, RecordError>> {
   let response: Response;
   try {
     response = await githubGet(path, access);
@@ -104,9 +111,9 @@ const searchSchema = z.object({ total_count: z.number(), items: z.array(itemSche
 function reachOf(repositories: Repository[]): string {
   const count = `${repositories.length} ${repositories.length === 1 ? "repository" : "repositories"}`;
   const owners = [...new Map(repositories.map((repo) => [repo.owner.login, repo.owner])).values()];
-  if (owners.length === 0) return "No repositories";
+  const [owner] = owners;
+  if (!owner) return "No repositories";
   if (owners.length > 1) return `${count} across ${owners.length} accounts`;
-  const [owner] = owners as [Repository["owner"]];
   return `${owner.type === "Organization" ? "Organisation " : ""}${owner.login}, ${count}`;
 }
 
@@ -145,7 +152,7 @@ function qualifiersOf(
     ...(involvesMe ? ["involves:@me"] : []),
     ...words,
     ...(inTitleBody ? ["in:title,body"] : []),
-    ...(query.type ? [QUALIFIER[query.type as GithubRecordType]] : []),
+    ...(query.type && isRecordType(query.type) ? [QUALIFIER[query.type]] : []),
     ...(query.includeClosed ? [] : ["is:open"]),
   ];
 }
@@ -171,7 +178,7 @@ async function searchPage(
   query: RecordSearchQuery,
   type: GithubRecordType,
   page: number,
-): Promise<Result<TypePage, RecordError>> {
+): Promise<Answer<TypePage, RecordError>> {
   const params = new URLSearchParams({
     q: queryOf(terms, { ...query, type }),
     ...(byRelevance(terms) ? {} : { sort: "updated", order: "desc" }),
@@ -196,7 +203,7 @@ async function searchTypes(
   query: RecordSearchQuery,
   types: readonly GithubRecordType[],
   page: number,
-): Promise<Result<TypePage[], RecordError>> {
+): Promise<Answer<TypePage[], RecordError>> {
   const pages = await Promise.all(
     types.map((type) => searchPage(access, terms, query, type, page)),
   );
@@ -288,7 +295,7 @@ function summaryInRepository(connectionId: string, repository: string, item: Ite
 export async function searchGithubRecords(
   access: ConnectionAccess,
   query: RecordSearchQuery,
-): Promise<Result<RecordSearchPage, RecordError>> {
+): Promise<Answer<RecordSearchPage, RecordError>> {
   const typeAsked = query.type;
   if (typeAsked !== undefined && !isRecordType(typeAsked))
     return err({ kind: "invalid_query", message: `GitHub has no record type '${typeAsked}'.` });
@@ -536,140 +543,6 @@ export const codePointsShown = (text: string) =>
     (character) => `<U+${character.codePointAt(0)!.toString(16).toUpperCase().padStart(4, "0")}>`,
   );
 
-/** An issue's or pull request's text and comments, as its view shows them. Markdown bodies. */
-export const githubIssueDetailSchema = z.object({
-  number: z.number(),
-  author: z.string(),
-  /** ISO 8601. */
-  createdAt: z.string(),
-  labels: z.array(z.object({ name: z.string(), color: z.string().optional() })),
-  assignees: z.array(z.string()),
-  body: z.string(),
-  /** All of them; `comments` holds the first 100. */
-  commentCount: z.number(),
-  comments: z.array(
-    z.object({ id: z.number(), author: z.string(), createdAt: z.string(), body: z.string() }),
-  ),
-});
-export type GithubIssueDetail = z.infer<typeof githubIssueDetailSchema>;
-
-/**
- * A pull request laid out for review (#61): its description and conversation as an issue's, its
- * reviews with their inline comments, the merge state and the changed files without their patches.
- */
-export const githubPullRequestDetailSchema = githubIssueDetailSchema.extend({
-  merge: z.object({
-    mergeableState: z
-      .string()
-      .describe(
-        "GitHub's mergeable_state: clean (can merge), unstable (can merge, but a check is failing), has_hooks (can merge, with hooks), behind (the base branch moved on), blocked (a required review or check is missing), dirty (a merge conflict), draft, or unknown (GitHub is still working it out, and after a merge).",
-      ),
-    draft: z
-      .boolean()
-      .describe("Not ready for review: GitHub may still call it clean, but it cannot be merged."),
-    merged: z.boolean(),
-    closed: z
-      .boolean()
-      .describe("Closed, merged or not: the mergeable state no longer applies."),
-    /** ISO 8601, when merged. */
-    mergedAt: z.string().optional(),
-    mergedBy: z.string().optional(),
-    /** The branch it merges into, and the branch it merges. */
-    base: z.string(),
-    head: z.string(),
-    commits: z.number(),
-    additions: z.number(),
-    deletions: z.number(),
-  }),
-  /** The first 100 reviews, each with its inline comments among the first 100 of those. */
-  reviews: z.array(
-    z.object({
-      id: z.number(),
-      author: z.string(),
-      state: z
-        .string()
-        .describe("APPROVED, CHANGES_REQUESTED, COMMENTED, DISMISSED or PENDING (not submitted yet)."),
-      /** ISO 8601; a pending review has none. */
-      submittedAt: z.string().optional(),
-      body: z.string(),
-      comments: z.array(
-        z.object({
-          id: z.number(),
-          author: z.string(),
-          createdAt: z.string(),
-          path: z.string(),
-          line: z.number().optional(),
-          body: z.string(),
-        }),
-      ),
-    }),
-  ),
-  /** All inline review comments, shown or not. */
-  reviewCommentCount: z.number(),
-  /** All changed files; `files` holds the first 100. */
-  fileCount: z.number(),
-  files: z.array(
-    z.object({
-      path: z.string(),
-      /** Where a renamed file was. */
-      previousPath: z.string().optional(),
-      status: z
-        .string()
-        .describe("added, removed, modified, renamed, copied, changed or unchanged."),
-      additions: z.number(),
-      deletions: z.number(),
-    }),
-  ),
-  /**
-   * CI for the head commit: its GitHub Actions runs and its combined commit status. Check runs
-   * from other apps are not read, because a fine-grained token cannot read them (#43). Each part
-   * is `readable: false` when the token lacks its permission, and the rest of the view still loads.
-   */
-  ci: z.object({
-    headSha: z.string(),
-    actions: z.discriminatedUnion("readable", [
-      z.object({ readable: z.literal(false) }),
-      z.object({
-        readable: z.literal(true),
-        /** All runs for the head commit; `runs` holds the first page. */
-        total: z.number(),
-        runs: z.array(
-          z.object({
-            id: z.number(),
-            name: z.string(),
-            title: z.string(),
-            event: z.string().describe("What started the run: push, pull_request, …"),
-            status: z.string().describe("queued, in_progress, completed, …"),
-            conclusion: z
-              .string()
-              .optional()
-              .describe("Once completed: success, failure, cancelled, skipped, …"),
-            /** Its page on GitHub, built from the connection's base URL. */
-            url: z.string(),
-          }),
-        ),
-      }),
-    ]),
-    statuses: z.discriminatedUnion("readable", [
-      z.object({ readable: z.literal(false) }),
-      z.object({
-        readable: z.literal(true),
-        state: z
-          .string()
-          .describe("The combined state of the commit statuses: success, pending, failure or error."),
-        statuses: z.array(
-          z.object({
-            id: z.number(),
-            context: z.string(),
-            state: z.string(),
-            description: z.string().optional(),
-          }),
-        ),
-      }),
-    ]),
-  }),
-});
-export type GithubPullRequestDetail = z.infer<typeof githubPullRequestDetailSchema>;
 
 /** `acme/web#482`: the repository and the number. */
 export function parseKey(key: string) {
@@ -875,10 +748,10 @@ type Ci = GithubPullRequestDetail["ci"];
  * GitHub has nothing there (404, e.g. Actions turned off); any other refusal fails the view.
  */
 function ciPart<T, P>(
-  read: Result<T, RecordError>,
+  read: Answer<T, RecordError>,
   shown: (value: T) => P,
   none: P,
-): Result<P | { readable: false }, RecordError> {
+): Answer<P | { readable: false }, RecordError> {
   if (read.ok) return ok(shown(read.value));
   if (read.error.kind === "no_access") return ok({ readable: false });
   if (read.error.kind === "not_found") return ok(none);
@@ -890,7 +763,7 @@ async function readCi(
   access: ConnectionAccess,
   repository: string,
   headSha: string,
-): Promise<Result<Ci, RecordError>> {
+): Promise<Answer<Ci, RecordError>> {
   const path = `/repos/${repository}`;
   const [runs, status] = await Promise.all([
     getJson(`${path}/actions/runs?head_sha=${headSha}`, access, workflowRunsSchema),
@@ -936,7 +809,7 @@ async function readCi(
 type Reader<D> = (
   access: ConnectionAccess,
   key: string,
-) => Promise<Result<{ summary: RecordSummary; detail: D }, RecordError>>;
+) => Promise<Answer<{ summary: RecordSummary; detail: D }, RecordError>>;
 
 /**
  * Reads an issue with its first 100 comments, in parallel. A pull request's number is

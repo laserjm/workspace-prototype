@@ -1,17 +1,22 @@
 // A pull request's code change for the agent (`github_pull_request_diff`, #65): its changed files
 // with their patches, cut to the model's limits. Its schemas are browser-safe, so the chat can type
 // the tool's parts; `tools.ts` runs it on the server.
+import "server-only";
 import { z } from "zod";
-import { err, ok, type Result } from "@/lib/result";
+import {
+  type RecordReadRefusal,
+  type RecordSummary,
+  githubDiffFileSchema,
+  type GithubPullRequestDiffOutput,
+} from "../../contracts";
 import {
   cutText,
   MODEL_LIMITS,
-  recordReadRefusalSchema,
-  recordSummarySchema,
   type ConnectionAccess,
-  type RecordReadRefusal,
-  type RecordSummary,
-} from "../../contracts";
+  err,
+  ok,
+  type Answer,
+} from "../../provider";
 import {
   codePointsShown,
   getJson,
@@ -30,55 +35,8 @@ const REST_ON_GITHUB = "the rest is on GitHub";
 /** "40,000": the answer's limit, as its notes name it. */
 const TOTAL_LABEL = MODEL_LIMITS.diffCharacters.toLocaleString("en-US");
 
-/** What the model may ask `github_pull_request_diff` for. */
-export const githubPullRequestDiffInputSchema = z.object({
-  connectionId: z
-    .string()
-    .min(1)
-    .max(100)
-    .describe("The pull request's connection: the connectionId of a GitHub connection you may use."),
-  key: z
-    .string()
-    .min(1)
-    .max(200)
-    .describe("The pull request's key, as an attached item or a search result names it, e.g. acme/web#42."),
-  path: z
-    .string()
-    .min(1)
-    .max(1000)
-    .optional()
-    .describe("Only this changed file's diff, by its path as a file list names it. Every file when left out."),
-});
-export type GithubPullRequestDiffInput = z.infer<typeof githubPullRequestDiffInputSchema>;
-
-const diffFileSchema = z.object({
-  path: z.string(),
-  previousPath: z.string().optional().describe("Where a renamed file was."),
-  status: z.string().describe("added, removed, modified, renamed, copied, changed or unchanged."),
-  additions: z.number(),
-  deletions: z.number(),
-  patch: z
-    .string()
-    .optional()
-    .describe("The file's change as a unified diff; a long one ends with what was cut."),
-  note: z.string().optional().describe("Why the file has no patch."),
-});
-
-/** The pull request's changed files with their diffs, or why they cannot be read. */
-export const githubPullRequestDiffOutputSchema = z.union([
-  z.object({
-    summary: recordSummarySchema.extend({
-      url: z.string().describe("The pull request's page on GitHub."),
-    }),
-    fileCount: z.number().describe("How many files the pull request changes in all."),
-    files: z.array(diffFileSchema),
-    note: z.string().optional().describe("What this answer left out, and how to read it."),
-  }),
-  z.object({ error: recordReadRefusalSchema }),
-]);
-export type GithubPullRequestDiffOutput = z.infer<typeof githubPullRequestDiffOutputSchema>;
 type GithubPullRequestDiff = Exclude<GithubPullRequestDiffOutput, { error: unknown }>;
-type DiffFile = z.infer<typeof diffFileSchema>;
+type DiffFile = z.infer<typeof githubDiffFileSchema>;
 
 /** The changed files with their patches (`patch` is missing for a binary or very large file). */
 const patchedFilesSchema = z.array(
@@ -161,7 +119,7 @@ export async function readGithubPullRequestDiff(
   access: ConnectionAccess,
   key: string,
   path?: string,
-): Promise<Result<GithubPullRequestDiff, RecordReadRefusal>> {
+): Promise<Answer<GithubPullRequestDiff, RecordReadRefusal>> {
   const parsed = parseKey(key);
   const url = githubRecordUrl(access.baseUrl, "pull-request", key);
   if (!parsed || !url) return err({ kind: "not_found" });

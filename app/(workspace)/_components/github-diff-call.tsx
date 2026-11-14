@@ -5,7 +5,7 @@ import { FileDiff } from "lucide-react";
 import type { RecordSummary } from "@/modules/integrations/contracts";
 import { recordErrorWords } from "./record-error-words";
 import { useIntegrations } from "./use-integrations";
-import type { GithubPullRequestDiffInput, GithubPullRequestDiffOutput } from "@/modules/integrations/providers/github/diff";
+import type { GithubPullRequestDiffInput, GithubPullRequestDiffOutput } from "@/modules/integrations/contracts";
 import { counted } from "./github-view-parts";
 
 /**

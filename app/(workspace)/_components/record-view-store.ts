@@ -1,7 +1,11 @@
 "use client";
 
-import { err, ok, type Result } from "@/lib/result";
-import type { RecordError, RecordRead } from "@/modules/integrations/contracts";
+import {
+  recordReadSchema,
+  recordRefusalBodySchema,
+  type RecordError,
+  type RecordRead,
+} from "@/modules/integrations/contracts";
 
 /** Which record a view reads. */
 export type ViewRecordRef = { id: string; connectionId: string; type: string; key: string };
@@ -19,8 +23,13 @@ export type ViewLoad =
   | { status: "ready"; read: RecordRead; refreshing: boolean }
   | { status: "failed"; error: ViewError };
 
+/** A view's record, or why it did not load. */
+export type RecordFetched =
+  | { ok: true; value: RecordRead }
+  | { ok: false; error: ViewError };
+
 /** Reads a view's record; never rejects. */
-export type FetchRecord = (view: ViewRecordRef) => Promise<Result<RecordRead, ViewError>>;
+export type FetchRecord = (view: ViewRecordRef) => Promise<RecordFetched>;
 
 /** Until a view's record is here; one value, so snapshots compare equal. */
 const loading: ViewLoad = { status: "loading" };
@@ -36,11 +45,18 @@ const fetchRecord: FetchRecord = async ({ connectionId, type, key }) => {
     const response = await fetch(
       `/api/connections/${encodeURIComponent(connectionId)}/records/${encodeURIComponent(type)}/${encodeURIComponent(key)}`,
     );
-    const body = await response.json().catch(() => undefined);
-    if (response.ok && body?.summary) return ok(body as RecordRead);
-    return err(typeof body?.error?.kind === "string" ? (body.error as ViewError) : UNREACHABLE);
+    const body: unknown = await response.json().catch(() => undefined);
+    const read = recordReadSchema.safeParse(body);
+    if (response.ok && read.success) return { ok: true, value: read.data };
+    const refused = recordRefusalBodySchema.safeParse(body);
+    return {
+      ok: false,
+      error: refused.success
+        ? { ...refused.data.refusal, message: refused.data.error }
+        : UNREACHABLE,
+    };
   } catch {
-    return err(UNREACHABLE);
+    return { ok: false, error: UNREACHABLE };
   }
 };
 
