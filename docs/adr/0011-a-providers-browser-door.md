@@ -1,6 +1,7 @@
 # ADR 0011: A provider's browser-safe shapes live in its folder
 
-- **Status:** Accepted
+- **Status:** Accepted. Since conventions 0.7.0 not a departure: lint treats a variant folder's
+  `contracts.ts` like the module's, and the five disables are gone.
 - **Date:** 2026-11-14
 - **Deciders:** Michael Laser
 - **Related:** `docs/adr/0002-integrations.md`, `docs/adr/0006-providers-answer-refusals-as-values.md`,
@@ -54,13 +55,14 @@ conventions challenge for lint to know the door.
 
 - `modules/integrations/providers/github/contracts.ts` holds GitHub's detail and diff tool
   schemas; `integrations/contracts.ts` has no provider's name in it.
-- `test/boundaries.test.ts` checks that a provider's `contracts.ts` imports only zod, types and
-  `integrations/contracts.ts`, and that outside its folder a provider is reached only through the
-  registries (`providers.ts`, `tools.ts`) or this file.
-- Departs from CONVENTIONS.md, Rule 6 ("the module's one browser-safe file") and Rule 4 for this
-  file.
-- Conventions challenge: let lint treat `modules/*/providers/*/contracts.ts` like a module's
-  `contracts.ts` (the browser-safe import block, no `server-only`, allowed from `app/`).
+- Lint (the conventions' Rules 4 and 6) checks that a provider's `contracts.ts` imports only zod,
+  types and another `contracts.ts`, needs no `server-only`, and is the one file of the provider
+  `app/` and other modules may import. `eslint.project.mjs` keeps one provider from importing
+  another; inside `integrations`, reaching a provider only through the registries
+  (`providers.ts`, `tools.ts`) is review.
+- Departed from CONVENTIONS.md 0.6.0, Rule 6 ("the module's one browser-safe file") and Rule 4
+  for this file, with five ADR-linked disables. The conventions challenge was taken in 0.7.0
+  (variant folders, `modules/**/contracts.ts`), and the disables are removed.
 
 ## Reversing this decision
 

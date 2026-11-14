@@ -7,7 +7,9 @@ Three documents share the project's decisions, and each fact is in one of them:
   restate it.
 - [`docs/adr/`](docs/adr/) records every departure from the conventions, and every reading of a
   rule they leave open, with the options and how to reverse it (0004 onwards; 0001 to 0003
-  predate the conventions and record product decisions).
+  predate the conventions and record product decisions). Since conventions 0.7.0, 0004, 0005,
+  0009, 0010 and 0011 record decisions the conventions now make themselves; each says so at the
+  top.
 - This file keeps the product's decisions the conventions leave open: the local stack, the schema,
   who owns what, sign-in, what is stored, the AI Gateway, the agent's tools, the providers, the
   record panel, the vault, skills and styling.
@@ -95,20 +97,20 @@ Dependencies point one way: `threads` imports `agent`, `records` and `projects`;
 `records`, `integrations` and `skills`; `records` imports `integrations`; `integrations`, `skills`
 and `projects` import no module. The record vocabulary every provider answers in is
 `integrations`' own. `records` has no `index.ts` and no `commands.ts`: only other modules call it,
-and it writes nothing. `skills` has no `commands.ts` either: its catalogue is files (ADR 0009).
-The files beyond the conventions' are ADRs: a `tools.ts` in `agent`, `integrations`, `records`
-and `skills` (ADR 0005); `integrations`' provider SPI and folders (ADR 0006); the rules the
-browser runs too in `contracts.ts` (ADR 0007).
+and it writes nothing. `skills` has no `commands.ts` either: its catalogue is files (the
+conventions' "doors its callers use"; ADR 0009). A `tools.ts` in `integrations`, `records` and
+`skills` is the conventions' agent door (Rule 6; ADR 0005), and `integrations`' provider SPI and
+folders are its variant folders (Layout; ADR 0006). The rules the browser runs too live in
+`contracts.ts`, a departure (ADR 0007).
 All UI lives in `app/(workspace)/_components/`, because the workspace is one route group, in a
 folder per noun it renders (ADR 0010): `threads/`, `records/`, `integrations/`, `skills/`,
 `projects/`, `markdown/`, `html-render/` and `providers/<id>/`, with the shell, the sidebar, the
 settings panel and what several folders share at the root. Flat `components/` holds none yet,
-and `components/ui/` is shadcn only. The component roles NAMING.md lacks are ADR 0008.
+and `components/ui/` is shadcn only. The component roles NAMING.md still lacks are ADR 0008.
 **Enforced by.** The conventions' ESLint config (`eslint.config.mjs`, the conventions' copy
-unchanged); `test/boundaries.test.ts` for the rules this app adds to it (`integrations` imports
-no module, `records` only `integrations`), since a project block in the config would replace the
-conventions' `no-restricted-imports` options for the same files instead of adding to them;
-review for the other directions and for cycles.
+unchanged); `eslint.project.mjs` for the rules this app adds to it (`integrations` imports no
+module, `records` only `integrations`, a provider no other provider); review for the other
+directions and for cycles.
 **Recorded in.** This entry; `docs/adr/0003-attached-items-and-record-views.md`;
 `docs/adr/0005-agent-tools-are-a-door.md`; `docs/adr/0006-providers-answer-refusals-as-values.md`;
 `docs/adr/0010-workspace-ui-grouped-by-noun.md`.
@@ -124,12 +126,16 @@ to compile until every adapter has said what it means, and an error no call of t
 throw is a case too, rethrown or answered as a bug. What is not the module's is rethrown. The
 copy for the actions is `app/(workspace)/refusals.ts` (`connectionRefusal`, `threadRefusal`,
 `signedIn`), outside the `"use server"` file so it can be tested; the thread messages route's
-statuses are `app/api/threads/[id]/messages/thread-error.ts`, and the record routes'
-`record-error.ts` maps the `RecordReadRefusal` kinds with a `Record` over them (ADR 0006).
-**Enforced by.** `tsc` (the `never` checks); `test/errors.test.ts` (every class a module's
-`errors.ts` exports is in its list, named after itself); `app/(workspace)/refusals.test.ts` and
-`thread-error.test.ts` (the copy and status of each error, plain functions without Next).
-**Recorded in.** This entry; `docs/adr/0004-actions-called-from-client-state.md`.
+statuses are `app/api/threads/[id]/messages/refusals.ts` (`threadRefusal`, `agentRefusal`,
+`thrownResponse`). The record routes map no module error: `record-error.ts` maps the
+`RecordReadRefusal` kinds, which are data, with a `Record` over them (ADR 0006). This is the
+conventions' default since 0.7.0 (Errors).
+**Enforced by.** `tsc` (the `never` checks); `test/errors.test.ts`, the conventions' copy (every
+class a module's `errors.ts` exports is in its list, named after itself); the two
+`refusals.test.ts` (the copy and status of each error, and that anything else is rethrown, plain
+functions without Next).
+**Recorded in.** This entry; `docs/CONVENTIONS.md`, Errors;
+`docs/adr/0004-actions-called-from-client-state.md`.
 
 ### Cross-module references are ids
 
@@ -197,9 +203,9 @@ name and email from Keycloak.
   0004).
 
 **Enforced by.** ESLint (the conventions' Rule 1 and Rule 12: a module imports `lib/auth` only in
-its `index.ts`, and a script never does); `test/boundaries.test.ts` (only `lib/auth/` imports
-`better-auth`). The check constraint `users_id_is_keycloak_sub`. Better Auth's startup schema check, which refuses to
-run when `schema.ts` and its fields disagree.
+its `index.ts`, and a script never does); `eslint.project.mjs` (only `lib/auth/` imports
+`better-auth`). The check constraint `users_id_is_keycloak_sub`. Better Auth's startup schema
+check, which refuses to run when `schema.ts` and its fields disagree.
 **Recorded in.** This entry; `docs/adr/0001-auth-library-for-keycloak-sign-in.md`;
 `docs/adr/0004-actions-called-from-client-state.md`.
 
@@ -754,12 +760,11 @@ connection into a `ConnectionAccess` per request, the only form in which a crede
 module. Nothing returns, logs or renders a credential: `ConnectionListItem` has no secret field
 (`connectionColumns`), and the connect form never shows a stored token. Better Auth's `accounts`
 stays the sign-in identity; it holds no integration tokens.
-**Enforced by.** `test/boundaries.test.ts`: only `integrations/repo.ts` and `commands.ts` (and
-`test/factories.ts` and integrations' tests) import `lib/db/vault.ts`; review: only
+**Enforced by.** `eslint.project.mjs`: only `integrations/repo.ts` and `commands.ts` (and
+`test/factories.ts` and integrations' tests) import `lib/db/vault.ts`, and only
 `lib/db/vault.ts` imports `connectionSecretsTable` (and `integrations/commands.test.ts`, which
-reads the row to check it holds no token); ESLint (the
-conventions' Rule 6: no other module imports `integrations/repo.ts`, so none reaches
-`readCredential` or `accessFor`); `lib/db/cipher.test.ts` (round trip, a fresh iv, the wrong
+reads the row to check it holds no token); ESLint (the conventions' Rule 6: no other module
+imports `integrations/repo.ts`, so none reaches `readCredential` or `accessFor`); `lib/db/cipher.test.ts` (round trip, a fresh iv, the wrong
 binding, a changed ciphertext, an older key version); `integrations/commands.test.ts` (the stored
 row holds no token; someone else's connection is refused).
 **Recorded in.** This entry; `docs/adr/0002-integrations.md`; `.env.example`.

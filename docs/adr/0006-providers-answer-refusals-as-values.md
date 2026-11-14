@@ -1,6 +1,7 @@
 # ADR 0006: Integrations keeps provider folders, and a provider answers a refusal as a value
 
-- **Status:** Accepted
+- **Status:** Accepted. Since conventions 0.7.0 only the reconnect mark in `queries.ts` departs:
+  provider folders are the conventions' variant folders, and a remote system's refusal is data.
 - **Date:** 2026-11-14
 - **Deciders:** Michael Laser
 - **Related:** `docs/adr/0002-integrations.md`, `docs/adr/0003-attached-items-and-record-views.md`
@@ -76,9 +77,11 @@ adapter maps a few thrown classes) holds for the commands, which keep it.
   records it; that is the one write in `queries.ts`.
 - The record routes answer a refusal as `{ error, refusal }`: `error` is the copy, `refusal` the
   `RecordReadRefusal` the panel draws from.
-- Departs from CONVENTIONS.md, Deliberately dropped ("`Result` types"), inside the provider SPI and
-  the record reads; from Layout (three extra files in one module); and from `queries.ts` being
-  reads only (the reconnect mark).
+- Departs from CONVENTIONS.md, `queries.ts` being reads only (the reconnect mark). Under 0.6.0 it
+  also departed from Deliberately dropped ("`Result` types") and from Layout (three extra files in
+  one module). Conventions 0.7.0 says a remote system's answer the user or a model is shown is
+  data, not an error, and names variant folders (`provider.ts`, `providers.ts`,
+  `providers/<id>/`), so neither is a departure now.
 - Enforced by review: nothing outside `modules/integrations/` imports `provider.ts`.
 
 ## Reversing this decision

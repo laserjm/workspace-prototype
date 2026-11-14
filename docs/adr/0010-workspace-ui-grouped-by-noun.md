@@ -1,6 +1,7 @@
 # ADR 0010: The workspace's UI is grouped by the noun it renders
 
-- **Status:** Accepted
+- **Status:** Accepted. Since conventions 0.7.0 the conventions say this: NAMING.md groups a
+  `_components/` that no longer scans flat by the noun its components render.
 - **Date:** 2026-11-14
 - **Deciders:** Michael Laser
 - **Related:** `docs/adr/0008-component-roles-the-list-lacks.md`, `docs/adr/0011-a-providers-browser-door.md`
@@ -50,8 +51,8 @@ under `providers/github/`. A component that renders several nouns, or none, is a
 ## Consequences
 
 - `app/(workspace)/_components/` has one folder per noun and a short root.
-- Not a departure: the conventions don't say how a `_components/` folder is laid out. This ADR
-  records the reading so the next reader doesn't flatten it again.
+- Not a departure. Under 0.6.0 the conventions didn't say how a `_components/` folder is laid
+  out, and this ADR recorded the reading; 0.7.0 made it the rule in NAMING.md.
 - Enforced by review.
 
 ## Reversing this decision

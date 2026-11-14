@@ -1,6 +1,7 @@
 # ADR 0005: A module's agent tools are a door into it
 
-- **Status:** Accepted
+- **Status:** Accepted. Since conventions 0.7.0 not a departure: Rule 6 names `tools.ts` as
+  the agent's door.
 - **Date:** 2026-11-14
 - **Deciders:** Michael Laser
 
@@ -57,10 +58,12 @@ avoid. Without that, Option 0 would be the simpler rule.
   imports them and nothing else imports a `tools.ts`. The tool context they share is
   `connectionToolContextSchema` in integrations' `contracts.ts`; a provider tool reads through
   `readWithConnection` in its `repo.ts`.
-- Departs from CONVENTIONS.md, Rule 6 (the list of doors): `tools.ts` is a door for the agent.
+- Departed from CONVENTIONS.md 0.6.0, Rule 6 (the list of doors). Conventions 0.7.0 made
+  `tools.ts` the fourth door, for an agent module only.
 - A tool name is stored in conversations, so it is never renamed (`modules/agent/tools.test.ts`
   lists them).
-- Enforced by review; the lint config allows the import.
+- Enforced by lint (Rule 6 allows `@/modules/<x>/tools` and refuses a module's other internal
+  files) and by review (only `modules/agent/tools.ts` imports a `tools.ts`).
 
 ## Reversing this decision
 

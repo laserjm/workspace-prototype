@@ -1,6 +1,7 @@
 # ADR 0004: The workspace calls its actions from client state
 
-- **Status:** Accepted
+- **Status:** Accepted. Since conventions 0.7.0 not a departure: Errors says an action called
+  from client state answers `{ error }`, with flags its caller acts on.
 - **Date:** 2026-11-14
 - **Deciders:** Michael Laser
 
@@ -94,8 +95,9 @@ where the adapter's answer is shown. Without the client-held state, Option 0 wou
   call answers with copy, and `signIn` sends the browser to `/api/sign-in?returnTo=<this page>`
   with a full load. The ESLint disable for `@next/next/no-location-assign-relative-destination`
   there is this decision: `/api/sign-in` is a route handler, not a page.
-- Departs from CONVENTIONS.md, Errors, the Action column for "Missing, not-owned or malformed id"
-  (`{ error }` instead of `notFound()`) and "Bug" (copy in the caller instead of `error.tsx`).
+- Departed from CONVENTIONS.md 0.6.0, Errors, the Action column for "Missing, not-owned or
+  malformed id" (`{ error }` instead of `notFound()`) and "Bug" (copy in the caller instead of
+  `error.tsx`). Conventions 0.7.0 took this reading into Errors, so it is the default now.
   Commands, queries and route handlers follow the table.
 - Enforced by review.
 

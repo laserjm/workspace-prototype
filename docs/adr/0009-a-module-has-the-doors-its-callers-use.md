@@ -1,6 +1,7 @@
 # ADR 0009: A module has the doors its callers use
 
-- **Status:** Accepted
+- **Status:** Accepted. Since conventions 0.7.0 not a departure: Layout says a module has the
+  doors its callers use.
 - **Date:** 2026-11-14
 - **Deciders:** Michael Laser
 
@@ -42,7 +43,8 @@ and an empty `commands.ts` says the module writes when it doesn't. The first ada
 
 - `modules/records/` has `contracts.ts`, `queries.ts` and `tools.ts` (ADR 0005), no `index.ts` or
   `commands.ts`. `modules/skills/` has no `commands.ts`.
-- Departs from CONVENTIONS.md, Layout ("A module starts as …").
+- Departed from CONVENTIONS.md 0.6.0, Layout ("A module starts as …"). Conventions 0.7.0
+  reversed that sentence, so this is the default now.
 - Enforced by review; lint refuses any `app/` import of a module but its `index.ts` and
   `contracts.ts`, so a missing `index.ts` shows the day an adapter needs one.
 

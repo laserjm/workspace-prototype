@@ -1,6 +1,8 @@
 # ADR 0008: Component roles the naming list lacks
 
-- **Status:** Accepted
+- **Status:** Accepted. Since conventions 0.7.0 only `Mark`, `Call`, `Note` and `Document`
+  depart: NAMING.md lists `Icon`, `Chip`, `View`, `Section`, `Frame`, `Shell` and content
+  renderers.
 - **Date:** 2026-11-14
 - **Deciders:** Michael Laser
 
@@ -51,8 +53,8 @@ thing:
 ## Decision
 
 **Option A.** Why: Developer experience. A name is how a reader finds a component, and Option 0's
-names would mislead. The roles above are raised as a conventions challenge, so the home
-repository decides whether every project gets them.
+names would mislead. The roles above were raised as a conventions challenge, so the home
+repository decides whether every project gets them; 0.7.0 took the general ones.
 
 ## Consequences
 
@@ -65,7 +67,8 @@ repository decides whether every project gets them.
 - The GitHub views' shared pieces (`github-view-parts.tsx`) carry the provider as their noun and a
   role: `GithubOpenedRow`, `GithubBylineRow`, `GithubCard`, `GithubCommentList`, `GithubSection`,
   `GithubNote`, `GithubMoreNote`, and `GithubDescription` as a content renderer.
-- Departs from NAMING.md, the role list, by the roles in the table.
+- Departs from NAMING.md, the role list, by `Mark`, `Call`, `Note` and `Document`. Conventions
+  0.7.0 took the other roles in the table into its list.
 - Enforced by review.
 
 ## Reversing this decision
