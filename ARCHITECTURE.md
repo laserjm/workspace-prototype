@@ -106,7 +106,7 @@ All UI lives in `app/(workspace)/_components/`, because the workspace is one rou
 folder per noun it renders (ADR 0010): `threads/`, `records/`, `integrations/`, `skills/`,
 `projects/`, `markdown/`, `html-render/` and `providers/<id>/`, with the shell, the sidebar, the
 settings panel and what several folders share at the root. Flat `components/` holds none yet,
-and `components/ui/` is shadcn only. The component roles NAMING.md still lacks are ADR 0008.
+and `components/ui/` is shadcn only. The component roles NAMING.md still lacks are in `docs/EXTENSIONS.md`, E4.
 **Enforced by.** The conventions' ESLint config (`eslint.config.mjs`, the conventions' copy
 unchanged); `eslint.project.mjs` for the rules this app adds to it (`integrations` imports no
 module, `records` only `integrations`, a provider no other provider); review for the other

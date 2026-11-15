@@ -1,8 +1,9 @@
 # ADR 0008: Component roles the naming list lacks
 
-- **Status:** Accepted. Since conventions 0.7.0 only `Mark`, `Call`, `Note` and `Document`
-  depart: NAMING.md lists `Icon`, `Chip`, `View`, `Section`, `Frame`, `Shell` and content
-  renderers.
+- **Status:** Superseded by `docs/EXTENSIONS.md`, E4 (conventions 0.9.0). Since conventions
+  0.7.0 NAMING.md lists `Icon`, `Chip`, `View`, `Section`, `Frame`, `Shell` and content
+  renderers. Since 0.9.0 a role the list lacks is a naming addition, not a departure, so `Mark`,
+  `Call`, `Note` and `Document` are in E4.
 - **Date:** 2026-11-14
 - **Deciders:** Michael Laser
 
